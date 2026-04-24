@@ -22,6 +22,15 @@ const summonCostTen = 270;
 /// After this many consecutive non-SR+ pulls, the next pull is guaranteed SR+.
 const pityThreshold = 80;
 
+/// Idle earnings config.
+const offlineMaxHours = 12;
+const offlineMaxSeconds = offlineMaxHours * 3600;
+
+/// Minimum away-time (seconds) before the "welcome back" dialog shows.
+/// Short enough to verify the feature quickly, long enough to skip tab-switch
+/// round-trips.
+const offlineMinSeconds = 30;
+
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
   (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
@@ -240,9 +249,9 @@ class GameNotifier extends Notifier<GameState> {
     if (loaded != null) {
       _save = loaded;
       final elapsed = DateTime.now().difference(loaded.lastSavedAt);
-      final cappedSeconds = elapsed.inSeconds.clamp(0, 12 * 3600);
+      final cappedSeconds = elapsed.inSeconds.clamp(0, offlineMaxSeconds);
       final dpsNow = _calcDps();
-      if (cappedSeconds > 60 && dpsNow > 0) {
+      if (cappedSeconds >= offlineMinSeconds && dpsNow > 0) {
         _pendingOffline = OfflineReward(
           Duration(seconds: cappedSeconds),
           dpsNow * cappedSeconds,

@@ -45,6 +45,14 @@ class OfflineRewardDialog extends ConsumerWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 4),
+            Text(
+              '방치 효율 100% · 최대 ${offlineMaxHours}시간 누적',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.black.withValues(alpha: 0.45),
+              ),
+            ),
             const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

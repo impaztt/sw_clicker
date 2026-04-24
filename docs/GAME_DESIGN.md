@@ -40,8 +40,10 @@
 elapsed = clamp(now - lastSavedAt, 0, 12h)
 reward  = dps × elapsed × 1.0      // 효율 100%
 ```
-- 부재 60초 미만 시 팝업 생략 (UX 마찰 감소)
+- 부재 30초 미만 시 팝업 생략 (UX 마찰 감소, 탭 전환 round-trip 무시)
 - 재접속 첫 프레임에서 `OfflineRewardDialog` 노출
+- 홈 화면에 상시 "방치 보상 최대 +X / 12h" 칩 노출 (DPS>0 시)
+- `lastSavedAt`은 모든 mutation에서 즉시 갱신 + 10s 오토세이브 + 라이프사이클 hidden 시 저장 — 재접속까지의 경과 시간 측정 정확도 ±10s 이내
 
 ---
 

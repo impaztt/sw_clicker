@@ -79,6 +79,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const Spacer(),
               _TapPowerChip(tapPower: game.tapPower),
+              if (game.dps > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _IdleChip(
+                    maxReward: game.dps * offlineMaxSeconds,
+                    hours: offlineMaxHours,
+                  ),
+                ),
               if (game.prestigeSouls > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -120,6 +128,39 @@ class _TapPowerChip extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Color(0xFF7A5C00),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IdleChip extends StatelessWidget {
+  final double maxReward;
+  final int hours;
+  const _IdleChip({required this.maxReward, required this.hours});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF9575CD).withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.nightlight_round,
+              size: 18, color: Color(0xFF5E35B1)),
+          const SizedBox(width: 4),
+          Text(
+            '방치 보상 최대 +${NumberFormatter.format(maxReward)} / ${hours}h',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF4527A0),
             ),
           ),
         ],
