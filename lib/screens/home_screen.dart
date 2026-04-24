@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/number_format.dart';
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
+import '../services/audio_service.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/floating_number.dart';
 import '../widgets/gold_display.dart';
@@ -26,9 +27,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (box == null) return;
     final local = box.globalToLocal(globalPos);
     final amount = ref.read(gameProvider.notifier).tap();
-    if (ref.read(gameProvider).haptic) {
-      HapticFeedback.lightImpact();
-    }
+    final state = ref.read(gameProvider);
+    if (state.haptic) HapticFeedback.lightImpact();
+    if (state.sound) AudioService.instance.playTap();
     setState(() {
       _floats.add(FloatingNumberData(
         id: _nextId++,

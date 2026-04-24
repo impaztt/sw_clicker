@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../models/sword.dart';
 import '../providers/game_provider.dart';
+import '../services/audio_service.dart';
 import 'sword_preview.dart';
 
 Future<void> showSummonDialog(
@@ -54,6 +55,7 @@ class _SummonRevealDialogState extends State<_SummonRevealDialog>
         .chain(CurveTween(curve: const Interval(0.0, 0.3)))
         .animate(_ctrl);
     _ctrl.forward();
+    AudioService.instance.playSummon();
   }
 
   @override

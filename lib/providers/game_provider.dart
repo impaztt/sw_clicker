@@ -3,9 +3,11 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/achievement_catalog.dart';
 import '../data/producer_catalog.dart';
 import '../data/sword_catalog.dart';
 import '../data/tap_upgrade_catalog.dart';
+import '../models/achievement.dart';
 import '../models/save_data.dart';
 import '../models/sword.dart';
 import '../services/save_service.dart';
@@ -20,11 +22,16 @@ const summonCostTen = 270;
 /// After this many consecutive non-SR+ pulls, the next pull is guaranteed SR+.
 const pityThreshold = 80;
 
+/// Stream of newly unlocked achievements (for toast UI).
+final achievementUnlockProvider = StreamProvider<AchievementDef>(
+  (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
+);
+
 class SummonResult {
   final SwordDef sword;
   final int levelAfter;
-  final bool isDuplicate; // true if already owned before this pull
-  final bool isMaxed; // true if was already at Lv 10 when pulled
+  final bool isDuplicate;
+  final bool isMaxed;
   SummonResult({
     required this.sword,
     required this.levelAfter,
@@ -46,11 +53,15 @@ class GameState {
   final int playTimeSeconds;
   final double maxDpsEver;
   final double lifetimeGold;
+  final int totalSummons;
+  final int totalTapUpgradesBought;
   final bool haptic;
+  final bool sound;
   final int essence;
   final Map<String, int> ownedSwords;
   final String? equippedSwordId;
   final int summonsSinceHighRare;
+  final Set<String> unlockedAchievements;
   final bool loaded;
 
   const GameState({
@@ -66,11 +77,15 @@ class GameState {
     required this.playTimeSeconds,
     required this.maxDpsEver,
     required this.lifetimeGold,
+    required this.totalSummons,
+    required this.totalTapUpgradesBought,
     required this.haptic,
+    required this.sound,
     required this.essence,
     required this.ownedSwords,
     required this.equippedSwordId,
     required this.summonsSinceHighRare,
+    required this.unlockedAchievements,
     this.loaded = false,
   });
 
@@ -87,11 +102,15 @@ class GameState {
         playTimeSeconds: 0,
         maxDpsEver: 0,
         lifetimeGold: 0,
+        totalSummons: 0,
+        totalTapUpgradesBought: 0,
         haptic: true,
+        sound: true,
         essence: 90,
         ownedSwords: {},
         equippedSwordId: null,
         summonsSinceHighRare: 0,
+        unlockedAchievements: {},
         loaded: false,
       );
 
@@ -118,6 +137,57 @@ class GameState {
   }
 
   bool canAfford(double cost) => gold >= cost;
+
+  bool isAchievementUnlocked(String id) => unlockedAchievements.contains(id);
+
+  /// Build an AchContext snapshot for progress computations.
+  AchContext achContext() {
+    int totalProducerLv = 0;
+    int ownedProducers = 0;
+    for (final v in producerLevels.values) {
+      totalProducerLv += v;
+      if (v > 0) ownedProducers++;
+    }
+    bool hasR = false, hasSr = false, hasSsr = false, hasUr = false;
+    int maxLv = 0;
+    int maxedCount = 0;
+    for (final entry in ownedSwords.entries) {
+      if (entry.value <= 0) continue;
+      try {
+        final tier = swordById(entry.key).tier;
+        if (tier == SwordTier.r) hasR = true;
+        if (tier == SwordTier.sr) hasSr = true;
+        if (tier == SwordTier.ssr) hasSsr = true;
+        if (tier == SwordTier.ur) hasUr = true;
+      } catch (_) {}
+      if (entry.value > maxLv) maxLv = entry.value;
+      if (entry.value >= SwordDef.maxLevel) maxedCount++;
+    }
+    return AchContext(
+      totalTaps: totalTaps,
+      lifetimeGold: lifetimeGold,
+      maxDpsEver: maxDpsEver,
+      playTimeSeconds: playTimeSeconds,
+      producerLevels: producerLevels,
+      totalProducerLevels: totalProducerLv,
+      ownedProducerCount: ownedProducers,
+      totalProducerCatalogCount: producerCatalog.length,
+      ownedSwords: ownedSwords,
+      ownedSwordCount: ownedSwords.values.where((v) => v > 0).length,
+      totalSwordCatalogCount: swordCatalog.length,
+      ownsAnyR: hasR,
+      ownsAnySr: hasSr,
+      ownsAnySsr: hasSsr,
+      ownsAnyUr: hasUr,
+      maxSwordLevel: maxLv,
+      maxedSwordCount: maxedCount,
+      totalSummons: totalSummons,
+      prestigeCount: prestigeCount,
+      prestigeSouls: prestigeSouls,
+      totalTapUpgradesBought: totalTapUpgradesBought,
+      hasEquippedSword: equippedSwordId != null,
+    );
+  }
 }
 
 class OfflineReward {
@@ -126,7 +196,6 @@ class OfflineReward {
   OfflineReward(this.duration, this.gold);
 }
 
-/// Essence awarded the first time each producer reaches the given level.
 const _milestoneEssence = <int, int>{
   25: 1,
   50: 2,
@@ -145,6 +214,7 @@ int _milestoneEssenceUpTo(int level) {
 class GameNotifier extends Notifier<GameState> {
   final _saveService = SaveService();
   final _random = Random();
+  final _achievementUnlocks = StreamController<AchievementDef>.broadcast();
   Timer? _tickTimer;
   Timer? _saveTimer;
   DateTime _lastTick = DateTime.now();
@@ -162,6 +232,7 @@ class GameNotifier extends Notifier<GameState> {
   void _dispose() {
     _tickTimer?.cancel();
     _saveTimer?.cancel();
+    _achievementUnlocks.close();
   }
 
   Future<void> _initialize() async {
@@ -202,8 +273,8 @@ class GameNotifier extends Notifier<GameState> {
         _save.gold += gain;
         _save.totalGoldEarned += gain;
         _save.stats.lifetimeGold += gain;
-        _emit(loaded: true);
       }
+      _emit(loaded: true);
     });
   }
 
@@ -232,13 +303,73 @@ class GameNotifier extends Notifier<GameState> {
       playTimeSeconds: _save.stats.playTimeSeconds,
       maxDpsEver: _save.stats.maxDpsEver,
       lifetimeGold: _save.stats.lifetimeGold,
+      totalSummons: _save.stats.totalSummons,
+      totalTapUpgradesBought: _save.stats.totalTapUpgradesBought,
       haptic: _save.settings.haptic,
+      sound: _save.settings.sound,
       essence: _save.essence,
       ownedSwords: Map.unmodifiable(_save.ownedSwords),
       equippedSwordId: _save.equippedSwordId,
       summonsSinceHighRare: _save.summonsSinceHighRare,
+      unlockedAchievements: Set.unmodifiable(_save.unlockedAchievements),
       loaded: loaded,
     );
+    if (loaded) _checkAchievements();
+  }
+
+  void _checkAchievements() {
+    final ctx = state.achContext();
+    bool anyChanged = false;
+    for (final def in achievementCatalog) {
+      if (_save.unlockedAchievements.contains(def.id)) continue;
+      if (def.id == 'master_perfectionist') continue; // handled below
+      if (def.progress(ctx).done) {
+        _save.unlockedAchievements.add(def.id);
+        _save.essence += def.essenceReward;
+        _achievementUnlocks.add(def);
+        anyChanged = true;
+      }
+    }
+    // Perfectionist: unlocks when every other achievement is done.
+    if (!_save.unlockedAchievements.contains('master_perfectionist')) {
+      final others =
+          achievementCatalog.where((a) => a.id != 'master_perfectionist');
+      if (others.every((a) => _save.unlockedAchievements.contains(a.id))) {
+        final def = achievementCatalog
+            .firstWhere((a) => a.id == 'master_perfectionist');
+        _save.unlockedAchievements.add(def.id);
+        _save.essence += def.essenceReward;
+        _achievementUnlocks.add(def);
+        anyChanged = true;
+      }
+    }
+    if (anyChanged) {
+      // Re-emit to reflect new essence + unlock set in a single next frame.
+      state = GameState(
+        gold: state.gold,
+        totalGoldEarned: state.totalGoldEarned,
+        tapPower: state.tapPower,
+        dps: state.dps,
+        prestigeSouls: state.prestigeSouls,
+        prestigeCount: state.prestigeCount,
+        producerLevels: state.producerLevels,
+        tapUpgradeLevels: state.tapUpgradeLevels,
+        totalTaps: state.totalTaps,
+        playTimeSeconds: state.playTimeSeconds,
+        maxDpsEver: state.maxDpsEver,
+        lifetimeGold: state.lifetimeGold,
+        totalSummons: state.totalSummons,
+        totalTapUpgradesBought: state.totalTapUpgradesBought,
+        haptic: state.haptic,
+        sound: state.sound,
+        essence: _save.essence,
+        ownedSwords: state.ownedSwords,
+        equippedSwordId: state.equippedSwordId,
+        summonsSinceHighRare: state.summonsSinceHighRare,
+        unlockedAchievements: Set.unmodifiable(_save.unlockedAchievements),
+        loaded: true,
+      );
+    }
   }
 
   double _prestigeMult() => 1.0 + (_save.prestigeSouls * 0.02);
@@ -321,6 +452,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.gold < cost) return 0;
     _save.gold -= cost;
     _save.tapUpgradeLevels[id] = lv + n;
+    _save.stats.totalTapUpgradesBought += n;
     _emit(loaded: true);
     return n;
   }
@@ -330,7 +462,6 @@ class GameNotifier extends Notifier<GameState> {
     if (souls <= 0) return false;
     _save.prestigeSouls += souls;
     _save.prestigeCount += 1;
-    // Prestige rewards essence too (3× souls gained).
     _save.essence += souls * 3;
     _save.gold = 0;
     _save.totalGoldEarned = 0;
@@ -359,6 +490,11 @@ class GameNotifier extends Notifier<GameState> {
     _emit(loaded: true);
   }
 
+  void setSound(bool value) {
+    _save.settings.sound = value;
+    _emit(loaded: true);
+  }
+
   Future<void> resetAll() async {
     await _saveService.wipe();
     _save = SaveData();
@@ -368,7 +504,6 @@ class GameNotifier extends Notifier<GameState> {
 
   // ============ Sword collection / gacha ============
 
-  /// Roll a tier using weighted rates. If [forceSrPlus] is true, rolls only from SR+.
   SwordTier _rollTier({required bool forceSrPlus}) {
     final pool = forceSrPlus
         ? const [SwordTier.sr, SwordTier.ssr, SwordTier.ur]
@@ -395,7 +530,6 @@ class GameNotifier extends Notifier<GameState> {
     if (pityHit) {
       tier = _rollTier(forceSrPlus: true);
     } else if (guaranteedRPlus) {
-      // 10연 마지막 — N은 걸러내고 R+에서 뽑되 기본 확률 비율 유지
       tier = _rollTier(forceSrPlus: false);
       if (tier == SwordTier.n) tier = SwordTier.r;
     } else {
@@ -407,8 +541,8 @@ class GameNotifier extends Notifier<GameState> {
     final wasMaxed = oldLv >= SwordDef.maxLevel;
     final newLv = wasMaxed ? SwordDef.maxLevel : (wasOwned ? oldLv + 1 : 1);
     _save.ownedSwords[def.id] = newLv;
-    // Auto-equip the first sword ever obtained.
     _save.equippedSwordId ??= def.id;
+    _save.stats.totalSummons++;
     if (tier.index >= SwordTier.sr.index) {
       _save.summonsSinceHighRare = 0;
     } else {
@@ -422,7 +556,6 @@ class GameNotifier extends Notifier<GameState> {
     );
   }
 
-  /// Attempt a single summon. Returns null if not enough essence.
   SummonResult? summonOne() {
     if (_save.essence < summonCostSingle) return null;
     _save.essence -= summonCostSingle;
@@ -431,7 +564,6 @@ class GameNotifier extends Notifier<GameState> {
     return r;
   }
 
-  /// Attempt a 10-pull. Returns null if not enough essence.
   List<SummonResult>? summonTen() {
     if (_save.essence < summonCostTen) return null;
     _save.essence -= summonCostTen;

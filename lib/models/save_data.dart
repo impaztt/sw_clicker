@@ -1,7 +1,7 @@
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 3;
+  static const currentVersion = 4;
 
   int version;
   double gold;
@@ -20,6 +20,9 @@ class SaveData {
   String? equippedSwordId;
   int summonsSinceHighRare; // pity counter (reset on SR+)
 
+  // Achievements (v4)
+  Set<String> unlockedAchievements;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -35,12 +38,14 @@ class SaveData {
     Map<String, int>? ownedSwords,
     this.equippedSwordId,
     this.summonsSinceHighRare = 0,
+    Set<String>? unlockedAchievements,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
         stats = stats ?? GameStats(),
         settings = settings ?? GameSettings(),
-        ownedSwords = ownedSwords ?? {};
+        ownedSwords = ownedSwords ?? {},
+        unlockedAchievements = unlockedAchievements ?? <String>{};
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -57,6 +62,7 @@ class SaveData {
         'ownedSwords': ownedSwords,
         'equippedSwordId': equippedSwordId,
         'summonsSinceHighRare': summonsSinceHighRare,
+        'unlockedAchievements': unlockedAchievements.toList(),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -81,5 +87,9 @@ class SaveData {
             Map<String, int>.from(json['ownedSwords'] as Map? ?? {}),
         equippedSwordId: json['equippedSwordId'] as String?,
         summonsSinceHighRare: json['summonsSinceHighRare'] as int? ?? 0,
+        unlockedAchievements: (json['unlockedAchievements'] as List?)
+                ?.map((e) => e as String)
+                .toSet() ??
+            <String>{},
       );
 }

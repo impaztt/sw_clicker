@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme.dart';
 import 'providers/game_provider.dart';
 import 'screens/main_screen.dart';
+import 'services/audio_service.dart';
+import 'widgets/achievement_toast.dart';
 
 class SwClickerApp extends ConsumerStatefulWidget {
   const SwClickerApp({super.key});
@@ -38,10 +40,19 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
 
   @override
   Widget build(BuildContext context) {
+    // Keep AudioService.enabled in sync with settings.
+    ref.listen<bool>(
+      gameProvider.select((s) => s.sound),
+      (_, next) => AudioService.instance.setEnabled(next),
+      fireImmediately: true,
+    );
+
     return MaterialApp(
       title: '검 키우기',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      builder: (context, child) =>
+          AchievementToastHost(child: child ?? const SizedBox.shrink()),
       home: const MainScreen(),
     );
   }

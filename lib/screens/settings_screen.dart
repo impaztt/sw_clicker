@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/number_format.dart';
 import '../core/theme.dart';
+import '../data/achievement_catalog.dart';
 import '../providers/game_provider.dart';
+import 'achievement_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -65,6 +67,16 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
+          _SectionTitle(title: '업적'),
+          const SizedBox(height: 8),
+          _AchievementLink(
+            unlocked: game.unlockedAchievements.length,
+            total: achievementCatalog.length,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AchievementScreen()),
+            ),
+          ),
+          const SizedBox(height: 24),
           _SectionTitle(title: '설정'),
           const SizedBox(height: 8),
           _ToggleRow(
@@ -72,6 +84,13 @@ class SettingsScreen extends ConsumerWidget {
             label: '햅틱 (터치 진동)',
             value: game.haptic,
             onChanged: (v) => ref.read(gameProvider.notifier).setHaptic(v),
+          ),
+          const SizedBox(height: 8),
+          _ToggleRow(
+            icon: Icons.volume_up,
+            label: '사운드',
+            value: game.sound,
+            onChanged: (v) => ref.read(gameProvider.notifier).setSound(v),
           ),
           const SizedBox(height: 24),
           _SectionTitle(title: '데이터'),
@@ -274,6 +293,85 @@ class _ToggleRow extends StatelessWidget {
             onChanged: onChanged,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AchievementLink extends StatelessWidget {
+  final int unlocked;
+  final int total;
+  final VoidCallback onTap;
+
+  const _AchievementLink({
+    required this.unlocked,
+    required this.total,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = total == 0 ? 0.0 : unlocked / total;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.emoji_events, color: Color(0xFFD81B60)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '전체 업적',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$unlocked / $total 해제',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        minHeight: 6,
+                        backgroundColor: Colors.black12,
+                        valueColor: const AlwaysStoppedAnimation(
+                            Color(0xFFD81B60)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, color: Colors.black45),
+            ],
+          ),
+        ),
       ),
     );
   }
