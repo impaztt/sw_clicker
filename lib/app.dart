@@ -40,12 +40,8 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
 
   @override
   Widget build(BuildContext context) {
-    // Keep AudioService.enabled in sync with settings.
-    ref.listen<bool>(
-      gameProvider.select((s) => s.sound),
-      (_, next) => AudioService.instance.setEnabled(next),
-      fireImmediately: true,
-    );
+    final sound = ref.watch(gameProvider.select((s) => s.sound));
+    AudioService.instance.setEnabled(sound);
 
     return MaterialApp(
       title: '검 키우기',
