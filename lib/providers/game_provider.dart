@@ -10,7 +10,7 @@ import '../data/tap_upgrade_catalog.dart';
 import '../models/achievement.dart';
 import '../models/save_data.dart';
 import '../models/sword.dart';
-import '../services/save_service.dart';
+import '../services/sync_service.dart';
 
 /// Buy count: 1, 10, 100 or -1 for Max.
 final buyMultiplierProvider = StateProvider<int>((_) => 1);
@@ -212,7 +212,7 @@ int _milestoneEssenceUpTo(int level) {
 }
 
 class GameNotifier extends Notifier<GameState> {
-  final _saveService = SaveService();
+  final _syncService = SyncService();
   final _random = Random();
   final _achievementUnlocks = StreamController<AchievementDef>.broadcast();
   Timer? _tickTimer;
@@ -236,7 +236,7 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   Future<void> _initialize() async {
-    final loaded = await _saveService.load();
+    final loaded = await _syncService.loadResolved();
     if (loaded != null) {
       _save = loaded;
       final elapsed = DateTime.now().difference(loaded.lastSavedAt);
@@ -286,7 +286,7 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   Future<void> _persist() async {
-    await _saveService.save(_save);
+    await _syncService.persist(_save);
   }
 
   void _emit({required bool loaded}) {
@@ -496,10 +496,13 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   Future<void> resetAll() async {
-    await _saveService.wipe();
+    await _syncService.wipe();
     _save = SaveData();
     _pendingOffline = null;
     _emit(loaded: true);
+    // Push the fresh state up immediately so other devices see the reset
+    // without waiting for the next auto-save tick.
+    await _persist();
   }
 
   // ============ Sword collection / gacha ============

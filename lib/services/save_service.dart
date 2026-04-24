@@ -23,6 +23,14 @@ class SaveService {
     await prefs.setString(_key, jsonEncode(data.toJson()));
   }
 
+  /// Persist without touching `lastSavedAt`. Used when applying a cloud save
+  /// locally — we must preserve the cloud's timestamp so the next sync
+  /// doesn't re-flip the last-write-wins decision.
+  Future<void> saveRaw(SaveData data) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(data.toJson()));
+  }
+
   Future<void> wipe() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
