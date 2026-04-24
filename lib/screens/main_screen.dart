@@ -6,6 +6,7 @@ import '../widgets/offline_reward_dialog.dart';
 import 'home_screen.dart';
 import 'prestige_screen.dart';
 import 'settings_screen.dart';
+import 'sword_screen.dart';
 import 'upgrade_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -22,6 +23,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   static const _pages = <Widget>[
     HomeScreen(),
     UpgradeScreen(),
+    SwordScreen(),
     PrestigeScreen(),
     SettingsScreen(),
   ];
@@ -49,6 +51,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             icon: Icon(Icons.upgrade_outlined),
             selectedIcon: Icon(Icons.upgrade_rounded),
             label: '강화',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.collections_outlined),
+            selectedIcon: Icon(Icons.collections),
+            label: '검',
           ),
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),

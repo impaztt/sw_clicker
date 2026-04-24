@@ -1,14 +1,29 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+
 import '../core/theme.dart';
+import '../models/sword.dart';
+
+const _defaultVisual = SwordVisual(
+  bladeColor: AppColors.blade,
+  bladeAccent: AppColors.bladeShadow,
+  guardColor: AppColors.yellow,
+  handleColor: AppColors.handle,
+  pommelColor: AppColors.yellow,
+  auraColor: AppColors.coral,
+  auraIntensity: 0.3,
+);
 
 class SwordWidget extends StatefulWidget {
   final void Function(Offset globalPosition) onTap;
   final double size;
+  final SwordVisual visual;
 
   const SwordWidget({
     super.key,
     required this.onTap,
     this.size = 240,
+    this.visual = _defaultVisual,
   });
 
   @override
@@ -16,89 +31,105 @@ class SwordWidget extends StatefulWidget {
 }
 
 class _SwordWidgetState extends State<SwordWidget>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+    with TickerProviderStateMixin {
+  late final AnimationController _tapController;
+  late final AnimationController _sparkleController;
   late final Animation<double> _scale;
   late final Animation<double> _rotation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _tapController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 130),
     );
     _scale = Tween<double>(begin: 1.0, end: 0.92)
         .chain(CurveTween(curve: Curves.easeOut))
-        .animate(_controller);
+        .animate(_tapController);
     _rotation = Tween<double>(begin: 0, end: 0.08)
         .chain(CurveTween(curve: Curves.easeInOut))
-        .animate(_controller);
+        .animate(_tapController);
+    _sparkleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _tapController.dispose();
+    _sparkleController.dispose();
     super.dispose();
   }
 
   void _handleTap(TapDownDetails details) {
-    if (_controller.isAnimating) {
-      _controller.reset();
-    }
-    _controller.forward().then((_) {
-      if (mounted) _controller.reverse();
+    if (_tapController.isAnimating) _tapController.reset();
+    _tapController.forward().then((_) {
+      if (mounted) _tapController.reverse();
     });
     widget.onTap(details.globalPosition);
   }
 
   @override
   Widget build(BuildContext context) {
+    final v = widget.visual;
     return GestureDetector(
       onTapDown: _handleTap,
       child: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, child) {
+        animation: Listenable.merge([_tapController, _sparkleController]),
+        builder: (_, __) {
           return Transform.rotate(
             angle: _rotation.value,
             child: Transform.scale(
               scale: _scale.value,
-              child: child,
+              child: SizedBox(
+                width: widget.size,
+                height: widget.size,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            v.auraColor.withValues(alpha: v.auraIntensity),
+                            v.auraColor.withValues(alpha: v.auraIntensity * 0.3),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.65, 1.0],
+                        ),
+                      ),
+                    ),
+                    if (v.sparkle != SparkleStyle.none)
+                      CustomPaint(
+                        size: Size(widget.size, widget.size),
+                        painter: _SparklePainter(
+                          style: v.sparkle,
+                          color: v.auraColor,
+                          t: _sparkleController.value,
+                        ),
+                      ),
+                    CustomPaint(
+                      size: Size(widget.size * 0.7, widget.size * 0.85),
+                      painter: _SwordPainter(v),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         },
-        child: SizedBox(
-          width: widget.size,
-          height: widget.size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.coral.withValues(alpha: 0.30),
-                      AppColors.coral.withValues(alpha: 0.05),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.65, 1.0],
-                  ),
-                ),
-              ),
-              CustomPaint(
-                size: Size(widget.size * 0.7, widget.size * 0.85),
-                painter: _SwordPainter(),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
 }
 
 class _SwordPainter extends CustomPainter {
+  final SwordVisual v;
+  _SwordPainter(this.v);
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
@@ -119,7 +150,7 @@ class _SwordPainter extends CustomPainter {
       ..lineTo(cx - w * 0.10, h * 0.14)
       ..close();
 
-    canvas.drawPath(bladePath, Paint()..color = AppColors.blade);
+    canvas.drawPath(bladePath, Paint()..color = v.bladeColor);
 
     final bladeShadowPath = Path()
       ..moveTo(cx + w * 0.04, h * 0.10)
@@ -129,7 +160,7 @@ class _SwordPainter extends CustomPainter {
       ..close();
     canvas.drawPath(
       bladeShadowPath,
-      Paint()..color = AppColors.bladeShadow.withValues(alpha: 0.6),
+      Paint()..color = v.bladeAccent.withValues(alpha: 0.6),
     );
 
     canvas.drawLine(
@@ -151,7 +182,7 @@ class _SwordPainter extends CustomPainter {
     );
     final guardRRect =
         RRect.fromRectAndRadius(guardRect, const Radius.circular(6));
-    canvas.drawRRect(guardRRect, Paint()..color = AppColors.yellow);
+    canvas.drawRRect(guardRRect, Paint()..color = v.guardColor);
     canvas.drawRRect(guardRRect, outline);
 
     final handleRect = Rect.fromLTWH(
@@ -162,7 +193,7 @@ class _SwordPainter extends CustomPainter {
     );
     final handleRRect =
         RRect.fromRectAndRadius(handleRect, const Radius.circular(8));
-    canvas.drawRRect(handleRRect, Paint()..color = AppColors.handle);
+    canvas.drawRRect(handleRRect, Paint()..color = v.handleColor);
     canvas.drawRRect(handleRRect, outline);
 
     final handleHighlight = Rect.fromLTWH(
@@ -179,7 +210,7 @@ class _SwordPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(cx, h * 0.92),
       w * 0.09,
-      Paint()..color = AppColors.yellow,
+      Paint()..color = v.pommelColor,
     );
     canvas.drawCircle(Offset(cx, h * 0.92), w * 0.09, outline);
 
@@ -191,5 +222,47 @@ class _SwordPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SwordPainter oldDelegate) =>
+      oldDelegate.v != v;
+}
+
+class _SparklePainter extends CustomPainter {
+  final SparkleStyle style;
+  final Color color;
+  final double t;
+
+  _SparklePainter({required this.style, required this.color, required this.t});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final radius = size.width * 0.36;
+    final count = style == SparkleStyle.orbiting ? 6 : 3;
+    final baseR = style == SparkleStyle.orbiting
+        ? 5.0
+        : style == SparkleStyle.bright
+            ? 3.5
+            : 2.5;
+    for (int i = 0; i < count; i++) {
+      final phase = (t + i / count) % 1.0;
+      final angle = phase * 2 * math.pi;
+      final dx = cx + math.cos(angle) * radius;
+      final dy = cy + math.sin(angle) * radius * 0.85;
+      final alpha = (math.sin(phase * math.pi) * 0.9 + 0.1).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        Offset(dx, dy),
+        baseR,
+        Paint()..color = color.withValues(alpha: alpha),
+      );
+      canvas.drawCircle(
+        Offset(dx, dy),
+        baseR * 2,
+        Paint()..color = color.withValues(alpha: alpha * 0.3),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklePainter oldDelegate) => true;
 }

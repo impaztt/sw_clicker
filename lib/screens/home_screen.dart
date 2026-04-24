@@ -65,7 +65,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               DpsDisplay(dps: game.dps),
               const Spacer(),
               Center(
-                child: SwordWidget(onTap: _handleTap),
+                child: Builder(builder: (_) {
+                  final equipped = game.equippedSword;
+                  if (equipped != null) {
+                    return SwordWidget(
+                      onTap: _handleTap,
+                      visual: equipped.visual,
+                    );
+                  }
+                  return SwordWidget(onTap: _handleTap);
+                }),
               ),
               const Spacer(),
               _TapPowerChip(tapPower: game.tapPower),

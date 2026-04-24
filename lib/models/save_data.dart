@@ -1,7 +1,7 @@
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 2;
+  static const currentVersion = 3;
 
   int version;
   double gold;
@@ -14,6 +14,12 @@ class SaveData {
   GameStats stats;
   GameSettings settings;
 
+  // Sword collection (v3)
+  int essence;
+  Map<String, int> ownedSwords; // id → level (1~10)
+  String? equippedSwordId;
+  int summonsSinceHighRare; // pity counter (reset on SR+)
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -25,11 +31,16 @@ class SaveData {
     DateTime? lastSavedAt,
     GameStats? stats,
     GameSettings? settings,
+    this.essence = 90,
+    Map<String, int>? ownedSwords,
+    this.equippedSwordId,
+    this.summonsSinceHighRare = 0,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
         stats = stats ?? GameStats(),
-        settings = settings ?? GameSettings();
+        settings = settings ?? GameSettings(),
+        ownedSwords = ownedSwords ?? {};
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -42,6 +53,10 @@ class SaveData {
         'lastSavedAt': lastSavedAt.toIso8601String(),
         'stats': stats.toJson(),
         'settings': settings.toJson(),
+        'essence': essence,
+        'ownedSwords': ownedSwords,
+        'equippedSwordId': equippedSwordId,
+        'summonsSinceHighRare': summonsSinceHighRare,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -61,5 +76,10 @@ class SaveData {
             GameStats.fromJson(json['stats'] as Map<String, dynamic>? ?? {}),
         settings: GameSettings.fromJson(
             json['settings'] as Map<String, dynamic>? ?? {}),
+        essence: json['essence'] as int? ?? 90,
+        ownedSwords:
+            Map<String, int>.from(json['ownedSwords'] as Map? ?? {}),
+        equippedSwordId: json['equippedSwordId'] as String?,
+        summonsSinceHighRare: json['summonsSinceHighRare'] as int? ?? 0,
       );
 }
