@@ -22,10 +22,10 @@ Thumbs.db
 # Android
 android/.gradle/
 android/captures/
-android/gradlew
-android/gradlew.bat
 android/local.properties
 android/**/GeneratedPluginRegistrant.java
+android/key.properties
+*.jks
 
 # iOS
 ios/Pods/
@@ -39,9 +39,6 @@ ios/Flutter/app.zip
 ios/Flutter/flutter_assets/
 ios/ServiceDefinitions.json
 ios/Runner/GeneratedPluginRegistrant.*
-
-# Web
-web/
 
 # Misc
 *.log
