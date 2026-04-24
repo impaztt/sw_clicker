@@ -280,7 +280,7 @@ class GameNotifier extends Notifier<GameState> {
 
   void _startAutoSave() {
     _saveTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 10),
       (_) => _persist(),
     );
   }
@@ -440,6 +440,7 @@ class GameNotifier extends Notifier<GameState> {
         _milestoneEssenceUpTo(newLv) - _milestoneEssenceUpTo(oldLv);
     if (essenceGain > 0) _save.essence += essenceGain;
     _emit(loaded: true);
+    unawaited(_persist());
     return n;
   }
 
@@ -454,6 +455,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.tapUpgradeLevels[id] = lv + n;
     _save.stats.totalTapUpgradesBought += n;
     _emit(loaded: true);
+    unawaited(_persist());
     return n;
   }
 
@@ -468,7 +470,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.producerLevels.clear();
     _save.tapUpgradeLevels.clear();
     _emit(loaded: true);
-    _persist();
+    unawaited(_persist());
     return true;
   }
 
@@ -477,6 +479,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += r.gold;
     _save.stats.lifetimeGold += r.gold;
     _emit(loaded: true);
+    unawaited(_persist());
   }
 
   OfflineReward? consumeOfflineReward() {
@@ -488,11 +491,13 @@ class GameNotifier extends Notifier<GameState> {
   void setHaptic(bool value) {
     _save.settings.haptic = value;
     _emit(loaded: true);
+    unawaited(_persist());
   }
 
   void setSound(bool value) {
     _save.settings.sound = value;
     _emit(loaded: true);
+    unawaited(_persist());
   }
 
   Future<void> resetAll() async {
@@ -564,6 +569,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.essence -= summonCostSingle;
     final r = _doOnePull(guaranteedRPlus: false);
     _emit(loaded: true);
+    unawaited(_persist());
     return r;
   }
 
@@ -576,6 +582,7 @@ class GameNotifier extends Notifier<GameState> {
       results.add(_doOnePull(guaranteedRPlus: isLast));
     }
     _emit(loaded: true);
+    unawaited(_persist());
     return results;
   }
 
@@ -583,6 +590,7 @@ class GameNotifier extends Notifier<GameState> {
     if ((_save.ownedSwords[id] ?? 0) <= 0) return;
     _save.equippedSwordId = id;
     _emit(loaded: true);
+    unawaited(_persist());
   }
 
   Future<void> persist() => _persist();
