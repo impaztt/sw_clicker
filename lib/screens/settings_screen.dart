@@ -92,6 +92,13 @@ class SettingsScreen extends ConsumerWidget {
             value: game.sound,
             onChanged: (v) => ref.read(gameProvider.notifier).setSound(v),
           ),
+          const SizedBox(height: 8),
+          _ToggleRow(
+            icon: Icons.dark_mode,
+            label: '다크 모드',
+            value: game.darkMode,
+            onChanged: (v) => ref.read(gameProvider.notifier).setDarkMode(v),
+          ),
           const SizedBox(height: 24),
           _SectionTitle(title: '데이터'),
           const SizedBox(height: 8),

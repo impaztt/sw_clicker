@@ -7,10 +7,12 @@ class FloatingNumberData {
   final int id;
   final Offset origin;
   final double amount;
+  final bool isCrit;
   FloatingNumberData({
     required this.id,
     required this.origin,
     required this.amount,
+    this.isCrit = false,
   });
 }
 
@@ -79,29 +81,43 @@ class _FloatingNumberState extends State<_FloatingNumber>
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {
+        final isCrit = widget.data.isCrit;
         final t = _c.value;
-        final dy = -60.0 * t;
+        final dy = -80.0 * t;
         final opacity = (1.0 - t).clamp(0.0, 1.0);
+        // Crit numbers are bigger, pop in with a brief scale bounce, and use
+        // the warm yellow accent instead of coral for instant recognition.
+        final scale = isCrit
+            ? (t < 0.15 ? 0.6 + (t / 0.15) * 0.9 : 1.5 - t * 0.3)
+            : 1.0;
+        final width = isCrit ? 140.0 : 80.0;
         return Positioned(
-          left: widget.data.origin.dx - 40,
+          left: widget.data.origin.dx - width / 2,
           top: widget.data.origin.dy + dy - 20,
-          width: 80,
+          width: width,
           child: Opacity(
             opacity: opacity,
-            child: Center(
-              child: Text(
-                '+${NumberFormatter.format(widget.data.amount)}',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.deepCoral,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(0, 1),
-                      blurRadius: 4,
-                      color: Colors.white,
-                    ),
-                  ],
+            child: Transform.scale(
+              scale: scale,
+              child: Center(
+                child: Text(
+                  isCrit
+                      ? 'CRIT! +${NumberFormatter.format(widget.data.amount)}'
+                      : '+${NumberFormatter.format(widget.data.amount)}',
+                  style: TextStyle(
+                    fontSize: isCrit ? 26 : 22,
+                    fontWeight: FontWeight.w900,
+                    color: isCrit
+                        ? const Color(0xFFB26A00)
+                        : AppColors.deepCoral,
+                    shadows: const [
+                      Shadow(
+                        offset: Offset(0, 1),
+                        blurRadius: 4,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

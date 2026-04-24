@@ -1,7 +1,7 @@
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 4;
+  static const currentVersion = 5;
 
   int version;
   double gold;
@@ -23,6 +23,10 @@ class SaveData {
   // Achievements (v4)
   Set<String> unlockedAchievements;
 
+  // Daily login bonus (v5)
+  DateTime? lastDailyClaimAt;
+  int dailyStreak;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -39,6 +43,8 @@ class SaveData {
     this.equippedSwordId,
     this.summonsSinceHighRare = 0,
     Set<String>? unlockedAchievements,
+    this.lastDailyClaimAt,
+    this.dailyStreak = 0,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
@@ -63,6 +69,8 @@ class SaveData {
         'equippedSwordId': equippedSwordId,
         'summonsSinceHighRare': summonsSinceHighRare,
         'unlockedAchievements': unlockedAchievements.toList(),
+        'lastDailyClaimAt': lastDailyClaimAt?.toIso8601String(),
+        'dailyStreak': dailyStreak,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -91,5 +99,8 @@ class SaveData {
                 ?.map((e) => e as String)
                 .toSet() ??
             <String>{},
+        lastDailyClaimAt:
+            DateTime.tryParse(json['lastDailyClaimAt'] as String? ?? ''),
+        dailyStreak: json['dailyStreak'] as int? ?? 0,
       );
 }

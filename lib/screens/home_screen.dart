@@ -26,15 +26,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final box = context.findRenderObject() as RenderBox?;
     if (box == null) return;
     final local = box.globalToLocal(globalPos);
-    final amount = ref.read(gameProvider.notifier).tap();
+    final result = ref.read(gameProvider.notifier).tapWithFeedback();
     final state = ref.read(gameProvider);
-    if (state.haptic) HapticFeedback.lightImpact();
+    if (state.haptic) {
+      if (result.isCrit) {
+        HapticFeedback.mediumImpact();
+      } else {
+        HapticFeedback.lightImpact();
+      }
+    }
     if (state.sound) AudioService.instance.playTap();
     setState(() {
       _floats.add(FloatingNumberData(
         id: _nextId++,
         origin: local,
-        amount: amount,
+        amount: result.amount,
+        isCrit: result.isCrit,
       ));
     });
   }
@@ -78,6 +85,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 }),
               ),
               const Spacer(),
+              if (game.combo > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ComboChip(combo: game.combo),
+                ),
               _TapPowerChip(tapPower: game.tapPower),
               if (game.dps > 0)
                 Padding(
@@ -128,6 +140,53 @@ class _TapPowerChip extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Color(0xFF7A5C00),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComboChip extends StatelessWidget {
+  final int combo;
+  const _ComboChip({required this.combo});
+
+  @override
+  Widget build(BuildContext context) {
+    final bonus = (combo * 0.01).clamp(0.0, 0.5);
+    final pct = (bonus * 100).toStringAsFixed(0);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.deepCoral.withValues(alpha: 0.9),
+            AppColors.coral.withValues(alpha: 0.9),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.coral.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_fire_department,
+              size: 18, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            '콤보 x$combo · +$pct% 터치',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
             ),
           ),
         ],

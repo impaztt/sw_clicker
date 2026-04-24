@@ -31,6 +31,22 @@ const offlineMaxSeconds = offlineMaxHours * 3600;
 /// round-trips.
 const offlineMinSeconds = 30;
 
+/// Crit + combo config.
+const critChance = 0.05; // 5%
+const critMultiplier = 10.0;
+const comboWindowMs = 1500; // taps within this many ms extend the combo
+const comboMax = 50;
+const comboBonusPerStack = 0.01; // +1% tap per combo stack, cap +50%
+
+/// Daily login reward table: streak day (1-indexed) → essence reward.
+/// Streak resets when the user skips a day (>48h since last claim).
+const dailyRewards = <int>[0, 5, 10, 15, 20, 30, 40, 60];
+int dailyRewardFor(int streak) {
+  if (streak < 1) return dailyRewards[1];
+  if (streak >= dailyRewards.length) return dailyRewards.last;
+  return dailyRewards[streak];
+}
+
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
   (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
@@ -47,6 +63,23 @@ class SummonResult {
     required this.isDuplicate,
     required this.isMaxed,
   });
+}
+
+class TapResult {
+  final double amount;
+  final bool isCrit;
+  final int combo;
+  const TapResult({
+    required this.amount,
+    required this.isCrit,
+    required this.combo,
+  });
+}
+
+class DailyBonus {
+  final int streak;
+  final int essence;
+  const DailyBonus({required this.streak, required this.essence});
 }
 
 class GameState {
@@ -66,11 +99,17 @@ class GameState {
   final int totalTapUpgradesBought;
   final bool haptic;
   final bool sound;
+  final bool darkMode;
   final int essence;
   final Map<String, int> ownedSwords;
   final String? equippedSwordId;
   final int summonsSinceHighRare;
   final Set<String> unlockedAchievements;
+  final int combo;
+  final int totalCrits;
+  final int maxCombo;
+  final int dailyStreak;
+  final DateTime? lastDailyClaimAt;
   final bool loaded;
 
   const GameState({
@@ -90,11 +129,17 @@ class GameState {
     required this.totalTapUpgradesBought,
     required this.haptic,
     required this.sound,
+    required this.darkMode,
     required this.essence,
     required this.ownedSwords,
     required this.equippedSwordId,
     required this.summonsSinceHighRare,
     required this.unlockedAchievements,
+    required this.combo,
+    required this.totalCrits,
+    required this.maxCombo,
+    required this.dailyStreak,
+    required this.lastDailyClaimAt,
     this.loaded = false,
   });
 
@@ -115,11 +160,17 @@ class GameState {
         totalTapUpgradesBought: 0,
         haptic: true,
         sound: true,
+        darkMode: false,
         essence: 90,
         ownedSwords: {},
         equippedSwordId: null,
         summonsSinceHighRare: 0,
         unlockedAchievements: {},
+        combo: 0,
+        totalCrits: 0,
+        maxCombo: 0,
+        dailyStreak: 0,
+        lastDailyClaimAt: null,
         loaded: false,
       );
 
@@ -226,10 +277,14 @@ class GameNotifier extends Notifier<GameState> {
   final _achievementUnlocks = StreamController<AchievementDef>.broadcast();
   Timer? _tickTimer;
   Timer? _saveTimer;
+  Timer? _comboDecayTimer;
   DateTime _lastTick = DateTime.now();
   double _playTimeAcc = 0;
   SaveData _save = SaveData();
   OfflineReward? _pendingOffline;
+  DailyBonus? _pendingDaily;
+  int _combo = 0;
+  DateTime? _lastTapAt;
 
   @override
   GameState build() {
@@ -241,6 +296,7 @@ class GameNotifier extends Notifier<GameState> {
   void _dispose() {
     _tickTimer?.cancel();
     _saveTimer?.cancel();
+    _comboDecayTimer?.cancel();
     _achievementUnlocks.close();
   }
 
@@ -258,9 +314,30 @@ class GameNotifier extends Notifier<GameState> {
         );
       }
     }
+    _pendingDaily = _evaluateDailyEligibility();
     _emit(loaded: true);
     _startTicker();
     _startAutoSave();
+  }
+
+  /// Decide whether the user is eligible for a daily bonus right now.
+  /// Does NOT mutate state — the claim happens via [claimDailyBonus] after
+  /// the user taps "수령" on the dialog, so we can reflect it in stats atomically.
+  DailyBonus? _evaluateDailyEligibility() {
+    final last = _save.lastDailyClaimAt;
+    final now = DateTime.now();
+    // First-ever claim → day 1.
+    if (last == null) {
+      return DailyBonus(streak: 1, essence: dailyRewardFor(1));
+    }
+    final hours = now.difference(last).inHours;
+    if (hours < 24) return null; // already claimed today
+    // 24h ≤ elapsed < 48h → streak continues.
+    // Beyond 48h → streak resets to day 1.
+    final nextStreak = hours < 48
+        ? ((_save.dailyStreak % (dailyRewards.length - 1)) + 1)
+        : 1;
+    return DailyBonus(streak: nextStreak, essence: dailyRewardFor(nextStreak));
   }
 
   void _startTicker() {
@@ -316,11 +393,17 @@ class GameNotifier extends Notifier<GameState> {
       totalTapUpgradesBought: _save.stats.totalTapUpgradesBought,
       haptic: _save.settings.haptic,
       sound: _save.settings.sound,
+      darkMode: _save.settings.darkMode,
       essence: _save.essence,
       ownedSwords: Map.unmodifiable(_save.ownedSwords),
       equippedSwordId: _save.equippedSwordId,
       summonsSinceHighRare: _save.summonsSinceHighRare,
       unlockedAchievements: Set.unmodifiable(_save.unlockedAchievements),
+      combo: _combo,
+      totalCrits: _save.stats.totalCrits,
+      maxCombo: _save.stats.maxCombo,
+      dailyStreak: _save.dailyStreak,
+      lastDailyClaimAt: _save.lastDailyClaimAt,
       loaded: loaded,
     );
     if (loaded) _checkAchievements();
@@ -371,11 +454,17 @@ class GameNotifier extends Notifier<GameState> {
         totalTapUpgradesBought: state.totalTapUpgradesBought,
         haptic: state.haptic,
         sound: state.sound,
+        darkMode: state.darkMode,
         essence: _save.essence,
         ownedSwords: state.ownedSwords,
         equippedSwordId: state.equippedSwordId,
         summonsSinceHighRare: state.summonsSinceHighRare,
         unlockedAchievements: Set.unmodifiable(_save.unlockedAchievements),
+        combo: state.combo,
+        totalCrits: state.totalCrits,
+        maxCombo: state.maxCombo,
+        dailyStreak: state.dailyStreak,
+        lastDailyClaimAt: state.lastDailyClaimAt,
         loaded: true,
       );
     }
@@ -425,14 +514,43 @@ class GameNotifier extends Notifier<GameState> {
     return sum * _prestigeMult() * _equippedDpsMult();
   }
 
-  double tap() {
-    final amount = _calcTapPower();
+  /// Back-compat shim for callers that still treat tap() as "give me gold".
+  /// New UI should prefer [tapWithFeedback] to access crit/combo info.
+  double tap() => tapWithFeedback().amount;
+
+  TapResult tapWithFeedback() {
+    final now = DateTime.now();
+    final withinWindow = _lastTapAt != null &&
+        now.difference(_lastTapAt!).inMilliseconds <= comboWindowMs;
+    _combo = withinWindow ? (_combo + 1).clamp(0, comboMax) : 1;
+    _lastTapAt = now;
+    if (_combo > _save.stats.maxCombo) _save.stats.maxCombo = _combo;
+
+    final base = _calcTapPower();
+    final comboMult = 1.0 + (_combo * comboBonusPerStack).clamp(0.0, 0.5);
+    final isCrit = _random.nextDouble() < critChance;
+    final critMult = isCrit ? critMultiplier : 1.0;
+    final amount = base * comboMult * critMult;
+
     _save.gold += amount;
     _save.totalGoldEarned += amount;
     _save.stats.lifetimeGold += amount;
     _save.stats.totalTaps++;
+    if (isCrit) _save.stats.totalCrits++;
+
+    _scheduleComboDecay();
     _emit(loaded: true);
-    return amount;
+    return TapResult(amount: amount, isCrit: isCrit, combo: _combo);
+  }
+
+  void _scheduleComboDecay() {
+    _comboDecayTimer?.cancel();
+    _comboDecayTimer =
+        Timer(const Duration(milliseconds: comboWindowMs), () {
+      if (_combo == 0) return;
+      _combo = 0;
+      _emit(loaded: true);
+    });
   }
 
   int buyProducer(String id, int count) {
@@ -509,10 +627,34 @@ class GameNotifier extends Notifier<GameState> {
     unawaited(_persist());
   }
 
+  void setDarkMode(bool value) {
+    _save.settings.darkMode = value;
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  /// Returns (and clears) the pending daily bonus computed at load time.
+  DailyBonus? consumePendingDaily() {
+    final r = _pendingDaily;
+    _pendingDaily = null;
+    return r;
+  }
+
+  void claimDailyBonus(DailyBonus bonus) {
+    _save.essence += bonus.essence;
+    _save.dailyStreak = bonus.streak;
+    _save.lastDailyClaimAt = DateTime.now();
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
   Future<void> resetAll() async {
     await _syncService.wipe();
     _save = SaveData();
     _pendingOffline = null;
+    _pendingDaily = null;
+    _combo = 0;
+    _lastTapAt = null;
     _emit(loaded: true);
     // Push the fresh state up immediately so other devices see the reset
     // without waiting for the next auto-save tick.

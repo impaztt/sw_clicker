@@ -43,10 +43,14 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
     final sound = ref.watch(gameProvider.select((s) => s.sound));
     AudioService.instance.setEnabled(sound);
 
+    final darkMode = ref.watch(gameProvider.select((s) => s.darkMode));
+
     return MaterialApp(
       title: '검 키우기',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
       builder: (context, child) =>
           AchievementToastHost(child: child ?? const SizedBox.shrink()),
       home: const MainScreen(),

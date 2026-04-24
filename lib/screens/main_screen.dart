@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/game_provider.dart';
+import '../widgets/daily_bonus_dialog.dart';
 import '../widgets/offline_reward_dialog.dart';
 import 'home_screen.dart';
 import 'prestige_screen.dart';
@@ -18,7 +19,7 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen> {
   int _index = 0;
-  bool _offlineShown = false;
+  bool _bootDialogsShown = false;
 
   static const _pages = <Widget>[
     HomeScreen(),
@@ -31,9 +32,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
-    if (game.loaded && !_offlineShown) {
-      _offlineShown = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowOffline());
+    if (game.loaded && !_bootDialogsShown) {
+      _bootDialogsShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _runBootDialogs());
     }
 
     return Scaffold(
@@ -72,13 +73,25 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     );
   }
 
-  void _maybeShowOffline() {
-    final reward = ref.read(gameProvider.notifier).consumeOfflineReward();
-    if (reward == null || !mounted) return;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => OfflineRewardDialog(reward: reward),
-    );
+  Future<void> _runBootDialogs() async {
+    // Offline reward first (time-sensitive context from lastSavedAt), then
+    // daily bonus. Both are shown sequentially so the user can't miss one.
+    final notifier = ref.read(gameProvider.notifier);
+    final offline = notifier.consumeOfflineReward();
+    if (offline != null && mounted) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => OfflineRewardDialog(reward: offline),
+      );
+    }
+    final daily = notifier.consumePendingDaily();
+    if (daily != null && mounted) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => DailyBonusDialog(bonus: daily),
+      );
+    }
   }
 }
