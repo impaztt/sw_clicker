@@ -749,6 +749,25 @@ class GameNotifier extends Notifier<GameState> {
   /// Public read for the home screen so it can show "수집 보너스 +X%".
   double get collectionBonusFraction => _collectionBonusTotal();
 
+  /// All multipliers that turn a producer's raw DPS into the effective DPS
+  /// shown on the home screen. Upgrade tiles use this to display the gain
+  /// the player will actually see (e.g. so the sword-collection bonus
+  /// visibly improves the "DPS +N" preview on companion/transcendent buys).
+  double get dpsMultiplier =>
+      _prestigeMult() *
+      _equippedDpsMult() *
+      _boosterDpsMult() *
+      _setDpsBonus() *
+      _collectionMult();
+
+  /// Counterpart of [dpsMultiplier] for tap-power upgrades.
+  double get tapMultiplier =>
+      _prestigeMult() *
+      _equippedTapMult() *
+      _boosterTapMult() *
+      _setTapBonus() *
+      _collectionMult();
+
   /// Drop expired boosters from the save (called before any calculation that
   /// reads them, to avoid "ghost" multipliers after their timer ran out).
   void _reapBoosters() {

@@ -106,7 +106,7 @@ class _HeaderBar extends ConsumerWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '수집 보너스 — 모든 보유 검이 터치·DPS에 +${(bonus * 100).toStringAsFixed(bonus >= 1 ? 0 : 1)}%',
+                        '수집 보너스 +${(bonus * 100).toStringAsFixed(bonus >= 1 ? 0 : 1)}% — 터치·동료·초월(초당 수입) 모두 증가',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -428,8 +428,8 @@ class _SwordDetailSheet extends ConsumerWidget {
               label: '보유 효과 (장착 안해도 적용)',
               value: '+${(def.ownedBonusAt(level) * 100).toStringAsFixed(2)}%',
               sub: level < SwordDef.maxLevel
-                  ? '최대 Lv ${SwordDef.maxLevel}: +${(def.ownedBonusAt(SwordDef.maxLevel) * 100).toStringAsFixed(2)}% (터치·DPS 모두)'
-                  : '터치·DPS 모두 적용',
+                  ? '최대 Lv ${SwordDef.maxLevel}: +${(def.ownedBonusAt(SwordDef.maxLevel) * 100).toStringAsFixed(2)}% — 터치·동료·초월 모두에 적용'
+                  : '터치·동료·초월(초당 수입) 모두에 적용',
             ),
             const SizedBox(height: 8),
             _StatRow(
@@ -478,7 +478,7 @@ class _SwordDetailSheet extends ConsumerWidget {
             _StatRow(
               label: '보유 효과',
               value: '+${(def.tier.ownedBonusBase * 100).toStringAsFixed(2)}%',
-              sub: '획득 즉시 터치·DPS에 적용 (Lv 1 기준)',
+              sub: '획득 즉시 터치·동료·초월(초당 수입) 모두에 적용 (Lv 1 기준)',
             ),
           ],
         ],

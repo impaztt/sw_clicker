@@ -73,6 +73,13 @@ class UpgradeScreen extends ConsumerWidget {
                           final affordable = isMax
                               ? maxN > 0
                               : game.canAfford(cost);
+                          // Show the EFFECTIVE gain — i.e. raw upgrade × all
+                          // currently active multipliers (prestige, equipped
+                          // sword, boosters, set, collection). Without this,
+                          // the sword-collection bonus would silently apply
+                          // but never show up in the buy preview.
+                          final rawTap = def.tapPowerPerLevel * n;
+                          final effTap = rawTap * notifier.tapMultiplier;
                           return UpgradeTile(
                             icon: def.icon,
                             accent: def.accent,
@@ -82,7 +89,7 @@ class UpgradeScreen extends ConsumerWidget {
                             cost: cost,
                             buyCount: n,
                             gainLabel:
-                                '터치당 +${NumberFormatter.formatPrecise(def.tapPowerPerLevel * n)}',
+                                '터치당 +${NumberFormatter.formatPrecise(effTap)}',
                             affordable: affordable,
                             onBuy: () =>
                                 notifier.buyTapUpgrade(def.id, multiplier),
@@ -159,6 +166,12 @@ class _ProducerList extends StatelessWidget {
             final msLabel = nextMs == null
                 ? '마일스톤 완주! (x$curMult DPS)'
                 : '다음 Lv $nextMs → DPS x2 (현재 x$curMult)';
+            // Effective gain = raw producer DPS × every active multiplier
+            // (prestige, equipped sword, boosters, set, COLLECTION). The
+            // collection bonus actually does affect 동료/초월 income — this
+            // surfaces it instead of leaving the player wondering.
+            final rawDps = def.baseDps * n * def.milestoneMultiplier(lv);
+            final effDps = rawDps * notifier.dpsMultiplier;
             return UpgradeTile(
               icon: def.icon,
               accent: def.accent,
@@ -168,7 +181,7 @@ class _ProducerList extends StatelessWidget {
               cost: cost,
               buyCount: n,
               gainLabel:
-                  'DPS +${NumberFormatter.formatPrecise(def.baseDps * n * def.milestoneMultiplier(lv))}',
+                  'DPS +${NumberFormatter.formatPrecise(effDps)}',
               milestoneLabel: msLabel,
               affordable: affordable,
               onBuy: () => notifier.buyProducer(def.id, multiplier),

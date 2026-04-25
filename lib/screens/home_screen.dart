@@ -516,7 +516,7 @@ class _CollectionChip extends StatelessWidget {
               size: 18, color: Color(0xFF6A1B9A)),
           const SizedBox(width: 4),
           Text(
-            '수집 보너스 +$pct% (터치·DPS)',
+            '수집 보너스 +$pct% · 터치·동료·초월 모두 적용',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
