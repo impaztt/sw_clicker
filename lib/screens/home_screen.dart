@@ -134,6 +134,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: _ComboChip(combo: game.combo),
                 ),
               _TapPowerChip(tapPower: game.tapPower),
+              const SizedBox(height: 6),
+              _SlimeHintLine(remaining: game.tapsUntilSlime),
               if (game.dps > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -316,6 +318,33 @@ class _TapPowerChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SlimeHintLine extends StatelessWidget {
+  final int remaining;
+  const _SlimeHintLine({required this.remaining});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('🟡', style: TextStyle(fontSize: 11)),
+        const SizedBox(width: 4),
+        Text(
+          '슬라임까지 $remaining 회 터치',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.55),
+          ),
+        ),
+      ],
     );
   }
 }

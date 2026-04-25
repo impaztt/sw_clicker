@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum SwordTier { n, r, sr, ssr, ur }
+enum SwordTier { n, r, sr, ssr, lr, ur }
 
 extension SwordTierInfo on SwordTier {
   String get label => switch (this) {
@@ -8,6 +8,7 @@ extension SwordTierInfo on SwordTier {
         SwordTier.r => 'R',
         SwordTier.sr => 'SR',
         SwordTier.ssr => 'SSR',
+        SwordTier.lr => 'LR',
         SwordTier.ur => 'UR',
       };
 
@@ -16,6 +17,7 @@ extension SwordTierInfo on SwordTier {
         SwordTier.r => '희귀',
         SwordTier.sr => '초희귀',
         SwordTier.ssr => '전설',
+        SwordTier.lr => '영웅',
         SwordTier.ur => '신화',
       };
 
@@ -24,15 +26,17 @@ extension SwordTierInfo on SwordTier {
         SwordTier.r => const Color(0xFF42A5F5),
         SwordTier.sr => const Color(0xFFAB47BC),
         SwordTier.ssr => const Color(0xFFFFB300),
+        SwordTier.lr => const Color(0xFF26A69A),
         SwordTier.ur => const Color(0xFFEF5350),
       };
 
   /// Roll rate as a percent (sum = 100).
   double get rate => switch (this) {
-        SwordTier.n => 60,
+        SwordTier.n => 55,
         SwordTier.r => 25,
-        SwordTier.sr => 10,
-        SwordTier.ssr => 4,
+        SwordTier.sr => 11,
+        SwordTier.ssr => 6,
+        SwordTier.lr => 2,
         SwordTier.ur => 1,
       };
 }

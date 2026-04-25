@@ -82,6 +82,7 @@ class AchContext {
   final bool ownsAnyR;
   final bool ownsAnySr;
   final bool ownsAnySsr;
+  final bool ownsAnyLr;
   final bool ownsAnyUr;
   final int maxSwordLevel;
   final int maxedSwordCount;
@@ -106,6 +107,7 @@ class AchContext {
     required this.ownsAnyR,
     required this.ownsAnySr,
     required this.ownsAnySsr,
+    required this.ownsAnyLr,
     required this.ownsAnyUr,
     required this.maxSwordLevel,
     required this.maxedSwordCount,

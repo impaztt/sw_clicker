@@ -99,8 +99,9 @@ const boosterOffers = <BoosterOffer>[
   ),
 ];
 
-/// Slime config — 1 in 500 taps (~0.2%) spawns a golden slime.
-const slimeSpawnChance = 0.002;
+/// Slime config — guaranteed spawn every N taps so the player can
+/// predict it. Counter persists in SaveData.tapsSinceSlime.
+const slimeSpawnEvery = 250;
 const slimeLifetimeMs = 5000;
 const slimeRushMultiplier = 3.0;
 const slimeRushDurationSec = 60;
@@ -171,6 +172,7 @@ class GameState {
   final int dailyStreak;
   final DateTime? lastDailyClaimAt;
   final List<Booster> activeBoosters;
+  final int tapsUntilSlime;
   final bool loaded;
 
   const GameState({
@@ -202,6 +204,7 @@ class GameState {
     required this.dailyStreak,
     required this.lastDailyClaimAt,
     required this.activeBoosters,
+    required this.tapsUntilSlime,
     this.loaded = false,
   });
 
@@ -234,6 +237,7 @@ class GameState {
         dailyStreak: 0,
         lastDailyClaimAt: null,
         activeBoosters: const [],
+        tapsUntilSlime: slimeSpawnEvery,
         loaded: false,
       );
 
@@ -271,7 +275,7 @@ class GameState {
       totalProducerLv += v;
       if (v > 0) ownedProducers++;
     }
-    bool hasR = false, hasSr = false, hasSsr = false, hasUr = false;
+    bool hasR = false, hasSr = false, hasSsr = false, hasLr = false, hasUr = false;
     int maxLv = 0;
     int maxedCount = 0;
     for (final entry in ownedSwords.entries) {
@@ -281,6 +285,7 @@ class GameState {
         if (tier == SwordTier.r) hasR = true;
         if (tier == SwordTier.sr) hasSr = true;
         if (tier == SwordTier.ssr) hasSsr = true;
+        if (tier == SwordTier.lr) hasLr = true;
         if (tier == SwordTier.ur) hasUr = true;
       } catch (_) {}
       if (entry.value > maxLv) maxLv = entry.value;
@@ -301,6 +306,7 @@ class GameState {
       ownsAnyR: hasR,
       ownsAnySr: hasSr,
       ownsAnySsr: hasSsr,
+      ownsAnyLr: hasLr,
       ownsAnyUr: hasUr,
       maxSwordLevel: maxLv,
       maxedSwordCount: maxedCount,
@@ -468,6 +474,7 @@ class GameNotifier extends Notifier<GameState> {
       dailyStreak: _save.dailyStreak,
       lastDailyClaimAt: _save.lastDailyClaimAt,
       activeBoosters: List.unmodifiable(_save.activeBoosters),
+      tapsUntilSlime: (slimeSpawnEvery - _save.tapsSinceSlime).clamp(0, slimeSpawnEvery),
       loaded: loaded,
     );
     if (loaded) _checkAchievements();
@@ -530,6 +537,7 @@ class GameNotifier extends Notifier<GameState> {
         dailyStreak: state.dailyStreak,
         lastDailyClaimAt: state.lastDailyClaimAt,
         activeBoosters: state.activeBoosters,
+        tapsUntilSlime: state.tapsUntilSlime,
         loaded: true,
       );
     }
@@ -632,7 +640,9 @@ class GameNotifier extends Notifier<GameState> {
     _save.stats.totalTaps++;
     if (isCrit) _save.stats.totalCrits++;
 
-    final slimeSpawned = _random.nextDouble() < slimeSpawnChance;
+    _save.tapsSinceSlime++;
+    final slimeSpawned = _save.tapsSinceSlime >= slimeSpawnEvery;
+    if (slimeSpawned) _save.tapsSinceSlime = 0;
 
     _scheduleComboDecay();
     _emit(loaded: true);
@@ -863,7 +873,7 @@ class GameNotifier extends Notifier<GameState> {
 
   SwordTier _rollTier({required bool forceSrPlus}) {
     final pool = forceSrPlus
-        ? const [SwordTier.sr, SwordTier.ssr, SwordTier.ur]
+        ? const [SwordTier.sr, SwordTier.ssr, SwordTier.lr, SwordTier.ur]
         : SwordTier.values;
     final totalWeight =
         pool.map((t) => t.rate).fold<double>(0, (a, b) => a + b);

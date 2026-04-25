@@ -159,12 +159,12 @@ class _CollectionView extends ConsumerWidget {
         return b.tier.index.compareTo(a.tier.index);
       });
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.72,
+        crossAxisCount: 4,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 0.7,
       ),
       itemCount: sorted.length,
       itemBuilder: (context, i) {
@@ -211,64 +211,68 @@ class _SwordCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: equipped
                   ? AppColors.coral
                   : def.tier.color.withValues(alpha: 0.4),
-              width: equipped ? 2.5 : 1.2,
+              width: equipped ? 2 : 1,
             ),
           ),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: def.tier.color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   def.tier.label,
                   style: TextStyle(
                     color: def.tier.color,
-                    fontSize: 11,
+                    fontSize: 9,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Expanded(
                 child: SwordPreview(
                   visual: def.visual,
                   locked: !owned,
-                  size: 70,
+                  size: 52,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 owned ? def.name : '???',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: owned ? Colors.black87 : Colors.black38,
+                  color: owned
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4),
                 ),
               ),
-              const SizedBox(height: 2),
               if (owned)
                 Text(
-                  equipped ? '장착 중 · Lv $level' : 'Lv $level',
+                  equipped ? '장착 · L$level' : 'L$level',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.w700,
                     color: equipped ? AppColors.coral : Colors.black54,
                   ),
@@ -277,7 +281,7 @@ class _SwordCard extends StatelessWidget {
                 const Text(
                   '미획득',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.w700,
                     color: Colors.black38,
                   ),

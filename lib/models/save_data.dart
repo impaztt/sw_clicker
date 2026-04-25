@@ -2,7 +2,7 @@ import 'booster.dart';
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 6;
+  static const currentVersion = 7;
 
   int version;
   double gold;
@@ -31,6 +31,9 @@ class SaveData {
   // Time-limited boosters (v6)
   List<Booster> activeBoosters;
 
+  // Deterministic golden-slime spawn counter (v7).
+  int tapsSinceSlime;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -50,6 +53,7 @@ class SaveData {
     this.lastDailyClaimAt,
     this.dailyStreak = 0,
     List<Booster>? activeBoosters,
+    this.tapsSinceSlime = 0,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
@@ -78,6 +82,7 @@ class SaveData {
         'lastDailyClaimAt': lastDailyClaimAt?.toIso8601String(),
         'dailyStreak': dailyStreak,
         'activeBoosters': activeBoosters.map((b) => b.toJson()).toList(),
+        'tapsSinceSlime': tapsSinceSlime,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -113,5 +118,6 @@ class SaveData {
                 ?.map((e) => Booster.fromJson(Map<String, dynamic>.from(e as Map)))
                 .toList() ??
             <Booster>[],
+        tapsSinceSlime: json['tapsSinceSlime'] as int? ?? 0,
       );
 }

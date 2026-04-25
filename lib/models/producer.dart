@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+/// Which tab in the upgrade screen owns this producer.
+enum ProducerCategory { companion, transcendent }
+
 class ProducerDef {
   static const milestones = <int>[25, 50, 100, 200];
 
@@ -12,6 +15,7 @@ class ProducerDef {
   final double baseCost;
   final double baseDps;
   final double growthRate;
+  final ProducerCategory category;
 
   const ProducerDef({
     required this.id,
@@ -22,6 +26,7 @@ class ProducerDef {
     required this.baseCost,
     required this.baseDps,
     this.growthRate = 1.15,
+    this.category = ProducerCategory.companion,
   });
 
   double costAt(int currentLevel) =>

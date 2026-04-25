@@ -5,6 +5,7 @@ import '../core/number_format.dart';
 import '../core/theme.dart';
 import '../data/producer_catalog.dart';
 import '../data/tap_upgrade_catalog.dart';
+import '../models/producer.dart';
 import '../providers/game_provider.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/gold_display.dart';
@@ -19,9 +20,16 @@ class UpgradeScreen extends ConsumerWidget {
     final notifier = ref.read(gameProvider.notifier);
     final multiplier = ref.watch(buyMultiplierProvider);
 
+    final companions = producerCatalog
+        .where((p) => p.category == ProducerCategory.companion)
+        .toList();
+    final transcendents = producerCatalog
+        .where((p) => p.category == ProducerCategory.transcendent)
+        .toList();
+
     return SafeArea(
       child: DefaultTabController(
-        length: 2,
+        length: 3,
         child: Column(
           children: [
             const SizedBox(height: 12),
@@ -42,10 +50,11 @@ class UpgradeScreen extends ConsumerWidget {
               labelColor: AppColors.deepCoral,
               unselectedLabelColor: Colors.black45,
               indicatorColor: AppColors.coral,
-              labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
               tabs: [
-                Tab(text: '터치 강화'),
+                Tab(text: '터치'),
                 Tab(text: '동료'),
+                Tab(text: '초월'),
               ],
             ),
             Expanded(
@@ -81,41 +90,19 @@ class UpgradeScreen extends ConsumerWidget {
                         }),
                     ],
                   ),
-                  ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    children: [
-                      for (final def in producerCatalog)
-                        Builder(builder: (_) {
-                          final lv = game.producerLevel(def.id);
-                          final maxN = def.maxAffordable(game.gold, lv);
-                          final isMax = multiplier < 0;
-                          final n = isMax ? (maxN > 0 ? maxN : 1) : multiplier;
-                          final cost = def.costForNext(lv, n);
-                          final affordable = isMax
-                              ? maxN > 0
-                              : game.canAfford(cost);
-                          final nextMs = def.nextMilestone(lv);
-                          final curMult = def.milestoneMultiplier(lv).toInt();
-                          final msLabel = nextMs == null
-                              ? '마일스톤 완주! (x$curMult DPS)'
-                              : '다음 Lv $nextMs → DPS x2 (현재 x$curMult)';
-                          return UpgradeTile(
-                            icon: def.icon,
-                            accent: def.accent,
-                            name: def.name,
-                            description: def.description,
-                            level: lv,
-                            cost: cost,
-                            buyCount: n,
-                            gainLabel:
-                                'DPS +${NumberFormatter.formatPrecise(def.baseDps * n * def.milestoneMultiplier(lv))}',
-                            milestoneLabel: msLabel,
-                            affordable: affordable,
-                            onBuy: () =>
-                                notifier.buyProducer(def.id, multiplier),
-                          );
-                        }),
-                    ],
+                  _ProducerList(
+                    defs: companions,
+                    game: game,
+                    multiplier: multiplier,
+                    notifier: notifier,
+                  ),
+                  _ProducerList(
+                    defs: transcendents,
+                    game: game,
+                    multiplier: multiplier,
+                    notifier: notifier,
+                    headerLabel:
+                        '동료보다 한참 위의 존재들. 가격이 무서울 정도지만 DPS도 자릿수가 다릅니다.',
                   ),
                 ],
               ),
@@ -123,6 +110,71 @@ class UpgradeScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProducerList extends StatelessWidget {
+  final List<ProducerDef> defs;
+  final GameState game;
+  final int multiplier;
+  final GameNotifier notifier;
+  final String? headerLabel;
+
+  const _ProducerList({
+    required this.defs,
+    required this.game,
+    required this.multiplier,
+    required this.notifier,
+    this.headerLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        if (headerLabel != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Text(
+              headerLabel!,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.black.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
+        for (final def in defs)
+          Builder(builder: (_) {
+            final lv = game.producerLevel(def.id);
+            final maxN = def.maxAffordable(game.gold, lv);
+            final isMax = multiplier < 0;
+            final n = isMax ? (maxN > 0 ? maxN : 1) : multiplier;
+            final cost = def.costForNext(lv, n);
+            final affordable = isMax ? maxN > 0 : game.canAfford(cost);
+            final nextMs = def.nextMilestone(lv);
+            final curMult = def.milestoneMultiplier(lv).toInt();
+            final msLabel = nextMs == null
+                ? '마일스톤 완주! (x$curMult DPS)'
+                : '다음 Lv $nextMs → DPS x2 (현재 x$curMult)';
+            return UpgradeTile(
+              icon: def.icon,
+              accent: def.accent,
+              name: def.name,
+              description: def.description,
+              level: lv,
+              cost: cost,
+              buyCount: n,
+              gainLabel:
+                  'DPS +${NumberFormatter.formatPrecise(def.baseDps * n * def.milestoneMultiplier(lv))}',
+              milestoneLabel: msLabel,
+              affordable: affordable,
+              onBuy: () => notifier.buyProducer(def.id, multiplier),
+            );
+          }),
+      ],
     );
   }
 }

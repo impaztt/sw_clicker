@@ -465,6 +465,14 @@ final achievementCatalog = <AchievementDef>[
     test: (c) => c.ownsAnySsr,
   ),
   _bool(
+    id: 'sword_lr',
+    name: '영웅의 이름',
+    description: 'LR 등급 검 획득',
+    category: AchievementCategory.swordCollect,
+    essenceReward: 22,
+    test: (c) => c.ownsAnyLr,
+  ),
+  _bool(
     id: 'sword_ur',
     name: '신화의 일각',
     description: 'UR 등급 검 획득',
