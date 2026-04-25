@@ -104,7 +104,7 @@ class AchContext {
   final int maxedSwordCount;
   final int totalSummons;
   final int prestigeCount;
-  final int prestigeSouls;
+  final Map<String, int> prestigeUpgradeLevels;
   final int totalTapUpgradesBought;
   final bool hasEquippedSword;
   final int totalCrits;
@@ -137,7 +137,7 @@ class AchContext {
     required this.maxedSwordCount,
     required this.totalSummons,
     required this.prestigeCount,
-    required this.prestigeSouls,
+    required this.prestigeUpgradeLevels,
     required this.totalTapUpgradesBought,
     required this.hasEquippedSword,
     required this.totalCrits,

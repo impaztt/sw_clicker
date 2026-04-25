@@ -2,7 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../models/prestige_upgrade.dart';
 
+const prestigeOverallUpgradeId = 'legacy_overall';
+
 const prestigeUpgradeCatalog = <PrestigeUpgradeDef>[
+  PrestigeUpgradeDef(
+    id: prestigeOverallUpgradeId,
+    name: '영구 각인',
+    description: '전체 배율을 영구 강화합니다.',
+    icon: Icons.auto_awesome,
+    accent: Color(0xFF00695C),
+    baseCost: 5,
+    growthRate: 1.12,
+    maxLevel: 9999,
+    globalBonusPerLevel: 0.02,
+  ),
   PrestigeUpgradeDef(
     id: 'legacy_tap',
     name: '검의 유산',
@@ -76,6 +89,15 @@ double prestigeCoinGainBonusFraction(Map<String, int> levels) {
   for (final def in prestigeUpgradeCatalog) {
     final lv = levels[def.id] ?? 0;
     total += def.coinGainBonusPerLevel * lv;
+  }
+  return total;
+}
+
+double prestigeGlobalBonusFraction(Map<String, int> levels) {
+  double total = 0;
+  for (final def in prestigeUpgradeCatalog) {
+    final lv = levels[def.id] ?? 0;
+    total += def.globalBonusPerLevel * lv;
   }
   return total;
 }

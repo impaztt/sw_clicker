@@ -1,3 +1,4 @@
+import 'prestige_upgrade_catalog.dart';
 import '../models/achievement.dart';
 
 /// Convenience: numeric target achievements.
@@ -632,30 +633,33 @@ final achievementCatalog = <AchievementDef>[
   ),
   _num(
     id: 'souls_100',
-    name: '백 개의 혼',
-    description: '누적 소울 100',
+    name: '각인의 시작',
+    description: '영구 각인 Lv 10',
     category: AchievementCategory.prestige,
     essenceReward: 5,
-    current: (c) => c.prestigeSouls.toDouble(),
-    target: 100,
+    current: (c) =>
+        (c.prestigeUpgradeLevels[prestigeOverallUpgradeId] ?? 0).toDouble(),
+    target: 10,
   ),
   _num(
     id: 'souls_1k',
-    name: '천 개의 혼',
-    description: '누적 소울 1,000',
+    name: '각인 장인',
+    description: '영구 각인 Lv 50',
     category: AchievementCategory.prestige,
     essenceReward: 20,
-    current: (c) => c.prestigeSouls.toDouble(),
-    target: 1000,
+    current: (c) =>
+        (c.prestigeUpgradeLevels[prestigeOverallUpgradeId] ?? 0).toDouble(),
+    target: 50,
   ),
   _num(
     id: 'souls_10k',
-    name: '만 개의 혼',
-    description: '누적 소울 10,000',
+    name: '끝없는 각인',
+    description: '영구 각인 Lv 150',
     category: AchievementCategory.prestige,
     essenceReward: 60,
-    current: (c) => c.prestigeSouls.toDouble(),
-    target: 10000,
+    current: (c) =>
+        (c.prestigeUpgradeLevels[prestigeOverallUpgradeId] ?? 0).toDouble(),
+    target: 150,
   ),
 
   // ============ 10. 슬라임 (6) ============

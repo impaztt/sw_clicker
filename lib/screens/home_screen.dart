@@ -164,13 +164,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     hours: offlineMaxHours,
                   ),
                 ),
-              if (game.prestigeSouls > 0)
+              if (game.prestigeMultiplier > 1)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: _SoulChip(
-                    souls: game.prestigeSouls,
-                    multiplier: game.prestigeMultiplier,
-                  ),
+                  child: _PermanentBoostChip(multiplier: game.prestigeMultiplier),
                 ),
               if (notifier.collectionBonusFraction > 0)
                 Padding(
@@ -529,10 +526,9 @@ class _CollectionChip extends StatelessWidget {
   }
 }
 
-class _SoulChip extends StatelessWidget {
-  final int souls;
+class _PermanentBoostChip extends StatelessWidget {
   final double multiplier;
-  const _SoulChip({required this.souls, required this.multiplier});
+  const _PermanentBoostChip({required this.multiplier});
 
   @override
   Widget build(BuildContext context) {
@@ -549,7 +545,7 @@ class _SoulChip extends StatelessWidget {
           const Icon(Icons.auto_awesome, size: 18, color: Color(0xFF00695C)),
           const SizedBox(width: 4),
           Text(
-            '검의 혼 $souls · +$pct%',
+            '영구 배율 +$pct%',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,

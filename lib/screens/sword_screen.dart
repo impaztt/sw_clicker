@@ -915,7 +915,7 @@ class _EssenceSources extends StatelessWidget {
           ),
           const _SourceRow(
             icon: Icons.auto_awesome,
-            text: '환생 시 (획득 소울 × 3)',
+            text: '환생 시 (획득 코인 × 3)',
           ),
           const _SourceRow(
             icon: Icons.calendar_month,

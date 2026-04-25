@@ -13,6 +13,7 @@ class PrestigeUpgradeDef {
   final double tapBonusPerLevel; // 0.10 = +10% tap/lv
   final double dpsBonusPerLevel; // 0.10 = +10% dps/lv
   final double coinGainBonusPerLevel; // 0.10 = +10% prestige coin gain/lv
+  final double globalBonusPerLevel; // 0.02 = +2% to both tap/dps per lv
 
   const PrestigeUpgradeDef({
     required this.id,
@@ -26,6 +27,7 @@ class PrestigeUpgradeDef {
     this.tapBonusPerLevel = 0,
     this.dpsBonusPerLevel = 0,
     this.coinGainBonusPerLevel = 0,
+    this.globalBonusPerLevel = 0,
   });
 
   int costAt(int currentLevel) {

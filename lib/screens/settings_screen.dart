@@ -119,7 +119,7 @@ class SettingsScreen extends ConsumerWidget {
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('정말 초기화할까요?'),
         content: const Text(
-          '모든 진행도, 골드, 동료 레벨, 검의 혼, 통계가 삭제돼요.\n'
+          '모든 진행도, 골드, 동료 레벨, 환생 코인, 통계가 삭제돼요.\n'
           '이 작업은 되돌릴 수 없어요.',
         ),
         actions: [

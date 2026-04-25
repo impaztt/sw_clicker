@@ -223,7 +223,6 @@ class GameState {
   final double totalGoldEarned;
   final double tapPower;
   final double dps;
-  final int prestigeSouls;
   final int prestigeCoins;
   final int prestigeCount;
   final Map<String, int> producerLevels;
@@ -266,7 +265,6 @@ class GameState {
     required this.totalGoldEarned,
     required this.tapPower,
     required this.dps,
-    required this.prestigeSouls,
     required this.prestigeCoins,
     required this.prestigeCount,
     required this.producerLevels,
@@ -310,7 +308,6 @@ class GameState {
         totalGoldEarned: 0,
         tapPower: 1,
         dps: 0,
-        prestigeSouls: 0,
         prestigeCoins: 0,
         prestigeCount: 0,
         producerLevels: {},
@@ -349,12 +346,8 @@ class GameState {
         loaded: false,
       );
 
-  double get prestigeMultiplier => 1.0 + (prestigeSouls * 0.02);
-
-  int get prestigeSoulsAvailable {
-    if (totalGoldEarned < 1e9) return 0;
-    return sqrt(totalGoldEarned / 1e9).floor();
-  }
+  double get prestigeMultiplier =>
+      1.0 + prestigeGlobalBonusFraction(prestigeUpgradeLevels);
 
   int get prestigeCoinsAvailable => _calcPrestigeCoinsFromProgress(
         totalGoldEarned: totalGoldEarned,
@@ -434,7 +427,7 @@ class GameState {
       maxedSwordCount: maxedCount,
       totalSummons: totalSummons,
       prestigeCount: prestigeCount,
-      prestigeSouls: prestigeSouls,
+      prestigeUpgradeLevels: prestigeUpgradeLevels,
       totalTapUpgradesBought: totalTapUpgradesBought,
       hasEquippedSword: equippedSwordId != null,
       totalCrits: totalCrits,
@@ -507,6 +500,7 @@ class GameNotifier extends Notifier<GameState> {
     final loaded = await _syncService.loadResolved();
     if (loaded != null) {
       _save = loaded;
+      _migrateLegacySoulsToOverallUpgrade();
       final elapsed = DateTime.now().difference(loaded.lastSavedAt);
       final cappedSeconds = elapsed.inSeconds.clamp(0, offlineMaxSeconds);
       final dpsNow = _calcDps();
@@ -521,6 +515,16 @@ class GameNotifier extends Notifier<GameState> {
     _emit(loaded: true);
     _startTicker();
     _startAutoSave();
+  }
+
+  void _migrateLegacySoulsToOverallUpgrade() {
+    final souls = _save.prestigeSouls;
+    if (souls <= 0) return;
+    final def = prestigeUpgradeById(prestigeOverallUpgradeId);
+    final prev = _save.prestigeUpgradeLevels[prestigeOverallUpgradeId] ?? 0;
+    final migrated = (prev + souls).clamp(0, def.maxLevel);
+    _save.prestigeUpgradeLevels[prestigeOverallUpgradeId] = migrated;
+    _save.prestigeSouls = 0;
   }
 
   /// Decide whether the user is eligible for a daily bonus right now.
@@ -583,7 +587,6 @@ class GameNotifier extends Notifier<GameState> {
       totalGoldEarned: _save.totalGoldEarned,
       tapPower: _calcTapPower(),
       dps: _calcDps(),
-      prestigeSouls: _save.prestigeSouls,
       prestigeCoins: _save.prestigeCoins,
       prestigeCount: _save.prestigeCount,
       producerLevels: Map.unmodifiable(_save.producerLevels),
@@ -692,7 +695,6 @@ class GameNotifier extends Notifier<GameState> {
         totalGoldEarned: state.totalGoldEarned,
         tapPower: state.tapPower,
         dps: state.dps,
-        prestigeSouls: state.prestigeSouls,
         prestigeCoins: state.prestigeCoins,
         prestigeCount: state.prestigeCount,
         producerLevels: state.producerLevels,
@@ -733,7 +735,8 @@ class GameNotifier extends Notifier<GameState> {
     }
   }
 
-  double _prestigeMult() => 1.0 + (_save.prestigeSouls * 0.02);
+  double _prestigeMult() =>
+      1.0 + prestigeGlobalBonusFraction(_save.prestigeUpgradeLevels);
 
   double _prestigeShopTapMult() =>
       1.0 + prestigeTapBonusFraction(_save.prestigeUpgradeLevels);
@@ -978,13 +981,11 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   bool prestige() {
-    final souls = state.prestigeSoulsAvailable;
     final coins = state.prestigeCoinsAvailable;
-    if (souls <= 0 && coins <= 0) return false;
-    _save.prestigeSouls += souls;
+    if (coins <= 0) return false;
     _save.prestigeCoins += coins;
     _save.prestigeCount += 1;
-    _save.essence += souls * 3;
+    _save.essence += coins * 3;
     _save.gold = 0;
     _save.totalGoldEarned = 0;
     _save.producerLevels.clear();

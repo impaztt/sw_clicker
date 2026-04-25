@@ -76,12 +76,9 @@ class _PrestigeOverview extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final game = ref.watch(gameProvider);
-    final soulsGain = game.prestigeSoulsAvailable;
     final coinsGain = game.prestigeCoinsAvailable;
-    final canPrestige = soulsGain > 0 || coinsGain > 0;
+    final canPrestige = coinsGain > 0;
     final currentPct = ((game.prestigeMultiplier - 1) * 100).toStringAsFixed(0);
-    final nextPct = (((1 + (game.prestigeSouls + soulsGain) * 0.02) - 1) * 100)
-        .toStringAsFixed(0);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -89,9 +86,9 @@ class _PrestigeOverview extends ConsumerWidget {
         _StatCard(
           icon: Icons.auto_awesome,
           iconColor: const Color(0xFF00695C),
-          label: '검의 혼 보유량',
-          value: '${game.prestigeSouls}',
-          subValue: '영구 소울 배율 +$currentPct%',
+          label: '현재 영구 배율',
+          value: '+$currentPct%',
+          subValue: '코인 상점의 영구 각인 업그레이드로 증가합니다',
         ),
         const SizedBox(height: 10),
         _StatCard(
@@ -106,9 +103,9 @@ class _PrestigeOverview extends ConsumerWidget {
           icon: Icons.trending_up,
           iconColor: AppColors.deepCoral,
           label: '지금 환생 시 획득',
-          value: '+$soulsGain 소울 / +$coinsGain 코인',
+          value: '+$coinsGain 코인',
           subValue: canPrestige
-              ? '환생 후 소울 배율 +$nextPct%'
+              ? '환생 후 코인 상점에서 영구 성장을 구매할 수 있습니다'
               : '골드와 진행도를 더 올리면 보상이 증가합니다',
         ),
         const SizedBox(height: 10),
@@ -125,9 +122,7 @@ class _PrestigeOverview extends ConsumerWidget {
               ? () => _confirmPrestige(
                     context,
                     ref,
-                    soulsGain: soulsGain,
                     coinsGain: coinsGain,
-                    nextPct: nextPct,
                   )
               : null,
           style: FilledButton.styleFrom(
@@ -138,7 +133,7 @@ class _PrestigeOverview extends ConsumerWidget {
           ),
           child: Text(
             canPrestige
-                ? '환생하기 (+$soulsGain 소울, +$coinsGain 코인)'
+                ? '환생하기 (+$coinsGain 코인)'
                 : '아직 보상이 부족합니다',
             style: const TextStyle(
               fontSize: 15,
@@ -148,7 +143,7 @@ class _PrestigeOverview extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '환생 시 현재 회차 골드와 업그레이드는 초기화되지만,\n소울·코인·코인 상점 업그레이드는 유지됩니다.',
+          '환생 시 현재 회차 골드와 업그레이드는 초기화되지만,\n환생 코인과 코인 상점 업그레이드는 유지됩니다.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 12,
@@ -162,9 +157,7 @@ class _PrestigeOverview extends ConsumerWidget {
   Future<void> _confirmPrestige(
     BuildContext context,
     WidgetRef ref, {
-    required int soulsGain,
     required int coinsGain,
-    required String nextPct,
   }) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -172,8 +165,8 @@ class _PrestigeOverview extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('환생 확인'),
         content: Text(
-          '소울 +$soulsGain, 환생 코인 +$coinsGain 을 획득합니다.\n'
-          '환생 후 소울 배율: +$nextPct%\n\n'
+          '환생 코인 +$coinsGain 을 획득합니다.\n'
+          '획득한 코인으로 영구 각인/영구 업그레이드를 구매할 수 있습니다.\n\n'
           '현재 회차 골드와 업그레이드는 초기화됩니다.',
         ),
         actions: [
@@ -373,6 +366,10 @@ class _ShopTile extends StatelessWidget {
   String _effectLabel(PrestigeUpgradeDef def, int level) {
     final clamped = level.clamp(0, def.maxLevel);
     final parts = <String>[];
+    if (def.globalBonusPerLevel > 0) {
+      final pct = (def.globalBonusPerLevel * clamped * 100).toStringAsFixed(0);
+      parts.add('전체 +$pct%');
+    }
     if (def.tapBonusPerLevel > 0) {
       final pct = (def.tapBonusPerLevel * clamped * 100).toStringAsFixed(0);
       parts.add('터치 +$pct%');
