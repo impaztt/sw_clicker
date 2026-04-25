@@ -7,6 +7,7 @@ class GameStats {
   int totalTapUpgradesBought;
   int totalCrits;
   int maxCombo;
+  int comboBurstCount;
 
   GameStats({
     this.totalTaps = 0,
@@ -17,6 +18,7 @@ class GameStats {
     this.totalTapUpgradesBought = 0,
     this.totalCrits = 0,
     this.maxCombo = 0,
+    this.comboBurstCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +30,7 @@ class GameStats {
         'totalTapUpgradesBought': totalTapUpgradesBought,
         'totalCrits': totalCrits,
         'maxCombo': maxCombo,
+        'comboBurstCount': comboBurstCount,
       };
 
   factory GameStats.fromJson(Map<String, dynamic> json) => GameStats(
@@ -39,6 +42,7 @@ class GameStats {
         totalTapUpgradesBought: json['totalTapUpgradesBought'] as int? ?? 0,
         totalCrits: json['totalCrits'] as int? ?? 0,
         maxCombo: json['maxCombo'] as int? ?? 0,
+        comboBurstCount: json['comboBurstCount'] as int? ?? 0,
       );
 }
 
@@ -46,22 +50,26 @@ class GameSettings {
   bool haptic;
   bool sound;
   bool darkMode;
+  bool tutorialSeen;
 
   GameSettings({
     this.haptic = true,
     this.sound = true,
     this.darkMode = false,
+    this.tutorialSeen = false,
   });
 
   Map<String, dynamic> toJson() => {
         'haptic': haptic,
         'sound': sound,
         'darkMode': darkMode,
+        'tutorialSeen': tutorialSeen,
       };
 
   factory GameSettings.fromJson(Map<String, dynamic> json) => GameSettings(
         haptic: json['haptic'] as bool? ?? true,
         sound: json['sound'] as bool? ?? true,
         darkMode: json['darkMode'] as bool? ?? false,
+        tutorialSeen: json['tutorialSeen'] as bool? ?? false,
       );
 }

@@ -6,10 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/achievement_catalog.dart';
 import '../data/producer_catalog.dart';
 import '../data/sword_catalog.dart';
+import '../data/skill_catalog.dart';
+import '../data/sword_sets.dart';
 import '../data/tap_upgrade_catalog.dart';
 import '../models/achievement.dart';
 import '../models/booster.dart';
 import '../models/save_data.dart';
+import '../models/skill.dart';
 import '../models/sword.dart';
 import '../services/sync_service.dart';
 
@@ -106,6 +109,24 @@ const slimeLifetimeMs = 5000;
 const slimeRushMultiplier = 3.0;
 const slimeRushDurationSec = 60;
 
+/// Auto-tap config: when an autoTap booster is active, fire a tap every
+/// [autoTapIntervalMs] milliseconds. ~4 taps/sec is comfortable: visible
+/// progress without trashing the framerate.
+const autoTapIntervalMs = 250;
+
+/// Combo burst: triggered the first time combo reaches comboMax during a
+/// single combo streak. Reward = current DPS × this many seconds.
+const comboBurstWorthSeconds = 60;
+
+/// Combo surge skill: extra combo stacks per tap and bonus multiplier
+/// applied while the surge window is active.
+const comboSurgePerTap = 2;
+const comboSurgeBonus = 2.0; // tap reward × this while surging
+
+/// Slash burst skill: instant gold equal to current DPS × this seconds.
+const slashBurstWorthSeconds = 300;
+const essenceGatherAmount = 30;
+
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
   (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
@@ -129,11 +150,29 @@ class TapResult {
   final bool isCrit;
   final int combo;
   final bool slimeSpawned;
+  final bool isBurst;
+  final double burstAmount;
   const TapResult({
     required this.amount,
     required this.isCrit,
     required this.combo,
     this.slimeSpawned = false,
+    this.isBurst = false,
+    this.burstAmount = 0,
+  });
+}
+
+class SkillResult {
+  final SkillId id;
+  final bool ok;
+  final String message;
+  /// Extra payload for UI (e.g. how much gold the burst granted).
+  final double payload;
+  const SkillResult({
+    required this.id,
+    required this.ok,
+    required this.message,
+    this.payload = 0,
   });
 }
 
@@ -173,6 +212,10 @@ class GameState {
   final DateTime? lastDailyClaimAt;
   final List<Booster> activeBoosters;
   final int tapsUntilSlime;
+  final bool autoTapping;
+  final bool tutorialSeen;
+  final Map<String, DateTime> skillReadyAt;
+  final Set<String> completedSetIds;
   final bool loaded;
 
   const GameState({
@@ -205,6 +248,10 @@ class GameState {
     required this.lastDailyClaimAt,
     required this.activeBoosters,
     required this.tapsUntilSlime,
+    required this.autoTapping,
+    required this.tutorialSeen,
+    required this.skillReadyAt,
+    required this.completedSetIds,
     this.loaded = false,
   });
 
@@ -238,6 +285,10 @@ class GameState {
         lastDailyClaimAt: null,
         activeBoosters: const [],
         tapsUntilSlime: slimeSpawnEvery,
+        autoTapping: false,
+        tutorialSeen: false,
+        skillReadyAt: const {},
+        completedSetIds: const {},
         loaded: false,
       );
 
@@ -347,6 +398,7 @@ class GameNotifier extends Notifier<GameState> {
   Timer? _tickTimer;
   Timer? _saveTimer;
   Timer? _comboDecayTimer;
+  Timer? _autoTapTimer;
   DateTime _lastTick = DateTime.now();
   double _playTimeAcc = 0;
   SaveData _save = SaveData();
@@ -354,6 +406,8 @@ class GameNotifier extends Notifier<GameState> {
   DailyBonus? _pendingDaily;
   int _combo = 0;
   DateTime? _lastTapAt;
+  DateTime? _comboSurgeUntil;
+  bool _burstFiredThisRun = false;
 
   @override
   GameState build() {
@@ -366,6 +420,7 @@ class GameNotifier extends Notifier<GameState> {
     _tickTimer?.cancel();
     _saveTimer?.cancel();
     _comboDecayTimer?.cancel();
+    _autoTapTimer?.cancel();
     _achievementUnlocks.close();
   }
 
@@ -475,9 +530,47 @@ class GameNotifier extends Notifier<GameState> {
       lastDailyClaimAt: _save.lastDailyClaimAt,
       activeBoosters: List.unmodifiable(_save.activeBoosters),
       tapsUntilSlime: (slimeSpawnEvery - _save.tapsSinceSlime).clamp(0, slimeSpawnEvery),
+      autoTapping: _autoTapActive(),
+      tutorialSeen: _save.settings.tutorialSeen,
+      skillReadyAt: Map.unmodifiable(_save.skillReadyAt),
+      completedSetIds: Set.unmodifiable(_completedSetIds()),
       loaded: loaded,
     );
     if (loaded) _checkAchievements();
+  }
+
+  bool _autoTapActive() {
+    final now = DateTime.now();
+    return _save.activeBoosters
+        .any((b) => b.type == BoosterType.autoTap && b.isActive(now));
+  }
+
+  Set<String> _completedSetIds() {
+    final ids = <String>{};
+    for (final s in swordSets) {
+      if (s.swordIds.every((id) => (_save.ownedSwords[id] ?? 0) > 0)) {
+        ids.add(s.id);
+      }
+    }
+    return ids;
+  }
+
+  double _setDpsBonus() {
+    double bonus = 0;
+    final completed = _completedSetIds();
+    for (final s in swordSets) {
+      if (completed.contains(s.id)) bonus += s.dpsBonus;
+    }
+    return 1.0 + bonus;
+  }
+
+  double _setTapBonus() {
+    double bonus = 0;
+    final completed = _completedSetIds();
+    for (final s in swordSets) {
+      if (completed.contains(s.id)) bonus += s.tapBonus;
+    }
+    return 1.0 + bonus;
   }
 
   void _checkAchievements() {
@@ -538,6 +631,10 @@ class GameNotifier extends Notifier<GameState> {
         lastDailyClaimAt: state.lastDailyClaimAt,
         activeBoosters: state.activeBoosters,
         tapsUntilSlime: state.tapsUntilSlime,
+        autoTapping: state.autoTapping,
+        tutorialSeen: state.tutorialSeen,
+        skillReadyAt: state.skillReadyAt,
+        completedSetIds: state.completedSetIds,
         loaded: true,
       );
     }
@@ -575,7 +672,11 @@ class GameNotifier extends Notifier<GameState> {
       final lv = _save.tapUpgradeLevels[def.id] ?? 0;
       base += def.tapPowerPerLevel * lv;
     }
-    return base * _prestigeMult() * _equippedTapMult() * _boosterTapMult();
+    return base *
+        _prestigeMult() *
+        _equippedTapMult() *
+        _boosterTapMult() *
+        _setTapBonus();
   }
 
   double _calcDps() {
@@ -584,7 +685,11 @@ class GameNotifier extends Notifier<GameState> {
       final lv = _save.producerLevels[def.id] ?? 0;
       sum += def.dpsAt(lv);
     }
-    return sum * _prestigeMult() * _equippedDpsMult() * _boosterDpsMult();
+    return sum *
+        _prestigeMult() *
+        _equippedDpsMult() *
+        _boosterDpsMult() *
+        _setDpsBonus();
   }
 
   /// Drop expired boosters from the save (called before any calculation that
@@ -624,15 +729,18 @@ class GameNotifier extends Notifier<GameState> {
     final now = DateTime.now();
     final withinWindow = _lastTapAt != null &&
         now.difference(_lastTapAt!).inMilliseconds <= comboWindowMs;
-    _combo = withinWindow ? (_combo + 1).clamp(0, comboMax) : 1;
+    final surge = _comboSurgeUntil != null && now.isBefore(_comboSurgeUntil!);
+    final increment = surge ? comboSurgePerTap : 1;
+    _combo = withinWindow ? (_combo + increment).clamp(0, comboMax) : increment;
     _lastTapAt = now;
     if (_combo > _save.stats.maxCombo) _save.stats.maxCombo = _combo;
 
     final base = _calcTapPower();
     final comboMult = 1.0 + (_combo * comboBonusPerStack).clamp(0.0, 0.5);
+    final surgeMult = surge ? comboSurgeBonus : 1.0;
     final isCrit = _random.nextDouble() < critChance;
     final critMult = isCrit ? critMultiplier : 1.0;
-    final amount = base * comboMult * critMult;
+    final amount = base * comboMult * surgeMult * critMult;
 
     _save.gold += amount;
     _save.totalGoldEarned += amount;
@@ -644,6 +752,19 @@ class GameNotifier extends Notifier<GameState> {
     final slimeSpawned = _save.tapsSinceSlime >= slimeSpawnEvery;
     if (slimeSpawned) _save.tapsSinceSlime = 0;
 
+    // Combo burst — fires once when combo first hits the cap during a run.
+    bool isBurst = false;
+    double burstAmount = 0;
+    if (_combo >= comboMax && !_burstFiredThisRun) {
+      _burstFiredThisRun = true;
+      isBurst = true;
+      burstAmount = _calcDps() * comboBurstWorthSeconds;
+      _save.gold += burstAmount;
+      _save.totalGoldEarned += burstAmount;
+      _save.stats.lifetimeGold += burstAmount;
+      _save.stats.comboBurstCount++;
+    }
+
     _scheduleComboDecay();
     _emit(loaded: true);
     return TapResult(
@@ -651,6 +772,8 @@ class GameNotifier extends Notifier<GameState> {
       isCrit: isCrit,
       combo: _combo,
       slimeSpawned: slimeSpawned,
+      isBurst: isBurst,
+      burstAmount: burstAmount,
     );
   }
 
@@ -660,6 +783,7 @@ class GameNotifier extends Notifier<GameState> {
         Timer(const Duration(milliseconds: comboWindowMs), () {
       if (_combo == 0) return;
       _combo = 0;
+      _burstFiredThisRun = false;
       _emit(loaded: true);
     });
   }
@@ -744,6 +868,12 @@ class GameNotifier extends Notifier<GameState> {
     unawaited(_persist());
   }
 
+  void setTutorialSeen(bool value) {
+    _save.settings.tutorialSeen = value;
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
   /// Returns (and clears) the pending daily bonus computed at load time.
   DailyBonus? consumePendingDaily() {
     final r = _pendingDaily;
@@ -803,6 +933,79 @@ class GameNotifier extends Notifier<GameState> {
         expiresAt: now.add(Duration(seconds: durationSec)),
       ));
     }
+    if (type == BoosterType.autoTap) _ensureAutoTapTimer();
+  }
+
+  void _ensureAutoTapTimer() {
+    if (_autoTapTimer != null) return;
+    _autoTapTimer = Timer.periodic(
+      const Duration(milliseconds: autoTapIntervalMs),
+      (_) {
+        if (!_autoTapActive()) {
+          _autoTapTimer?.cancel();
+          _autoTapTimer = null;
+          _emit(loaded: true);
+          return;
+        }
+        tapWithFeedback();
+      },
+    );
+  }
+
+  // ============ Skills ============
+
+  /// Returns the moment a skill becomes ready, or null if it's already
+  /// usable. UI uses this to render cooldown overlays.
+  DateTime? skillCooldownEndsAt(SkillId id) {
+    final ready = _save.skillReadyAt[id.id];
+    if (ready == null) return null;
+    return ready.isAfter(DateTime.now()) ? ready : null;
+  }
+
+  SkillResult useSkill(SkillId id) {
+    final def = skillDefFor(id);
+    final cooldownEnd = skillCooldownEndsAt(id);
+    if (cooldownEnd != null) {
+      return SkillResult(
+        id: id,
+        ok: false,
+        message: '아직 쿨타임이에요',
+      );
+    }
+    final now = DateTime.now();
+    SkillResult result;
+    switch (id) {
+      case SkillId.slashBurst:
+        final reward = _calcDps() * slashBurstWorthSeconds;
+        _save.gold += reward;
+        _save.totalGoldEarned += reward;
+        _save.stats.lifetimeGold += reward;
+        result = SkillResult(
+          id: id,
+          ok: true,
+          message: '검기 폭발!',
+          payload: reward,
+        );
+      case SkillId.comboSurge:
+        _comboSurgeUntil = now.add(const Duration(seconds: 10));
+        result = const SkillResult(
+          id: SkillId.comboSurge,
+          ok: true,
+          message: '10초간 콤보 폭주!',
+        );
+      case SkillId.essenceGather:
+        _save.essence += essenceGatherAmount;
+        result = const SkillResult(
+          id: SkillId.essenceGather,
+          ok: true,
+          message: '정수 +$essenceGatherAmount',
+          payload: essenceGatherAmount.toDouble(),
+        );
+    }
+    _save.skillReadyAt[id.id] = now.add(def.cooldown);
+    _emit(loaded: true);
+    unawaited(_persist());
+    return result;
   }
 
   /// Called by the home screen when the user taps a golden slime.

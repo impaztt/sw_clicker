@@ -2,7 +2,7 @@ import 'booster.dart';
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 7;
+  static const currentVersion = 8;
 
   int version;
   double gold;
@@ -34,6 +34,10 @@ class SaveData {
   // Deterministic golden-slime spawn counter (v7).
   int tapsSinceSlime;
 
+  // Skill cooldowns (v8): skill id → moment when the skill becomes usable
+  // again. Skill is "ready" if missing or in the past.
+  Map<String, DateTime> skillReadyAt;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -54,6 +58,7 @@ class SaveData {
     this.dailyStreak = 0,
     List<Booster>? activeBoosters,
     this.tapsSinceSlime = 0,
+    Map<String, DateTime>? skillReadyAt,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
@@ -61,7 +66,8 @@ class SaveData {
         settings = settings ?? GameSettings(),
         ownedSwords = ownedSwords ?? {},
         unlockedAchievements = unlockedAchievements ?? <String>{},
-        activeBoosters = activeBoosters ?? <Booster>[];
+        activeBoosters = activeBoosters ?? <Booster>[],
+        skillReadyAt = skillReadyAt ?? <String, DateTime>{};
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -83,6 +89,8 @@ class SaveData {
         'dailyStreak': dailyStreak,
         'activeBoosters': activeBoosters.map((b) => b.toJson()).toList(),
         'tapsSinceSlime': tapsSinceSlime,
+        'skillReadyAt': skillReadyAt
+            .map((k, v) => MapEntry(k, v.toIso8601String())),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -119,5 +127,11 @@ class SaveData {
                 .toList() ??
             <Booster>[],
         tapsSinceSlime: json['tapsSinceSlime'] as int? ?? 0,
+        skillReadyAt: ((json['skillReadyAt'] as Map?) ?? {}).map(
+          (k, v) => MapEntry(
+            k as String,
+            DateTime.tryParse(v as String? ?? '') ?? DateTime.now(),
+          ),
+        ),
       );
 }

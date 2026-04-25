@@ -75,6 +75,8 @@ class SwordDef {
   final double baseTapMult;
   final double baseDpsMult;
   final SwordVisual visual;
+  final String? setId;
+  final String? eventTag;
 
   const SwordDef({
     required this.id,
@@ -84,6 +86,8 @@ class SwordDef {
     required this.baseTapMult,
     this.baseDpsMult = 1.0,
     required this.visual,
+    this.setId,
+    this.eventTag,
   });
 
   /// At level L (1~10), effective multiplier = base * (1 + (L-1) * 0.1).

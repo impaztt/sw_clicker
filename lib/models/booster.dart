@@ -1,7 +1,8 @@
 enum BoosterType {
   dps('dps'),
   tap('tap'),
-  rush('rush'); // affects both dps + tap
+  rush('rush'), // affects both dps + tap
+  autoTap('auto_tap'); // simulates taps for the player; multiplier ignored
 
   final String id;
   const BoosterType(this.id);
