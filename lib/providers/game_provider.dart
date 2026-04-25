@@ -701,6 +701,23 @@ class GameNotifier extends Notifier<GameState> {
     }
   }
 
+  /// Total fractional bonus contributed by every owned sword (incl. the
+  /// equipped one — its big equip multiplier is separate, so this stacks
+  /// without "double-dipping" on the same source). Returns the raw sum,
+  /// e.g. 0.42 for "+42%" — see [_collectionMult] for the multiplier form.
+  double _collectionBonusTotal() {
+    double total = 0;
+    _save.ownedSwords.forEach((id, lv) {
+      if (lv <= 0) return;
+      try {
+        total += swordById(id).ownedBonusAt(lv);
+      } catch (_) {}
+    });
+    return total;
+  }
+
+  double _collectionMult() => 1.0 + _collectionBonusTotal();
+
   double _calcTapPower() {
     double base = 1.0;
     for (final def in tapUpgradeCatalog) {
@@ -711,7 +728,8 @@ class GameNotifier extends Notifier<GameState> {
         _prestigeMult() *
         _equippedTapMult() *
         _boosterTapMult() *
-        _setTapBonus();
+        _setTapBonus() *
+        _collectionMult();
   }
 
   double _calcDps() {
@@ -724,8 +742,12 @@ class GameNotifier extends Notifier<GameState> {
         _prestigeMult() *
         _equippedDpsMult() *
         _boosterDpsMult() *
-        _setDpsBonus();
+        _setDpsBonus() *
+        _collectionMult();
   }
+
+  /// Public read for the home screen so it can show "수집 보너스 +X%".
+  double get collectionBonusFraction => _collectionBonusTotal();
 
   /// Drop expired boosters from the save (called before any calculation that
   /// reads them, to avoid "ghost" multipliers after their timer ran out).

@@ -59,27 +59,65 @@ class _HeaderBar extends ConsumerWidget {
     final essence = ref.watch(gameProvider).essence;
     final owned = ref.watch(gameProvider).ownedSwords.length;
     final total = swordCatalog.length;
+    final bonus = ref.read(gameProvider.notifier).collectionBonusFraction;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _InfoChip(
-              icon: Icons.diamond,
-              color: const Color(0xFF7C4DFF),
-              label: '정수',
-              value: '$essence',
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _InfoChip(
+                  icon: Icons.diamond,
+                  color: const Color(0xFF7C4DFF),
+                  label: '정수',
+                  value: '$essence',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _InfoChip(
+                  icon: Icons.collections_bookmark,
+                  color: AppColors.deepCoral,
+                  label: '수집',
+                  value: '$owned / $total',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _InfoChip(
-              icon: Icons.collections_bookmark,
-              color: AppColors.deepCoral,
-              label: '수집',
-              value: '$owned / $total',
+          if (bonus > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFAB47BC).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFAB47BC).withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome,
+                        color: Color(0xFF6A1B9A), size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '수집 보너스 — 모든 보유 검이 터치·DPS에 +${(bonus * 100).toStringAsFixed(bonus >= 1 ? 0 : 1)}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF6A1B9A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -371,7 +409,7 @@ class _SwordDetailSheet extends ConsumerWidget {
           const SizedBox(height: 16),
           if (owned) ...[
             _StatRow(
-              label: '터치 배율',
+              label: '장착 시 터치 배율',
               value: '×${def.tapMultAt(level).toStringAsFixed(2)}',
               sub: level < SwordDef.maxLevel
                   ? '최대 Lv ${SwordDef.maxLevel}: ×${def.tapMultAt(SwordDef.maxLevel).toStringAsFixed(2)}'
@@ -379,11 +417,19 @@ class _SwordDetailSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             _StatRow(
-              label: 'DPS 배율',
+              label: '장착 시 DPS 배율',
               value: '×${def.dpsMultAt(level).toStringAsFixed(2)}',
               sub: level < SwordDef.maxLevel
                   ? '최대 Lv ${SwordDef.maxLevel}: ×${def.dpsMultAt(SwordDef.maxLevel).toStringAsFixed(2)}'
                   : '최대 레벨 달성',
+            ),
+            const SizedBox(height: 8),
+            _StatRow(
+              label: '보유 효과 (장착 안해도 적용)',
+              value: '+${(def.ownedBonusAt(level) * 100).toStringAsFixed(2)}%',
+              sub: level < SwordDef.maxLevel
+                  ? '최대 Lv ${SwordDef.maxLevel}: +${(def.ownedBonusAt(SwordDef.maxLevel) * 100).toStringAsFixed(2)}% (터치·DPS 모두)'
+                  : '터치·DPS 모두 적용',
             ),
             const SizedBox(height: 8),
             _StatRow(
@@ -418,15 +464,21 @@ class _SwordDetailSheet extends ConsumerWidget {
             _DismantleButton(def: def, level: level, equipped: equipped),
           ] else ...[
             _StatRow(
-              label: '터치 배율',
+              label: '장착 시 터치 배율',
               value: '?',
               sub: '소환 후 표시',
             ),
             const SizedBox(height: 8),
             _StatRow(
-              label: 'DPS 배율',
+              label: '장착 시 DPS 배율',
               value: '?',
               sub: '소환 후 표시',
+            ),
+            const SizedBox(height: 8),
+            _StatRow(
+              label: '보유 효과',
+              value: '+${(def.tier.ownedBonusBase * 100).toStringAsFixed(2)}%',
+              sub: '획득 즉시 터치·DPS에 적용 (Lv 1 기준)',
             ),
           ],
         ],

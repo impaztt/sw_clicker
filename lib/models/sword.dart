@@ -39,6 +39,19 @@ extension SwordTierInfo on SwordTier {
         SwordTier.lr => 2,
         SwordTier.ur => 1,
       };
+
+  /// Per-copy passive bonus a sword of this tier contributes to BOTH tap
+  /// power and DPS just by being owned (Lv 1, before level scaling). The
+  /// idea: collecting feels rewarding even before you equip, but equipping
+  /// is still meaningfully better thanks to the big base multipliers.
+  double get ownedBonusBase => switch (this) {
+        SwordTier.n => 0.005,
+        SwordTier.r => 0.012,
+        SwordTier.sr => 0.025,
+        SwordTier.ssr => 0.05,
+        SwordTier.lr => 0.10,
+        SwordTier.ur => 0.18,
+      };
 }
 
 enum SparkleStyle { none, dim, bright, orbiting }
@@ -96,4 +109,11 @@ class SwordDef {
       baseTapMult * (1 + (level.clamp(1, maxLevel) - 1) * 0.1);
   double dpsMultAt(int level) =>
       baseDpsMult * (1 + (level.clamp(1, maxLevel) - 1) * 0.1);
+
+  /// Passive collection bonus contributed while this sword is owned (even
+  /// when not equipped). Returns a fraction (e.g. 0.05 = +5%). Scales the
+  /// tier base by the same (1 + (L-1) * 0.1) curve as equip multipliers,
+  /// so leveling up an owned sword raises its passive value too.
+  double ownedBonusAt(int level) =>
+      tier.ownedBonusBase * (1 + (level.clamp(1, maxLevel) - 1) * 0.1);
 }

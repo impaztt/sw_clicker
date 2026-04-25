@@ -172,6 +172,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     multiplier: game.prestigeMultiplier,
                   ),
                 ),
+              if (notifier.collectionBonusFraction > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _CollectionChip(
+                    fraction: notifier.collectionBonusFraction,
+                  ),
+                ),
               if (game.activeBoosters.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -481,6 +488,39 @@ class _IdleChip extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Color(0xFF4527A0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollectionChip extends StatelessWidget {
+  final double fraction;
+  const _CollectionChip({required this.fraction});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (fraction * 100).toStringAsFixed(fraction >= 1 ? 0 : 1);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFAB47BC).withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.collections_bookmark,
+              size: 18, color: Color(0xFF6A1B9A)),
+          const SizedBox(width: 4),
+          Text(
+            '수집 보너스 +$pct% (터치·DPS)',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6A1B9A),
             ),
           ),
         ],
