@@ -919,7 +919,7 @@ class _HoldingPanel extends StatelessWidget {
               Expanded(
                 child: _MiniStat(
                   label: '보유 수량',
-                  value: '$shares 주',
+                  value: '${NumberFormatter.formatInt(shares)} 주',
                 ),
               ),
               Expanded(
@@ -1011,7 +1011,7 @@ class _BuyDialogState extends ConsumerState<_BuyDialog> {
             _kv('보유 골드', NumberFormatter.format(game.gold)),
             _kv(
               '최대 매수 가능',
-              '$cap 주 (지분 ${(regionMaxOwnershipFraction * 100).toStringAsFixed(0)}% 한도)',
+              '${NumberFormatter.formatInt(cap)} 주 (지분 ${(regionMaxOwnershipFraction * 100).toStringAsFixed(0)}% 한도)',
             ),
             const SizedBox(height: 10),
             _QtyStepper(
@@ -1046,7 +1046,7 @@ class _BuyDialogState extends ConsumerState<_BuyDialog> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                            '${def.name} $bought주 매수 완료'),
+                            '${def.name} ${NumberFormatter.formatInt(bought)}주 매수 완료'),
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -1101,7 +1101,7 @@ class _SellDialogState extends ConsumerState<_SellDialog> {
           children: [
             _kv('현재가', NumberFormatter.formatPrecise(price)),
             _kv('평단가', NumberFormatter.formatPrecise(st.avgCost)),
-            _kv('보유 수량', '${st.shares} 주'),
+            _kv('보유 수량', '${NumberFormatter.formatInt(st.shares)} 주'),
             const SizedBox(height: 10),
             _QtyStepper(
               value: _qty,
@@ -1141,7 +1141,7 @@ class _SellDialogState extends ConsumerState<_SellDialog> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          '${def.name} ${r.sharesSold}주 매도 · 순 ${NumberFormatter.format(r.netProceeds)}골드',
+                          '${def.name} ${NumberFormatter.formatInt(r.sharesSold)}주 매도 · 순 ${NumberFormatter.format(r.netProceeds)}골드',
                         ),
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
@@ -1245,7 +1245,7 @@ class _QtyStepper extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
-            '$value 주',
+            '${NumberFormatter.formatInt(value)} 주',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,

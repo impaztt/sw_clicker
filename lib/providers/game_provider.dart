@@ -2121,9 +2121,12 @@ class GameNotifier extends Notifier<GameState> {
 
         // Update / start forming candle. Candle bucket is 30s, but ticks
         // arrive every [stockPriceTickSeconds]; so each bucket gets several
-        // ticks before rolling over.
-        final tickInstant = now.subtract(Duration(
-            seconds: (ticksElapsed - i - 1) * stockPriceTickSeconds));
+        // ticks before rolling over. Use millisecond-precision Duration so
+        // a fractional tick interval (e.g. 2.5s) still works.
+        final tickOffsetMs =
+            ((ticksElapsed - i - 1) * stockPriceTickSeconds * 1000).round();
+        final tickInstant =
+            now.subtract(Duration(milliseconds: tickOffsetMs));
         final candleStart = _candleStartFor(tickInstant);
         var forming = state.formingCandle;
         if (forming == null || forming.startedAt != candleStart) {

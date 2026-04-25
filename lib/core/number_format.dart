@@ -29,6 +29,21 @@ class NumberFormatter {
     return format(value);
   }
 
+  /// Render an integer with thousands separators (e.g. 1234567 → "1,234,567").
+  /// Use this for share counts and other discrete quantities that should not
+  /// be rounded to K/M/B/T.
+  static String formatInt(int value) {
+    if (value == 0) return '0';
+    final negative = value < 0;
+    final s = (negative ? -value : value).toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return negative ? '-${buf.toString()}' : buf.toString();
+  }
+
   /// Format a BigNum. Same suffix scheme as `format(double)` but handles
   /// magnitudes far beyond double range.
   static String formatBig(BigNum value) {

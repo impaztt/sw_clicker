@@ -49,7 +49,7 @@ const stockTradeFee = 0.02; // 2%
 
 /// Wall-clock seconds between price ticks. Candles still bucket on
 /// [candleWindowSeconds]; multiple price ticks compose one candle.
-const stockPriceTickSeconds = 5;
+const stockPriceTickSeconds = 2.5;
 
 /// Candle window length in seconds.
 const candleWindowSeconds = 30;
