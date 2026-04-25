@@ -10,6 +10,10 @@ enum AchievementCategory {
   swordLevel,
   summon,
   prestige,
+  slime,
+  combat,
+  skill,
+  daily,
   master,
 }
 
@@ -24,6 +28,10 @@ extension AchievementCategoryInfo on AchievementCategory {
         AchievementCategory.swordLevel => '검 강화',
         AchievementCategory.summon => '소환',
         AchievementCategory.prestige => '환생',
+        AchievementCategory.slime => '슬라임',
+        AchievementCategory.combat => '전투',
+        AchievementCategory.skill => '스킬',
+        AchievementCategory.daily => '일일',
         AchievementCategory.master => '마스터',
       };
 
@@ -37,6 +45,10 @@ extension AchievementCategoryInfo on AchievementCategory {
         AchievementCategory.swordLevel => Icons.upgrade,
         AchievementCategory.summon => Icons.diamond,
         AchievementCategory.prestige => Icons.auto_awesome,
+        AchievementCategory.slime => Icons.bubble_chart,
+        AchievementCategory.combat => Icons.local_fire_department,
+        AchievementCategory.skill => Icons.flash_on,
+        AchievementCategory.daily => Icons.event_available,
         AchievementCategory.master => Icons.emoji_events,
       };
 
@@ -50,6 +62,10 @@ extension AchievementCategoryInfo on AchievementCategory {
         AchievementCategory.swordLevel => const Color(0xFF8D6E63),
         AchievementCategory.summon => const Color(0xFF7C4DFF),
         AchievementCategory.prestige => const Color(0xFFFFCA28),
+        AchievementCategory.slime => const Color(0xFFFFC107),
+        AchievementCategory.combat => const Color(0xFFEF5350),
+        AchievementCategory.skill => const Color(0xFF42A5F5),
+        AchievementCategory.daily => const Color(0xFF66BB6A),
         AchievementCategory.master => const Color(0xFFD81B60),
       };
 }
@@ -91,6 +107,14 @@ class AchContext {
   final int prestigeSouls;
   final int totalTapUpgradesBought;
   final bool hasEquippedSword;
+  final int totalCrits;
+  final int maxCombo;
+  final int comboBurstCount;
+  final int slimesDefeated;
+  final int skillsUsed;
+  final int boostersPurchased;
+  final int maxDailyStreak;
+  final int completedSetCount;
 
   const AchContext({
     required this.totalTaps,
@@ -116,6 +140,14 @@ class AchContext {
     required this.prestigeSouls,
     required this.totalTapUpgradesBought,
     required this.hasEquippedSword,
+    required this.totalCrits,
+    required this.maxCombo,
+    required this.comboBurstCount,
+    required this.slimesDefeated,
+    required this.skillsUsed,
+    required this.boostersPurchased,
+    required this.maxDailyStreak,
+    required this.completedSetCount,
   });
 }
 

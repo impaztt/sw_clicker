@@ -105,9 +105,11 @@ const boosterOffers = <BoosterOffer>[
 /// Slime config — guaranteed spawn every N taps so the player can
 /// predict it. Counter persists in SaveData.tapsSinceSlime.
 const slimeSpawnEvery = 250;
-const slimeLifetimeMs = 5000;
-const slimeRushMultiplier = 3.0;
-const slimeRushDurationSec = 60;
+const slimeLifetimeMs = 7000;
+/// HP the slime takes to defeat — each tap on the slime deals 1 damage.
+const slimeMaxHp = 10;
+/// Reward when the slime is killed: gold = tapPower × this many taps.
+const slimeRewardTaps = 5000;
 
 /// Auto-tap config: when an autoTap booster is active, fire a tap every
 /// [autoTapIntervalMs] milliseconds. ~4 taps/sec is comfortable: visible
@@ -208,7 +210,9 @@ class GameState {
   final int combo;
   final int totalCrits;
   final int maxCombo;
+  final int comboBurstCount;
   final int dailyStreak;
+  final int maxDailyStreak;
   final DateTime? lastDailyClaimAt;
   final List<Booster> activeBoosters;
   final int tapsUntilSlime;
@@ -216,6 +220,9 @@ class GameState {
   final bool tutorialSeen;
   final Map<String, DateTime> skillReadyAt;
   final Set<String> completedSetIds;
+  final int slimesDefeated;
+  final int skillsUsed;
+  final int boostersPurchased;
   final bool loaded;
 
   const GameState({
@@ -244,7 +251,9 @@ class GameState {
     required this.combo,
     required this.totalCrits,
     required this.maxCombo,
+    required this.comboBurstCount,
     required this.dailyStreak,
+    required this.maxDailyStreak,
     required this.lastDailyClaimAt,
     required this.activeBoosters,
     required this.tapsUntilSlime,
@@ -252,6 +261,9 @@ class GameState {
     required this.tutorialSeen,
     required this.skillReadyAt,
     required this.completedSetIds,
+    required this.slimesDefeated,
+    required this.skillsUsed,
+    required this.boostersPurchased,
     this.loaded = false,
   });
 
@@ -281,7 +293,9 @@ class GameState {
         combo: 0,
         totalCrits: 0,
         maxCombo: 0,
+        comboBurstCount: 0,
         dailyStreak: 0,
+        maxDailyStreak: 0,
         lastDailyClaimAt: null,
         activeBoosters: const [],
         tapsUntilSlime: slimeSpawnEvery,
@@ -289,6 +303,9 @@ class GameState {
         tutorialSeen: false,
         skillReadyAt: const {},
         completedSetIds: const {},
+        slimesDefeated: 0,
+        skillsUsed: 0,
+        boostersPurchased: 0,
         loaded: false,
       );
 
@@ -366,6 +383,14 @@ class GameState {
       prestigeSouls: prestigeSouls,
       totalTapUpgradesBought: totalTapUpgradesBought,
       hasEquippedSword: equippedSwordId != null,
+      totalCrits: totalCrits,
+      maxCombo: maxCombo,
+      comboBurstCount: comboBurstCount,
+      slimesDefeated: slimesDefeated,
+      skillsUsed: skillsUsed,
+      boostersPurchased: boostersPurchased,
+      maxDailyStreak: maxDailyStreak,
+      completedSetCount: completedSetIds.length,
     );
   }
 }
@@ -526,7 +551,9 @@ class GameNotifier extends Notifier<GameState> {
       combo: _combo,
       totalCrits: _save.stats.totalCrits,
       maxCombo: _save.stats.maxCombo,
+      comboBurstCount: _save.stats.comboBurstCount,
       dailyStreak: _save.dailyStreak,
+      maxDailyStreak: _save.stats.maxDailyStreak,
       lastDailyClaimAt: _save.lastDailyClaimAt,
       activeBoosters: List.unmodifiable(_save.activeBoosters),
       tapsUntilSlime: (slimeSpawnEvery - _save.tapsSinceSlime).clamp(0, slimeSpawnEvery),
@@ -534,6 +561,9 @@ class GameNotifier extends Notifier<GameState> {
       tutorialSeen: _save.settings.tutorialSeen,
       skillReadyAt: Map.unmodifiable(_save.skillReadyAt),
       completedSetIds: Set.unmodifiable(_completedSetIds()),
+      slimesDefeated: _save.stats.slimesDefeated,
+      skillsUsed: _save.stats.skillsUsed,
+      boostersPurchased: _save.stats.boostersPurchased,
       loaded: loaded,
     );
     if (loaded) _checkAchievements();
@@ -627,7 +657,9 @@ class GameNotifier extends Notifier<GameState> {
         combo: state.combo,
         totalCrits: state.totalCrits,
         maxCombo: state.maxCombo,
+        comboBurstCount: state.comboBurstCount,
         dailyStreak: state.dailyStreak,
+        maxDailyStreak: state.maxDailyStreak,
         lastDailyClaimAt: state.lastDailyClaimAt,
         activeBoosters: state.activeBoosters,
         tapsUntilSlime: state.tapsUntilSlime,
@@ -635,6 +667,9 @@ class GameNotifier extends Notifier<GameState> {
         tutorialSeen: state.tutorialSeen,
         skillReadyAt: state.skillReadyAt,
         completedSetIds: state.completedSetIds,
+        slimesDefeated: state.slimesDefeated,
+        skillsUsed: state.skillsUsed,
+        boostersPurchased: state.boostersPurchased,
         loaded: true,
       );
     }
@@ -884,6 +919,9 @@ class GameNotifier extends Notifier<GameState> {
   void claimDailyBonus(DailyBonus bonus) {
     _save.essence += bonus.essence;
     _save.dailyStreak = bonus.streak;
+    if (bonus.streak > _save.stats.maxDailyStreak) {
+      _save.stats.maxDailyStreak = bonus.streak;
+    }
     _save.lastDailyClaimAt = DateTime.now();
     _emit(loaded: true);
     unawaited(_persist());
@@ -896,6 +934,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.essence < offer.essenceCost) return false;
     _save.essence -= offer.essenceCost;
     _applyBooster(offer.type, offer.multiplier, offer.durationSec);
+    _save.stats.boostersPurchased++;
     _emit(loaded: true);
     unawaited(_persist());
     return true;
@@ -906,6 +945,7 @@ class GameNotifier extends Notifier<GameState> {
   /// Right now we just hand the reward out for testing.
   void grantAdBooster(BoosterOffer offer) {
     _applyBooster(offer.type, offer.multiplier, offer.durationSec);
+    _save.stats.boostersPurchased++;
     _emit(loaded: true);
     unawaited(_persist());
   }
@@ -1003,22 +1043,29 @@ class GameNotifier extends Notifier<GameState> {
         );
     }
     _save.skillReadyAt[id.id] = now.add(def.cooldown);
+    _save.stats.skillsUsed++;
     _emit(loaded: true);
     unawaited(_persist());
     return result;
   }
 
-  /// Called by the home screen when the user taps a golden slime.
-  /// Grants a "rush" booster with no essence cost.
-  void catchGoldenSlime() {
-    _applyBooster(
-      BoosterType.rush,
-      slimeRushMultiplier,
-      slimeRushDurationSec,
-    );
+  /// Called by the home screen when a golden slime is killed (its HP drops
+  /// to 0). Grants gold equal to [slimeRewardTaps] × current tap power and
+  /// returns the awarded amount so the UI can show a floating number.
+  double defeatGoldenSlime() {
+    final reward = _calcTapPower() * slimeRewardTaps;
+    _save.gold += reward;
+    _save.totalGoldEarned += reward;
+    _save.stats.lifetimeGold += reward;
+    _save.stats.slimesDefeated++;
     _emit(loaded: true);
     unawaited(_persist());
+    return reward;
   }
+
+  /// Estimated reward shown on the slime HP bar so the player can see what
+  /// finishing it off is worth at the current moment.
+  double get slimePreviewReward => _calcTapPower() * slimeRewardTaps;
 
   // ============ Sword dismantle ============
 

@@ -75,11 +75,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _slimes.add(_SlimeSpawn(id: id, offset: Offset(dx, dy)));
   }
 
-  void _catchSlime(int id) {
+  void _defeatSlime(int id, Offset slimeOffset) {
     if (!mounted) return;
-    ref.read(gameProvider.notifier).catchGoldenSlime();
-    setState(() => _slimes.removeWhere((s) => s.id == id));
+    final reward = ref.read(gameProvider.notifier).defeatGoldenSlime();
     if (ref.read(gameProvider).haptic) HapticFeedback.heavyImpact();
+    setState(() {
+      _slimes.removeWhere((s) => s.id == id);
+      // Pop a big floating number where the slime was so the reward feels
+      // grounded in the actual kill, not a phantom number from elsewhere.
+      _floats.add(FloatingNumberData(
+        id: _nextId++,
+        origin: slimeOffset + const Offset(40, 30),
+        amount: reward,
+        isCrit: true,
+      ));
+    });
   }
 
   void _slimeTimedOut(int id) {
@@ -97,6 +107,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
+    final notifier = ref.read(gameProvider.notifier);
+    final slimeActive = _slimes.isNotEmpty;
 
     return SafeArea(
       child: Stack(
@@ -114,6 +126,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 10),
               DpsDisplay(dps: game.dps),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _SlimeProgressBar(
+                  remaining: game.tapsUntilSlime,
+                  total: slimeSpawnEvery,
+                  active: slimeActive,
+                  reward: notifier.slimePreviewReward,
+                ),
+              ),
               const Spacer(),
               Center(
                 child: Builder(builder: (_) {
@@ -134,8 +156,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: _ComboChip(combo: game.combo),
                 ),
               _TapPowerChip(tapPower: game.tapPower),
-              const SizedBox(height: 6),
-              _SlimeHintLine(remaining: game.tapsUntilSlime),
               if (game.dps > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -166,7 +186,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               left: slime.offset.dx,
               top: slime.offset.dy,
               child: GoldenSlime(
-                onCatch: () => _catchSlime(slime.id),
+                previewReward: notifier.slimePreviewReward,
+                onDefeat: () => _defeatSlime(slime.id, slime.offset),
                 onTimeout: () => _slimeTimedOut(slime.id),
               ),
             ),
@@ -324,29 +345,66 @@ class _TapPowerChip extends StatelessWidget {
   }
 }
 
-class _SlimeHintLine extends StatelessWidget {
+/// Visible-from-anywhere progress bar for the next slime spawn. Replaces the
+/// old text-only "슬라임까지 N회 터치" hint. While a slime is on screen, the
+/// bar switches to an "출현 중!" call-to-action so the player knows it's the
+/// active state, not a stuck progress meter.
+class _SlimeProgressBar extends StatelessWidget {
   final int remaining;
-  const _SlimeHintLine({required this.remaining});
+  final int total;
+  final bool active;
+  final double reward;
+  const _SlimeProgressBar({
+    required this.remaining,
+    required this.total,
+    required this.active,
+    required this.reward,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text('🟡', style: TextStyle(fontSize: 11)),
-        const SizedBox(width: 4),
-        Text(
-          '슬라임까지 $remaining 회 터치',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.55),
+    final ratio = active
+        ? 1.0
+        : ((total - remaining) / total).clamp(0.0, 1.0);
+    final accent = active
+        ? const Color(0xFFE53935)
+        : const Color(0xFFFFB300);
+    final label = active
+        ? '🟡 슬라임 출현! 처치 보상 +${NumberFormatter.format(reward)}'
+        : '🟡 슬라임까지 $remaining회 · 처치 시 +${NumberFormatter.format(reward)}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.45), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: accent.computeLuminance() < 0.5
+                  ? accent
+                  : const Color(0xFF8D6E00),
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 8,
+              backgroundColor: Colors.black12,
+              valueColor: AlwaysStoppedAnimation(accent),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

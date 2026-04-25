@@ -8,6 +8,10 @@ class GameStats {
   int totalCrits;
   int maxCombo;
   int comboBurstCount;
+  int slimesDefeated;
+  int skillsUsed;
+  int boostersPurchased;
+  int maxDailyStreak;
 
   GameStats({
     this.totalTaps = 0,
@@ -19,6 +23,10 @@ class GameStats {
     this.totalCrits = 0,
     this.maxCombo = 0,
     this.comboBurstCount = 0,
+    this.slimesDefeated = 0,
+    this.skillsUsed = 0,
+    this.boostersPurchased = 0,
+    this.maxDailyStreak = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -31,6 +39,10 @@ class GameStats {
         'totalCrits': totalCrits,
         'maxCombo': maxCombo,
         'comboBurstCount': comboBurstCount,
+        'slimesDefeated': slimesDefeated,
+        'skillsUsed': skillsUsed,
+        'boostersPurchased': boostersPurchased,
+        'maxDailyStreak': maxDailyStreak,
       };
 
   factory GameStats.fromJson(Map<String, dynamic> json) => GameStats(
@@ -43,6 +55,10 @@ class GameStats {
         totalCrits: json['totalCrits'] as int? ?? 0,
         maxCombo: json['maxCombo'] as int? ?? 0,
         comboBurstCount: json['comboBurstCount'] as int? ?? 0,
+        slimesDefeated: json['slimesDefeated'] as int? ?? 0,
+        skillsUsed: json['skillsUsed'] as int? ?? 0,
+        boostersPurchased: json['boostersPurchased'] as int? ?? 0,
+        maxDailyStreak: json['maxDailyStreak'] as int? ?? 0,
       );
 }
 
