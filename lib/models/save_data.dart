@@ -2,7 +2,7 @@ import 'booster.dart';
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 8;
+  static const currentVersion = 9;
 
   int version;
   double gold;
@@ -11,6 +11,8 @@ class SaveData {
   Map<String, int> tapUpgradeLevels;
   int prestigeSouls;
   int prestigeCount;
+  int prestigeCoins;
+  Map<String, int> prestigeUpgradeLevels;
   DateTime lastSavedAt;
   GameStats stats;
   GameSettings settings;
@@ -46,6 +48,8 @@ class SaveData {
     Map<String, int>? tapUpgradeLevels,
     this.prestigeSouls = 0,
     this.prestigeCount = 0,
+    this.prestigeCoins = 0,
+    Map<String, int>? prestigeUpgradeLevels,
     DateTime? lastSavedAt,
     GameStats? stats,
     GameSettings? settings,
@@ -61,6 +65,7 @@ class SaveData {
     Map<String, DateTime>? skillReadyAt,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
+        prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
         stats = stats ?? GameStats(),
         settings = settings ?? GameSettings(),
@@ -77,6 +82,8 @@ class SaveData {
         'tapUpgradeLevels': tapUpgradeLevels,
         'prestigeSouls': prestigeSouls,
         'prestigeCount': prestigeCount,
+        'prestigeCoins': prestigeCoins,
+        'prestigeUpgradeLevels': prestigeUpgradeLevels,
         'lastSavedAt': lastSavedAt.toIso8601String(),
         'stats': stats.toJson(),
         'settings': settings.toJson(),
@@ -89,8 +96,8 @@ class SaveData {
         'dailyStreak': dailyStreak,
         'activeBoosters': activeBoosters.map((b) => b.toJson()).toList(),
         'tapsSinceSlime': tapsSinceSlime,
-        'skillReadyAt': skillReadyAt
-            .map((k, v) => MapEntry(k, v.toIso8601String())),
+        'skillReadyAt':
+            skillReadyAt.map((k, v) => MapEntry(k, v.toIso8601String())),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -103,16 +110,16 @@ class SaveData {
             Map<String, int>.from(json['tapUpgradeLevels'] as Map? ?? {}),
         prestigeSouls: json['prestigeSouls'] as int? ?? 0,
         prestigeCount: json['prestigeCount'] as int? ?? 0,
-        lastSavedAt:
-            DateTime.tryParse(json['lastSavedAt'] as String? ?? '') ??
-                DateTime.now(),
-        stats:
-            GameStats.fromJson(json['stats'] as Map<String, dynamic>? ?? {}),
+        prestigeCoins: json['prestigeCoins'] as int? ?? 0,
+        prestigeUpgradeLevels:
+            Map<String, int>.from(json['prestigeUpgradeLevels'] as Map? ?? {}),
+        lastSavedAt: DateTime.tryParse(json['lastSavedAt'] as String? ?? '') ??
+            DateTime.now(),
+        stats: GameStats.fromJson(json['stats'] as Map<String, dynamic>? ?? {}),
         settings: GameSettings.fromJson(
             json['settings'] as Map<String, dynamic>? ?? {}),
         essence: json['essence'] as int? ?? 90,
-        ownedSwords:
-            Map<String, int>.from(json['ownedSwords'] as Map? ?? {}),
+        ownedSwords: Map<String, int>.from(json['ownedSwords'] as Map? ?? {}),
         equippedSwordId: json['equippedSwordId'] as String?,
         summonsSinceHighRare: json['summonsSinceHighRare'] as int? ?? 0,
         unlockedAchievements: (json['unlockedAchievements'] as List?)
@@ -123,7 +130,8 @@ class SaveData {
             DateTime.tryParse(json['lastDailyClaimAt'] as String? ?? ''),
         dailyStreak: json['dailyStreak'] as int? ?? 0,
         activeBoosters: (json['activeBoosters'] as List?)
-                ?.map((e) => Booster.fromJson(Map<String, dynamic>.from(e as Map)))
+                ?.map((e) =>
+                    Booster.fromJson(Map<String, dynamic>.from(e as Map)))
                 .toList() ??
             <Booster>[],
         tapsSinceSlime: json['tapsSinceSlime'] as int? ?? 0,

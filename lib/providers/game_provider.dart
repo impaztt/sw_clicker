@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/achievement_catalog.dart';
+import '../data/prestige_upgrade_catalog.dart';
 import '../data/producer_catalog.dart';
 import '../data/sword_catalog.dart';
 import '../data/skill_catalog.dart';
@@ -49,6 +50,36 @@ int dailyRewardFor(int streak) {
   if (streak < 1) return dailyRewards[1];
   if (streak >= dailyRewards.length) return dailyRewards.last;
   return dailyRewards[streak];
+}
+
+int _calcPrestigeCoinsFromProgress({
+  required double totalGoldEarned,
+  required double currentGold,
+  required Map<String, int> producerLevels,
+  required Map<String, int> tapUpgradeLevels,
+  required int prestigeCount,
+  required Map<String, int> prestigeUpgradeLevels,
+}) {
+  int producerLevelSum = 0;
+  for (final lv in producerLevels.values) {
+    producerLevelSum += lv;
+  }
+  int tapUpgradeSum = 0;
+  for (final lv in tapUpgradeLevels.values) {
+    tapUpgradeSum += lv;
+  }
+
+  final wealthScore = sqrt(
+    ((totalGoldEarned + currentGold * 2).clamp(0.0, double.infinity)) / 1e7,
+  );
+  final progressionScore = producerLevelSum / 30 + tapUpgradeSum / 20;
+  final runDepthScore = min(10.0, prestigeCount * 0.1);
+  final raw = (wealthScore + progressionScore + runDepthScore).floor();
+  if (raw <= 0) return 0;
+
+  final bonusMultiplier =
+      1.0 + prestigeCoinGainBonusFraction(prestigeUpgradeLevels);
+  return max(1, (raw * bonusMultiplier).floor());
 }
 
 /// Booster shop catalog. (`adOnly`=true means essence cost is N/A; only
@@ -106,8 +137,10 @@ const boosterOffers = <BoosterOffer>[
 /// predict it. Counter persists in SaveData.tapsSinceSlime.
 const slimeSpawnEvery = 250;
 const slimeLifetimeMs = 7000;
+
 /// HP the slime takes to defeat — each tap on the slime deals 1 damage.
 const slimeMaxHp = 10;
+
 /// Reward when the slime is killed: gold = tapPower × this many taps.
 const slimeRewardTaps = 5000;
 
@@ -168,6 +201,7 @@ class SkillResult {
   final SkillId id;
   final bool ok;
   final String message;
+
   /// Extra payload for UI (e.g. how much gold the burst granted).
   final double payload;
   const SkillResult({
@@ -190,9 +224,11 @@ class GameState {
   final double tapPower;
   final double dps;
   final int prestigeSouls;
+  final int prestigeCoins;
   final int prestigeCount;
   final Map<String, int> producerLevels;
   final Map<String, int> tapUpgradeLevels;
+  final Map<String, int> prestigeUpgradeLevels;
   final int totalTaps;
   final int playTimeSeconds;
   final double maxDpsEver;
@@ -231,9 +267,11 @@ class GameState {
     required this.tapPower,
     required this.dps,
     required this.prestigeSouls,
+    required this.prestigeCoins,
     required this.prestigeCount,
     required this.producerLevels,
     required this.tapUpgradeLevels,
+    required this.prestigeUpgradeLevels,
     required this.totalTaps,
     required this.playTimeSeconds,
     required this.maxDpsEver,
@@ -273,9 +311,11 @@ class GameState {
         tapPower: 1,
         dps: 0,
         prestigeSouls: 0,
+        prestigeCoins: 0,
         prestigeCount: 0,
         producerLevels: {},
         tapUpgradeLevels: {},
+        prestigeUpgradeLevels: const {},
         totalTaps: 0,
         playTimeSeconds: 0,
         maxDpsEver: 0,
@@ -316,8 +356,18 @@ class GameState {
     return sqrt(totalGoldEarned / 1e9).floor();
   }
 
+  int get prestigeCoinsAvailable => _calcPrestigeCoinsFromProgress(
+        totalGoldEarned: totalGoldEarned,
+        currentGold: gold,
+        producerLevels: producerLevels,
+        tapUpgradeLevels: tapUpgradeLevels,
+        prestigeCount: prestigeCount,
+        prestigeUpgradeLevels: prestigeUpgradeLevels,
+      );
+
   int producerLevel(String id) => producerLevels[id] ?? 0;
   int tapUpgradeLevel(String id) => tapUpgradeLevels[id] ?? 0;
+  int prestigeUpgradeLevel(String id) => prestigeUpgradeLevels[id] ?? 0;
   int swordLevel(String id) => ownedSwords[id] ?? 0;
   bool ownsSword(String id) => (ownedSwords[id] ?? 0) > 0;
 
@@ -343,7 +393,11 @@ class GameState {
       totalProducerLv += v;
       if (v > 0) ownedProducers++;
     }
-    bool hasR = false, hasSr = false, hasSsr = false, hasLr = false, hasUr = false;
+    bool hasR = false,
+        hasSr = false,
+        hasSsr = false,
+        hasLr = false,
+        hasUr = false;
     int maxLv = 0;
     int maxedCount = 0;
     for (final entry in ownedSwords.entries) {
@@ -483,9 +537,8 @@ class GameNotifier extends Notifier<GameState> {
     if (hours < 24) return null; // already claimed today
     // 24h ≤ elapsed < 48h → streak continues.
     // Beyond 48h → streak resets to day 1.
-    final nextStreak = hours < 48
-        ? ((_save.dailyStreak % (dailyRewards.length - 1)) + 1)
-        : 1;
+    final nextStreak =
+        hours < 48 ? ((_save.dailyStreak % (dailyRewards.length - 1)) + 1) : 1;
     return DailyBonus(streak: nextStreak, essence: dailyRewardFor(nextStreak));
   }
 
@@ -531,9 +584,11 @@ class GameNotifier extends Notifier<GameState> {
       tapPower: _calcTapPower(),
       dps: _calcDps(),
       prestigeSouls: _save.prestigeSouls,
+      prestigeCoins: _save.prestigeCoins,
       prestigeCount: _save.prestigeCount,
       producerLevels: Map.unmodifiable(_save.producerLevels),
       tapUpgradeLevels: Map.unmodifiable(_save.tapUpgradeLevels),
+      prestigeUpgradeLevels: Map.unmodifiable(_save.prestigeUpgradeLevels),
       totalTaps: _save.stats.totalTaps,
       playTimeSeconds: _save.stats.playTimeSeconds,
       maxDpsEver: _save.stats.maxDpsEver,
@@ -556,7 +611,8 @@ class GameNotifier extends Notifier<GameState> {
       maxDailyStreak: _save.stats.maxDailyStreak,
       lastDailyClaimAt: _save.lastDailyClaimAt,
       activeBoosters: List.unmodifiable(_save.activeBoosters),
-      tapsUntilSlime: (slimeSpawnEvery - _save.tapsSinceSlime).clamp(0, slimeSpawnEvery),
+      tapsUntilSlime:
+          (slimeSpawnEvery - _save.tapsSinceSlime).clamp(0, slimeSpawnEvery),
       autoTapping: _autoTapActive(),
       tutorialSeen: _save.settings.tutorialSeen,
       skillReadyAt: Map.unmodifiable(_save.skillReadyAt),
@@ -637,9 +693,11 @@ class GameNotifier extends Notifier<GameState> {
         tapPower: state.tapPower,
         dps: state.dps,
         prestigeSouls: state.prestigeSouls,
+        prestigeCoins: state.prestigeCoins,
         prestigeCount: state.prestigeCount,
         producerLevels: state.producerLevels,
         tapUpgradeLevels: state.tapUpgradeLevels,
+        prestigeUpgradeLevels: state.prestigeUpgradeLevels,
         totalTaps: state.totalTaps,
         playTimeSeconds: state.playTimeSeconds,
         maxDpsEver: state.maxDpsEver,
@@ -676,6 +734,12 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   double _prestigeMult() => 1.0 + (_save.prestigeSouls * 0.02);
+
+  double _prestigeShopTapMult() =>
+      1.0 + prestigeTapBonusFraction(_save.prestigeUpgradeLevels);
+
+  double _prestigeShopDpsMult() =>
+      1.0 + prestigeDpsBonusFraction(_save.prestigeUpgradeLevels);
 
   double _equippedTapMult() {
     final id = _save.equippedSwordId;
@@ -726,6 +790,7 @@ class GameNotifier extends Notifier<GameState> {
     }
     return base *
         _prestigeMult() *
+        _prestigeShopTapMult() *
         _equippedTapMult() *
         _boosterTapMult() *
         _setTapBonus() *
@@ -740,6 +805,7 @@ class GameNotifier extends Notifier<GameState> {
     }
     return sum *
         _prestigeMult() *
+        _prestigeShopDpsMult() *
         _equippedDpsMult() *
         _boosterDpsMult() *
         _setDpsBonus() *
@@ -755,6 +821,7 @@ class GameNotifier extends Notifier<GameState> {
   /// visibly improves the "DPS +N" preview on companion/transcendent buys).
   double get dpsMultiplier =>
       _prestigeMult() *
+      _prestigeShopDpsMult() *
       _equippedDpsMult() *
       _boosterDpsMult() *
       _setDpsBonus() *
@@ -763,6 +830,7 @@ class GameNotifier extends Notifier<GameState> {
   /// Counterpart of [dpsMultiplier] for tap-power upgrades.
   double get tapMultiplier =>
       _prestigeMult() *
+      _prestigeShopTapMult() *
       _equippedTapMult() *
       _boosterTapMult() *
       _setTapBonus() *
@@ -855,8 +923,7 @@ class GameNotifier extends Notifier<GameState> {
 
   void _scheduleComboDecay() {
     _comboDecayTimer?.cancel();
-    _comboDecayTimer =
-        Timer(const Duration(milliseconds: comboWindowMs), () {
+    _comboDecayTimer = Timer(const Duration(milliseconds: comboWindowMs), () {
       if (_combo == 0) return;
       _combo = 0;
       _burstFiredThisRun = false;
@@ -897,16 +964,34 @@ class GameNotifier extends Notifier<GameState> {
     return n;
   }
 
+  bool buyPrestigeUpgrade(String id) {
+    final def = prestigeUpgradeById(id);
+    final lv = _save.prestigeUpgradeLevels[id] ?? 0;
+    if (lv >= def.maxLevel) return false;
+    final cost = def.costAt(lv);
+    if (_save.prestigeCoins < cost) return false;
+    _save.prestigeCoins -= cost;
+    _save.prestigeUpgradeLevels[id] = lv + 1;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return true;
+  }
+
   bool prestige() {
     final souls = state.prestigeSoulsAvailable;
-    if (souls <= 0) return false;
+    final coins = state.prestigeCoinsAvailable;
+    if (souls <= 0 && coins <= 0) return false;
     _save.prestigeSouls += souls;
+    _save.prestigeCoins += coins;
     _save.prestigeCount += 1;
     _save.essence += souls * 3;
     _save.gold = 0;
     _save.totalGoldEarned = 0;
     _save.producerLevels.clear();
     _save.tapUpgradeLevels.clear();
+    _combo = 0;
+    _lastTapAt = null;
+    _burstFiredThisRun = false;
     _emit(loaded: true);
     unawaited(_persist());
     return true;
@@ -1069,7 +1154,7 @@ class GameNotifier extends Notifier<GameState> {
         );
       case SkillId.comboSurge:
         _comboSurgeUntil = now.add(const Duration(seconds: 10));
-        result = SkillResult(
+        result = const SkillResult(
           id: SkillId.comboSurge,
           ok: true,
           message: '10초간 콤보 폭주!',
