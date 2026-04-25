@@ -1009,7 +1009,10 @@ class _BuyDialogState extends ConsumerState<_BuyDialog> {
           children: [
             _kv('현재가', NumberFormatter.formatPrecise(price)),
             _kv('보유 골드', NumberFormatter.format(game.gold)),
-            _kv('최대 매수 가능', '$cap 주'),
+            _kv(
+              '최대 매수 가능',
+              '$cap 주 (지분 ${(regionMaxOwnershipFraction * 100).toStringAsFixed(0)}% 한도)',
+            ),
             const SizedBox(height: 10),
             _QtyStepper(
               value: _qty,

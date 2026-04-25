@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Static metadata for the 17 시/도 in the stock-market system.
 ///
-/// Volatility is per-minute σ% — converted to per-second σ by dividing by
-/// √60 in the price tick. Hourly yield is the dividend rate per hour
-/// (e.g. 0.08 = 8% of the holding's market value paid out per hour into
-/// the region's pendingDividend).
+/// Volatility is per-minute σ% — converted to per-tick σ in the price
+/// simulation. Hourly yield is the dividend rate per hour (e.g. 0.08 = 8%
+/// of the holding's market value paid out per hour into the region's
+/// pendingDividend).
+///
+/// Market cap design: 경기도 = 100aa (1×10^17 골드, ≈ "현재 가격 × 1000배"의
+/// 의도). 그 위로 직전 지역의 4.5배씩 등비 증가 — 17번째(서울)까지
+/// 4.5^16 ≈ 282억 배 격차. 모든 지역 총주식수는 100B(1,000억주)로 통일.
 class RegionDef {
   final String id;
   final String name;
@@ -36,8 +40,16 @@ class RegionDef {
 /// to unlock the next.
 const regionUnlockOwnershipThreshold = 0.20; // 20%
 
+/// Maximum fraction of total shares any single player can hold. Owning a
+/// majority isn't allowed so prices remain a meaningful market signal.
+const regionMaxOwnershipFraction = 0.80; // 80%
+
 /// Trade fee fraction applied on both buy and sell.
 const stockTradeFee = 0.02; // 2%
+
+/// Wall-clock seconds between price ticks. Candles still bucket on
+/// [candleWindowSeconds]; multiple price ticks compose one candle.
+const stockPriceTickSeconds = 5;
 
 /// Candle window length in seconds.
 const candleWindowSeconds = 30;
@@ -48,15 +60,19 @@ const candleHistoryMax = 60;
 /// Dividend accrual interval.
 const dividendIntervalSeconds = 3600; // 1 hour
 
+// Cap & shares constants used in the catalog literals below.
+const _baseShares = 100000000000; // 100B = 1.0e11
+// 4.5^i × 1e17 = 시총 (i = unlockOrder - 1).
+// 1주 가격 = 시총 / 100B = 4.5^i × 1e6.
 const regionCatalog = <RegionDef>[
   RegionDef(
     id: 'gyeonggi',
     name: '경기도',
     shortName: '경기',
     unlockOrder: 1,
-    baseMarketCap: 5000000000,
-    totalShares: 10000000,
-    initialPrice: 500,
+    baseMarketCap: 1.0e17, // 100aa
+    totalShares: _baseShares,
+    initialPrice: 1.0e6,
     volatilityPerMinute: 0.005,
     hourlyYield: 0.08,
     accent: Color(0xFF42A5F5),
@@ -66,9 +82,9 @@ const regionCatalog = <RegionDef>[
     name: '인천광역시',
     shortName: '인천',
     unlockOrder: 2,
-    baseMarketCap: 6000000000,
-    totalShares: 8000000,
-    initialPrice: 750,
+    baseMarketCap: 4.5e17,
+    totalShares: _baseShares,
+    initialPrice: 4.5e6,
     volatilityPerMinute: 0.006,
     hourlyYield: 0.08,
     accent: Color(0xFF26A69A),
@@ -78,9 +94,9 @@ const regionCatalog = <RegionDef>[
     name: '충청북도',
     shortName: '충북',
     unlockOrder: 3,
-    baseMarketCap: 7000000000,
-    totalShares: 7000000,
-    initialPrice: 1000,
+    baseMarketCap: 2.025e18,
+    totalShares: _baseShares,
+    initialPrice: 2.025e7,
     volatilityPerMinute: 0.005,
     hourlyYield: 0.09,
     accent: Color(0xFF66BB6A),
@@ -90,9 +106,9 @@ const regionCatalog = <RegionDef>[
     name: '충청남도',
     shortName: '충남',
     unlockOrder: 4,
-    baseMarketCap: 9000000000,
-    totalShares: 6000000,
-    initialPrice: 1500,
+    baseMarketCap: 9.1125e18,
+    totalShares: _baseShares,
+    initialPrice: 9.1125e7,
     volatilityPerMinute: 0.005,
     hourlyYield: 0.09,
     accent: Color(0xFF9CCC65),
@@ -102,9 +118,9 @@ const regionCatalog = <RegionDef>[
     name: '세종특별자치시',
     shortName: '세종',
     unlockOrder: 5,
-    baseMarketCap: 10000000000,
-    totalShares: 4000000,
-    initialPrice: 2500,
+    baseMarketCap: 4.100625e19,
+    totalShares: _baseShares,
+    initialPrice: 4.100625e8,
     volatilityPerMinute: 0.004,
     hourlyYield: 0.10,
     accent: Color(0xFF7E57C2),
@@ -114,9 +130,9 @@ const regionCatalog = <RegionDef>[
     name: '전라북도',
     shortName: '전북',
     unlockOrder: 6,
-    baseMarketCap: 12000000000,
-    totalShares: 6000000,
-    initialPrice: 2000,
+    baseMarketCap: 1.84528125e20,
+    totalShares: _baseShares,
+    initialPrice: 1.84528125e9,
     volatilityPerMinute: 0.007,
     hourlyYield: 0.10,
     accent: Color(0xFFFFA726),
@@ -126,9 +142,9 @@ const regionCatalog = <RegionDef>[
     name: '전라남도',
     shortName: '전남',
     unlockOrder: 7,
-    baseMarketCap: 16000000000,
-    totalShares: 5000000,
-    initialPrice: 3200,
+    baseMarketCap: 8.303765625e20,
+    totalShares: _baseShares,
+    initialPrice: 8.303765625e9,
     volatilityPerMinute: 0.007,
     hourlyYield: 0.10,
     accent: Color(0xFFFFB74D),
@@ -138,9 +154,9 @@ const regionCatalog = <RegionDef>[
     name: '광주광역시',
     shortName: '광주',
     unlockOrder: 8,
-    baseMarketCap: 20000000000,
-    totalShares: 5000000,
-    initialPrice: 4000,
+    baseMarketCap: 3.7366945312e21,
+    totalShares: _baseShares,
+    initialPrice: 3.7366945312e10,
     volatilityPerMinute: 0.006,
     hourlyYield: 0.09,
     accent: Color(0xFFEF5350),
@@ -150,9 +166,9 @@ const regionCatalog = <RegionDef>[
     name: '대전광역시',
     shortName: '대전',
     unlockOrder: 9,
-    baseMarketCap: 28000000000,
-    totalShares: 4000000,
-    initialPrice: 7000,
+    baseMarketCap: 1.6815125391e22,
+    totalShares: _baseShares,
+    initialPrice: 1.6815125391e11,
     volatilityPerMinute: 0.006,
     hourlyYield: 0.09,
     accent: Color(0xFFEC407A),
@@ -162,9 +178,9 @@ const regionCatalog = <RegionDef>[
     name: '대구광역시',
     shortName: '대구',
     unlockOrder: 10,
-    baseMarketCap: 40000000000,
-    totalShares: 4000000,
-    initialPrice: 10000,
+    baseMarketCap: 7.5668064258e22,
+    totalShares: _baseShares,
+    initialPrice: 7.5668064258e11,
     volatilityPerMinute: 0.007,
     hourlyYield: 0.10,
     accent: Color(0xFFAB47BC),
@@ -174,9 +190,9 @@ const regionCatalog = <RegionDef>[
     name: '경상북도',
     shortName: '경북',
     unlockOrder: 11,
-    baseMarketCap: 55000000000,
-    totalShares: 4000000,
-    initialPrice: 13750,
+    baseMarketCap: 3.4050628916e23,
+    totalShares: _baseShares,
+    initialPrice: 3.4050628916e12,
     volatilityPerMinute: 0.008,
     hourlyYield: 0.10,
     accent: Color(0xFF8D6E63),
@@ -186,9 +202,9 @@ const regionCatalog = <RegionDef>[
     name: '경상남도',
     shortName: '경남',
     unlockOrder: 12,
-    baseMarketCap: 75000000000,
-    totalShares: 3000000,
-    initialPrice: 25000,
+    baseMarketCap: 1.5322783012e24,
+    totalShares: _baseShares,
+    initialPrice: 1.5322783012e13,
     volatilityPerMinute: 0.007,
     hourlyYield: 0.11,
     accent: Color(0xFF6D4C41),
@@ -198,9 +214,9 @@ const regionCatalog = <RegionDef>[
     name: '부산광역시',
     shortName: '부산',
     unlockOrder: 13,
-    baseMarketCap: 100000000000,
-    totalShares: 3000000,
-    initialPrice: 33333,
+    baseMarketCap: 6.8952523554e24,
+    totalShares: _baseShares,
+    initialPrice: 6.8952523554e13,
     volatilityPerMinute: 0.006,
     hourlyYield: 0.10,
     accent: Color(0xFF5C6BC0),
@@ -210,9 +226,9 @@ const regionCatalog = <RegionDef>[
     name: '울산광역시',
     shortName: '울산',
     unlockOrder: 14,
-    baseMarketCap: 140000000000,
-    totalShares: 2000000,
-    initialPrice: 70000,
+    baseMarketCap: 3.1028635599e25,
+    totalShares: _baseShares,
+    initialPrice: 3.1028635599e14,
     volatilityPerMinute: 0.007,
     hourlyYield: 0.11,
     accent: Color(0xFF3949AB),
@@ -222,9 +238,9 @@ const regionCatalog = <RegionDef>[
     name: '강원특별자치도',
     shortName: '강원',
     unlockOrder: 15,
-    baseMarketCap: 180000000000,
-    totalShares: 2000000,
-    initialPrice: 90000,
+    baseMarketCap: 1.3962886020e26,
+    totalShares: _baseShares,
+    initialPrice: 1.3962886020e15,
     volatilityPerMinute: 0.008,
     hourlyYield: 0.12,
     accent: Color(0xFF1E88E5),
@@ -234,9 +250,9 @@ const regionCatalog = <RegionDef>[
     name: '제주도',
     shortName: '제주',
     unlockOrder: 16,
-    baseMarketCap: 250000000000,
-    totalShares: 1000000,
-    initialPrice: 250000,
+    baseMarketCap: 6.2832987088e26,
+    totalShares: _baseShares,
+    initialPrice: 6.2832987088e15,
     volatilityPerMinute: 0.012,
     hourlyYield: 0.14,
     accent: Color(0xFF00ACC1),
@@ -246,9 +262,9 @@ const regionCatalog = <RegionDef>[
     name: '서울특별시',
     shortName: '서울',
     unlockOrder: 17,
-    baseMarketCap: 1000000000000,
-    totalShares: 5000000,
-    initialPrice: 200000,
+    baseMarketCap: 2.8274844190e27,
+    totalShares: _baseShares,
+    initialPrice: 2.8274844190e16,
     volatilityPerMinute: 0.004,
     hourlyYield: 0.08,
     accent: Color(0xFFD32F2F),

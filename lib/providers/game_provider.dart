@@ -998,10 +998,10 @@ class GameNotifier extends Notifier<GameState> {
         _save.stats.lifetimeGold += gain;
       }
       _stockTickAcc += dt;
-      if (_stockTickAcc >= 1.0) {
-        final ticks = _stockTickAcc.floor();
-        _stockTickAcc -= ticks;
-        _runStockSimulation(now: now, secondsElapsed: ticks);
+      if (_stockTickAcc >= stockPriceTickSeconds) {
+        final ticks = (_stockTickAcc / stockPriceTickSeconds).floor();
+        _stockTickAcc -= ticks * stockPriceTickSeconds;
+        _runStockSimulation(now: now, ticksElapsed: ticks);
       }
       _emit(loaded: true);
     });
@@ -2071,25 +2071,40 @@ class GameNotifier extends Notifier<GameState> {
     return mag * cos(2.0 * pi * u2);
   }
 
-  /// Step prices, candles, and dividends forward by [secondsElapsed] seconds.
+  /// Step prices, candles, and dividends forward by [ticksElapsed] price
+  /// ticks. Each tick represents [stockPriceTickSeconds] real seconds, so a
+  /// candle (30s window) accumulates 30 / [stockPriceTickSeconds] ticks per
+  /// bar.
   void _runStockSimulation({
     required DateTime now,
-    required int secondsElapsed,
+    required int ticksElapsed,
   }) {
-    if (secondsElapsed <= 0) return;
+    if (ticksElapsed <= 0) return;
     final m = _save.market;
+    // Per-tick σ: convert per-minute volatility to per-tick.
+    // σ_tick = σ_min × √(tickSec / 60).
+    final tickFactor = sqrt(stockPriceTickSeconds / 60.0);
+    // Drift / event rates are originally per-second; scale linearly to tick.
+    const driftPerSec = 0.0005;
+    const eventProbPerSec = 0.0005;
+    // Compound intrinsic inflation across [stockPriceTickSeconds].
+    final intrinsicGrowthPerTick =
+        pow(1.0000003, stockPriceTickSeconds).toDouble();
+
     for (final state in m.regions.values) {
       if (!state.unlocked) continue;
       final def = regionDefById(state.regionId);
-      // Per-second σ: convert per-minute volatility to per-second.
-      final sigmaPerSec = def.volatilityPerMinute / sqrt(60.0);
+      final sigmaPerTick = def.volatilityPerMinute * tickFactor;
 
-      for (var i = 0; i < secondsElapsed; i++) {
-        // Mean-reverting drift toward intrinsic price.
-        final drift = (state.intrinsicPrice - state.currentPrice) * 0.0005;
-        final noise = _randGauss() * sigmaPerSec * state.currentPrice;
+      for (var i = 0; i < ticksElapsed; i++) {
+        // Mean-reverting drift toward intrinsic price (scaled to tick).
+        final drift = (state.intrinsicPrice - state.currentPrice) *
+            driftPerSec *
+            stockPriceTickSeconds;
+        final noise = _randGauss() * sigmaPerTick * state.currentPrice;
         var event = 0.0;
-        if (_random.nextDouble() < 0.0005) {
+        if (_random.nextDouble() <
+            eventProbPerSec * stockPriceTickSeconds) {
           const shocks = [
             -0.12, -0.08, -0.05, 0.05, 0.08, 0.12, 0.18,
           ];
@@ -2102,13 +2117,14 @@ class GameNotifier extends Notifier<GameState> {
         if (next < lo) next = lo;
         if (next > hi) next = hi;
         state.currentPrice = next;
-        // Slowly inflate intrinsic (~+0.1%/hour). 0.1% per hour ≈
-        // 0.000000278 per second compounded; linear approximation here.
-        state.intrinsicPrice *= 1.0000003;
+        state.intrinsicPrice *= intrinsicGrowthPerTick;
 
-        // Update / start forming candle.
-        final candleStart = _candleStartFor(now.subtract(
-            Duration(seconds: secondsElapsed - i - 1)));
+        // Update / start forming candle. Candle bucket is 30s, but ticks
+        // arrive every [stockPriceTickSeconds]; so each bucket gets several
+        // ticks before rolling over.
+        final tickInstant = now.subtract(Duration(
+            seconds: (ticksElapsed - i - 1) * stockPriceTickSeconds));
+        final candleStart = _candleStartFor(tickInstant);
         var forming = state.formingCandle;
         if (forming == null || forming.startedAt != candleStart) {
           if (forming != null) {
@@ -2203,14 +2219,26 @@ class GameNotifier extends Notifier<GameState> {
     return sum;
   }
 
-  /// Maximum buyable share count given current gold (after fee).
+  /// Maximum buyable share count given current gold (after fee), respecting
+  /// the global ownership cap.
   int maxBuyableShares(String regionId) {
     final st = _save.market.regions[regionId];
     if (st == null || !st.unlocked) return 0;
+    final def = regionDefById(regionId);
     final unitTotalCost = st.currentPrice * (1 + stockTradeFee);
     if (unitTotalCost <= 0) return 0;
-    final n = (_save.gold / unitTotalCost).floor();
-    return n < 0 ? 0 : n;
+    final byGold = (_save.gold / unitTotalCost).floor();
+    final maxOwnable =
+        (def.totalShares * regionMaxOwnershipFraction).floor();
+    final byCap = maxOwnable - st.shares;
+    if (byCap <= 0) return 0;
+    return byGold < byCap ? byGold : byCap;
+  }
+
+  /// Hard cap on the number of shares a player may own for a region.
+  int regionMaxOwnableShares(String regionId) {
+    final def = regionDefById(regionId);
+    return (def.totalShares * regionMaxOwnershipFraction).floor();
   }
 
   /// Buy [shares] of [regionId] at current price + 2% fee. Returns the
@@ -2225,8 +2253,10 @@ class GameNotifier extends Notifier<GameState> {
     final fee = gross * stockTradeFee;
     final total = gross + fee;
     if (_save.gold < total) return 0;
-    // Cap at remaining shares so ownership never exceeds 100%.
-    final remaining = def.totalShares - st.shares;
+    // Cap at the configured max ownership fraction (e.g. 80%).
+    final maxOwnable =
+        (def.totalShares * regionMaxOwnershipFraction).floor();
+    final remaining = maxOwnable - st.shares;
     final actualShares = shares > remaining ? remaining : shares;
     if (actualShares <= 0) return 0;
     final actualGross = actualShares * price;
