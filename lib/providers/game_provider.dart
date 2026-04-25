@@ -8,6 +8,7 @@ import '../data/producer_catalog.dart';
 import '../data/sword_catalog.dart';
 import '../data/tap_upgrade_catalog.dart';
 import '../models/achievement.dart';
+import '../models/booster.dart';
 import '../models/save_data.dart';
 import '../models/sword.dart';
 import '../services/sync_service.dart';
@@ -47,6 +48,63 @@ int dailyRewardFor(int streak) {
   return dailyRewards[streak];
 }
 
+/// Booster shop catalog. (`adOnly`=true means essence cost is N/A; only
+/// purchasable via the ad stub.)
+class BoosterOffer {
+  final String id;
+  final String title;
+  final String subtitle;
+  final BoosterType type;
+  final double multiplier;
+  final int durationSec;
+  final int essenceCost; // 0 → ad-only
+  const BoosterOffer({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.type,
+    required this.multiplier,
+    required this.durationSec,
+    required this.essenceCost,
+  });
+}
+
+const boosterOffers = <BoosterOffer>[
+  BoosterOffer(
+    id: 'dps_2x_30m',
+    title: '자동 수익 x2 · 30분',
+    subtitle: '동료들의 DPS가 두 배가 돼요',
+    type: BoosterType.dps,
+    multiplier: 2.0,
+    durationSec: 1800,
+    essenceCost: 50,
+  ),
+  BoosterOffer(
+    id: 'tap_2x_15m',
+    title: '터치 x2 · 15분',
+    subtitle: '탭당 획득 골드 두 배',
+    type: BoosterType.tap,
+    multiplier: 2.0,
+    durationSec: 900,
+    essenceCost: 30,
+  ),
+  BoosterOffer(
+    id: 'rush_3x_5m',
+    title: '골드러시 x3 · 5분',
+    subtitle: 'DPS + 터치 모두 3배',
+    type: BoosterType.rush,
+    multiplier: 3.0,
+    durationSec: 300,
+    essenceCost: 100,
+  ),
+];
+
+/// Slime config — 1 in 500 taps (~0.2%) spawns a golden slime.
+const slimeSpawnChance = 0.002;
+const slimeLifetimeMs = 5000;
+const slimeRushMultiplier = 3.0;
+const slimeRushDurationSec = 60;
+
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
   (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
@@ -69,10 +127,12 @@ class TapResult {
   final double amount;
   final bool isCrit;
   final int combo;
+  final bool slimeSpawned;
   const TapResult({
     required this.amount,
     required this.isCrit,
     required this.combo,
+    this.slimeSpawned = false,
   });
 }
 
@@ -110,6 +170,7 @@ class GameState {
   final int maxCombo;
   final int dailyStreak;
   final DateTime? lastDailyClaimAt;
+  final List<Booster> activeBoosters;
   final bool loaded;
 
   const GameState({
@@ -140,6 +201,7 @@ class GameState {
     required this.maxCombo,
     required this.dailyStreak,
     required this.lastDailyClaimAt,
+    required this.activeBoosters,
     this.loaded = false,
   });
 
@@ -171,6 +233,7 @@ class GameState {
         maxCombo: 0,
         dailyStreak: 0,
         lastDailyClaimAt: null,
+        activeBoosters: const [],
         loaded: false,
       );
 
@@ -404,6 +467,7 @@ class GameNotifier extends Notifier<GameState> {
       maxCombo: _save.stats.maxCombo,
       dailyStreak: _save.dailyStreak,
       lastDailyClaimAt: _save.lastDailyClaimAt,
+      activeBoosters: List.unmodifiable(_save.activeBoosters),
       loaded: loaded,
     );
     if (loaded) _checkAchievements();
@@ -465,6 +529,7 @@ class GameNotifier extends Notifier<GameState> {
         maxCombo: state.maxCombo,
         dailyStreak: state.dailyStreak,
         lastDailyClaimAt: state.lastDailyClaimAt,
+        activeBoosters: state.activeBoosters,
         loaded: true,
       );
     }
@@ -502,7 +567,7 @@ class GameNotifier extends Notifier<GameState> {
       final lv = _save.tapUpgradeLevels[def.id] ?? 0;
       base += def.tapPowerPerLevel * lv;
     }
-    return base * _prestigeMult() * _equippedTapMult();
+    return base * _prestigeMult() * _equippedTapMult() * _boosterTapMult();
   }
 
   double _calcDps() {
@@ -511,7 +576,36 @@ class GameNotifier extends Notifier<GameState> {
       final lv = _save.producerLevels[def.id] ?? 0;
       sum += def.dpsAt(lv);
     }
-    return sum * _prestigeMult() * _equippedDpsMult();
+    return sum * _prestigeMult() * _equippedDpsMult() * _boosterDpsMult();
+  }
+
+  /// Drop expired boosters from the save (called before any calculation that
+  /// reads them, to avoid "ghost" multipliers after their timer ran out).
+  void _reapBoosters() {
+    final now = DateTime.now();
+    _save.activeBoosters.removeWhere((b) => !b.isActive(now));
+  }
+
+  double _boosterDpsMult() {
+    _reapBoosters();
+    double m = 1.0;
+    for (final b in _save.activeBoosters) {
+      if (b.type == BoosterType.dps || b.type == BoosterType.rush) {
+        m *= b.multiplier;
+      }
+    }
+    return m;
+  }
+
+  double _boosterTapMult() {
+    _reapBoosters();
+    double m = 1.0;
+    for (final b in _save.activeBoosters) {
+      if (b.type == BoosterType.tap || b.type == BoosterType.rush) {
+        m *= b.multiplier;
+      }
+    }
+    return m;
   }
 
   /// Back-compat shim for callers that still treat tap() as "give me gold".
@@ -538,9 +632,16 @@ class GameNotifier extends Notifier<GameState> {
     _save.stats.totalTaps++;
     if (isCrit) _save.stats.totalCrits++;
 
+    final slimeSpawned = _random.nextDouble() < slimeSpawnChance;
+
     _scheduleComboDecay();
     _emit(loaded: true);
-    return TapResult(amount: amount, isCrit: isCrit, combo: _combo);
+    return TapResult(
+      amount: amount,
+      isCrit: isCrit,
+      combo: _combo,
+      slimeSpawned: slimeSpawned,
+    );
   }
 
   void _scheduleComboDecay() {
@@ -646,6 +747,103 @@ class GameNotifier extends Notifier<GameState> {
     _save.lastDailyClaimAt = DateTime.now();
     _emit(loaded: true);
     unawaited(_persist());
+  }
+
+  // ============ Boosters + ads ============
+
+  /// Attempt to buy [offer] with essence. Returns true on success.
+  bool buyBoosterWithEssence(BoosterOffer offer) {
+    if (_save.essence < offer.essenceCost) return false;
+    _save.essence -= offer.essenceCost;
+    _applyBooster(offer.type, offer.multiplier, offer.durationSec);
+    _emit(loaded: true);
+    unawaited(_persist());
+    return true;
+  }
+
+  /// Dev stub for ad rewards — in production this would actually show an
+  /// ad via AdMob / UnityAds and only grant on the completion callback.
+  /// Right now we just hand the reward out for testing.
+  void grantAdBooster(BoosterOffer offer) {
+    _applyBooster(offer.type, offer.multiplier, offer.durationSec);
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  void _applyBooster(BoosterType type, double multiplier, int durationSec) {
+    _reapBoosters();
+    final now = DateTime.now();
+    // If the same type+multiplier is already active, extend its timer
+    // instead of stacking a second identical booster.
+    final existing = _save.activeBoosters.indexWhere(
+      (b) => b.type == type && b.multiplier == multiplier,
+    );
+    if (existing >= 0) {
+      final prev = _save.activeBoosters[existing];
+      final base = prev.expiresAt.isAfter(now) ? prev.expiresAt : now;
+      _save.activeBoosters[existing] = Booster(
+        type: type,
+        multiplier: multiplier,
+        expiresAt: base.add(Duration(seconds: durationSec)),
+      );
+    } else {
+      _save.activeBoosters.add(Booster(
+        type: type,
+        multiplier: multiplier,
+        expiresAt: now.add(Duration(seconds: durationSec)),
+      ));
+    }
+  }
+
+  /// Called by the home screen when the user taps a golden slime.
+  /// Grants a "rush" booster with no essence cost.
+  void catchGoldenSlime() {
+    _applyBooster(
+      BoosterType.rush,
+      slimeRushMultiplier,
+      slimeRushDurationSec,
+    );
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  // ============ Sword dismantle ============
+
+  /// Returns the amount of essence that dismantling [swordId] would refund,
+  /// or 0 if the sword can't be dismantled.
+  int dismantleRefund(String swordId) {
+    final lv = _save.ownedSwords[swordId] ?? 0;
+    if (lv <= 0) return 0;
+    if (_save.equippedSwordId == swordId) return 0;
+    final SwordDef def;
+    try {
+      def = swordById(swordId);
+    } catch (_) {
+      return 0;
+    }
+    return _dismantleEssencePerLevel(def.tier) * lv;
+  }
+
+  int _dismantleEssencePerLevel(SwordTier tier) {
+    return switch (tier) {
+      SwordTier.n => 2,
+      SwordTier.r => 5,
+      SwordTier.sr => 12,
+      SwordTier.ssr => 25,
+      SwordTier.ur => 60,
+    };
+  }
+
+  /// Dismantle an owned, non-equipped sword. Returns essence granted (0 on
+  /// failure — usually because the sword is equipped or not owned).
+  int dismantleSword(String swordId) {
+    final refund = dismantleRefund(swordId);
+    if (refund <= 0) return 0;
+    _save.ownedSwords.remove(swordId);
+    _save.essence += refund;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return refund;
   }
 
   Future<void> resetAll() async {

@@ -1,7 +1,8 @@
+import 'booster.dart';
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 5;
+  static const currentVersion = 6;
 
   int version;
   double gold;
@@ -27,6 +28,9 @@ class SaveData {
   DateTime? lastDailyClaimAt;
   int dailyStreak;
 
+  // Time-limited boosters (v6)
+  List<Booster> activeBoosters;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -45,13 +49,15 @@ class SaveData {
     Set<String>? unlockedAchievements,
     this.lastDailyClaimAt,
     this.dailyStreak = 0,
+    List<Booster>? activeBoosters,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
         stats = stats ?? GameStats(),
         settings = settings ?? GameSettings(),
         ownedSwords = ownedSwords ?? {},
-        unlockedAchievements = unlockedAchievements ?? <String>{};
+        unlockedAchievements = unlockedAchievements ?? <String>{},
+        activeBoosters = activeBoosters ?? <Booster>[];
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -71,6 +77,7 @@ class SaveData {
         'unlockedAchievements': unlockedAchievements.toList(),
         'lastDailyClaimAt': lastDailyClaimAt?.toIso8601String(),
         'dailyStreak': dailyStreak,
+        'activeBoosters': activeBoosters.map((b) => b.toJson()).toList(),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -102,5 +109,9 @@ class SaveData {
         lastDailyClaimAt:
             DateTime.tryParse(json['lastDailyClaimAt'] as String? ?? ''),
         dailyStreak: json['dailyStreak'] as int? ?? 0,
+        activeBoosters: (json['activeBoosters'] as List?)
+                ?.map((e) => Booster.fromJson(Map<String, dynamic>.from(e as Map)))
+                .toList() ??
+            <Booster>[],
       );
 }

@@ -410,6 +410,8 @@ class _SwordDetailSheet extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            _DismantleButton(def: def, level: level, equipped: equipped),
           ] else ...[
             _StatRow(
               label: '터치 배율',
@@ -426,6 +428,97 @@ class _SwordDetailSheet extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _DismantleButton extends ConsumerWidget {
+  final SwordDef def;
+  final int level;
+  final bool equipped;
+  const _DismantleButton({
+    required this.def,
+    required this.level,
+    required this.equipped,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(gameProvider.notifier);
+    final refund = notifier.dismantleRefund(def.id);
+    final disabled = equipped || refund <= 0;
+    final hint = equipped
+        ? '장착 중인 검은 분해할 수 없어요'
+        : '분해 시 정수 +$refund (Lv $level 기준)';
+    return Column(
+      children: [
+        OutlinedButton.icon(
+          onPressed: disabled ? null : () => _confirm(context, ref, refund),
+          icon: const Icon(Icons.recycling, size: 18),
+          label: Text('분해 (+$refund 정수)'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
+            foregroundColor: const Color(0xFF7C4DFF),
+            side: BorderSide(
+              color: disabled
+                  ? Colors.grey.shade400
+                  : const Color(0xFF7C4DFF).withValues(alpha: 0.6),
+              width: 1.4,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          hint,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.black.withValues(alpha: 0.5),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirm(
+      BuildContext context, WidgetRef ref, int refund) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('${def.name} 분해'),
+        content: Text(
+          '이 검은 컬렉션에서 영구 제거되고, 정수 +$refund 가 지급돼요.\n'
+          '되돌릴 수 없어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF7C4DFF),
+            ),
+            child: const Text('분해'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final granted = ref.read(gameProvider.notifier).dismantleSword(def.id);
+    if (granted > 0 && context.mounted) {
+      Navigator.of(context).pop(); // close detail sheet
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${def.name} 분해 · 정수 +$granted'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 
@@ -767,6 +860,18 @@ class _EssenceSources extends StatelessWidget {
           const _SourceRow(
             icon: Icons.auto_awesome,
             text: '환생 시 (획득 소울 × 3)',
+          ),
+          const _SourceRow(
+            icon: Icons.calendar_month,
+            text: '일일 출석 보너스 (5~60 정수)',
+          ),
+          const _SourceRow(
+            icon: Icons.emoji_events,
+            text: '업적 해제 시',
+          ),
+          const _SourceRow(
+            icon: Icons.recycling,
+            text: '검 분해 시 (등급·레벨에 비례)',
           ),
         ],
       ),

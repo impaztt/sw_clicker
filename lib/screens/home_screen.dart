@@ -1,13 +1,18 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/number_format.dart';
 import '../core/theme.dart';
+import '../models/booster.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
+import '../widgets/booster_shop_dialog.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/floating_number.dart';
+import '../widgets/golden_slime.dart';
 import '../widgets/gold_display.dart';
 import '../widgets/sword_widget.dart';
 
@@ -20,7 +25,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final List<FloatingNumberData> _floats = [];
+  final List<_SlimeSpawn> _slimes = [];
   int _nextId = 0;
+  int _nextSlimeId = 0;
+  final _rng = Random();
 
   void _handleTap(Offset globalPos) {
     final box = context.findRenderObject() as RenderBox?;
@@ -43,12 +51,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         amount: result.amount,
         isCrit: result.isCrit,
       ));
+      if (result.slimeSpawned) _spawnSlime(box.size);
     });
   }
 
   void _removeFloat(int id) {
     if (!mounted) return;
     setState(() => _floats.removeWhere((f) => f.id == id));
+  }
+
+  void _spawnSlime(Size bounds) {
+    final id = _nextSlimeId++;
+    // Keep it clear of the top bar and the sword center by biasing the
+    // random position toward the horizontal edges and avoiding the middle
+    // band where the main sword sits.
+    final w = bounds.width;
+    final h = bounds.height;
+    final leftSide = _rng.nextBool();
+    final dx = leftSide
+        ? 16.0 + _rng.nextDouble() * (w * 0.25)
+        : w * 0.6 + _rng.nextDouble() * (w * 0.25) - 16.0;
+    final dy = h * 0.25 + _rng.nextDouble() * (h * 0.45);
+    _slimes.add(_SlimeSpawn(id: id, offset: Offset(dx, dy)));
+  }
+
+  void _catchSlime(int id) {
+    if (!mounted) return;
+    ref.read(gameProvider.notifier).catchGoldenSlime();
+    setState(() => _slimes.removeWhere((s) => s.id == id));
+    if (ref.read(gameProvider).haptic) HapticFeedback.heavyImpact();
+  }
+
+  void _slimeTimedOut(int id) {
+    if (!mounted) return;
+    setState(() => _slimes.removeWhere((s) => s.id == id));
+  }
+
+  void _openBoosterShop() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => const BoosterShopDialog(),
+    );
   }
 
   @override
@@ -107,13 +150,142 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     multiplier: game.prestigeMultiplier,
                   ),
                 ),
+              if (game.activeBoosters.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _ActiveBoostersStrip(boosters: game.activeBoosters),
+                ),
               const SizedBox(height: 24),
             ],
           ),
           FloatingNumberLayer(items: _floats, onDone: _removeFloat),
+          for (final slime in _slimes)
+            Positioned(
+              left: slime.offset.dx,
+              top: slime.offset.dy,
+              child: GoldenSlime(
+                onCatch: () => _catchSlime(slime.id),
+                onTimeout: () => _slimeTimedOut(slime.id),
+              ),
+            ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: _ShopFab(onTap: _openBoosterShop),
+          ),
         ],
       ),
     );
+  }
+}
+
+class _SlimeSpawn {
+  final int id;
+  final Offset offset;
+  const _SlimeSpawn({required this.id, required this.offset});
+}
+
+class _ShopFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ShopFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.coral,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 52,
+          height: 52,
+          child: Icon(Icons.bolt, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveBoostersStrip extends StatelessWidget {
+  final List<Booster> boosters;
+  const _ActiveBoostersStrip({required this.boosters});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final b in boosters)
+            _BoosterChip(
+              type: b.type,
+              multiplier: b.multiplier,
+              remaining: b.remaining(now),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoosterChip extends StatelessWidget {
+  final BoosterType type;
+  final double multiplier;
+  final Duration remaining;
+  const _BoosterChip({
+    required this.type,
+    required this.multiplier,
+    required this.remaining,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (type) {
+      BoosterType.dps => 'DPS',
+      BoosterType.tap => '터치',
+      BoosterType.rush => '러시',
+    };
+    final color = switch (type) {
+      BoosterType.dps => const Color(0xFF26A69A),
+      BoosterType.tap => AppColors.deepCoral,
+      BoosterType.rush => const Color(0xFFFFB300),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bolt, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$label x${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)} · ${_fmt(remaining)}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(Duration d) {
+    final totalSec = d.inSeconds.clamp(0, 1 << 31);
+    final m = totalSec ~/ 60;
+    final s = totalSec % 60;
+    return '${m}:${s.toString().padLeft(2, '0')}';
   }
 }
 
