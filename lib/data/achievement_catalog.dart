@@ -1,6 +1,16 @@
 import 'prestige_upgrade_catalog.dart';
 import '../models/achievement.dart';
 
+// Global tuning knob: raises all achievement essence rewards while preserving
+// relative progression tiers across the catalog.
+const _achievementEssenceScale = 1.35;
+
+int _scaledEssenceReward(int base) {
+  final scaled = (base * _achievementEssenceScale).round();
+  // Keep progression feeling better at every tier by guaranteeing +1 minimum.
+  return scaled > base ? scaled : (base + 1);
+}
+
 /// Convenience: numeric target achievements.
 AchievementDef _num({
   required String id,
@@ -16,7 +26,7 @@ AchievementDef _num({
     name: name,
     description: description,
     category: category,
-    essenceReward: essenceReward,
+    essenceReward: _scaledEssenceReward(essenceReward),
     progress: (ctx) => AchProgress(current(ctx), target),
   );
 }
@@ -35,7 +45,7 @@ AchievementDef _bool({
     name: name,
     description: description,
     category: category,
-    essenceReward: essenceReward,
+    essenceReward: _scaledEssenceReward(essenceReward),
     progress: (ctx) => AchProgress(test(ctx) ? 1 : 0, 1),
   );
 }
@@ -893,8 +903,8 @@ final achievementCatalog = <AchievementDef>[
     essenceReward: 15,
     current: (c) {
       if (c.producerLevels.length < c.totalProducerCatalogCount) return 0;
-      final minLv = c.producerLevels.values
-          .fold<int>(1 << 30, (a, b) => a < b ? a : b);
+      final minLv =
+          c.producerLevels.values.fold<int>(1 << 30, (a, b) => a < b ? a : b);
       return minLv.toDouble();
     },
     target: 10,

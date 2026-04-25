@@ -152,39 +152,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 }),
               ),
               const Spacer(),
-              if (game.combo > 1)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ComboChip(combo: game.combo),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _BattleStatusPanel(
+                  combo: game.combo,
+                  tapPower: game.tapPower,
+                  maxIdleReward: game.dps * offlineMaxSeconds,
+                  idleHours: offlineMaxHours,
+                  prestigeMultiplier: game.prestigeMultiplier,
+                  collectionFraction: notifier.collectionBonusFraction,
+                  boosters: game.activeBoosters,
                 ),
-              _TapPowerChip(tapPower: game.tapPower),
-              if (game.dps > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _IdleChip(
-                    maxReward: game.dps * offlineMaxSeconds,
-                    hours: offlineMaxHours,
-                  ),
-                ),
-              if (game.prestigeMultiplier > 1)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child:
-                      _PermanentBoostChip(multiplier: game.prestigeMultiplier),
-                ),
-              if (notifier.collectionBonusFraction > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _CollectionChip(
-                    fraction: notifier.collectionBonusFraction,
-                  ),
-                ),
-              if (game.activeBoosters.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _ActiveBoostersStrip(boosters: game.activeBoosters),
-                ),
-              const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 76),
             ],
           ),
           FloatingNumberLayer(items: _floats, onDone: _removeFloat),
@@ -238,112 +218,185 @@ class _ShopFab extends StatelessWidget {
   }
 }
 
-class _ActiveBoostersStrip extends StatelessWidget {
+class _BattleStatusPanel extends StatelessWidget {
+  final int combo;
+  final double tapPower;
+  final double maxIdleReward;
+  final int idleHours;
+  final double prestigeMultiplier;
+  final double collectionFraction;
   final List<Booster> boosters;
-  const _ActiveBoostersStrip({required this.boosters});
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 6,
-        runSpacing: 6,
-        children: [
-          for (final b in boosters)
-            _BoosterChip(
-              type: b.type,
-              multiplier: b.multiplier,
-              remaining: b.remaining(now),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BoosterChip extends StatelessWidget {
-  final BoosterType type;
-  final double multiplier;
-  final Duration remaining;
-  const _BoosterChip({
-    required this.type,
-    required this.multiplier,
-    required this.remaining,
+  const _BattleStatusPanel({
+    required this.combo,
+    required this.tapPower,
+    required this.maxIdleReward,
+    required this.idleHours,
+    required this.prestigeMultiplier,
+    required this.collectionFraction,
+    required this.boosters,
   });
 
   @override
   Widget build(BuildContext context) {
-    final label = switch (type) {
-      BoosterType.dps => 'DPS',
-      BoosterType.tap => '터치',
-      BoosterType.rush => '러시',
-      BoosterType.autoTap => 'AUTO',
-    };
-    final color = switch (type) {
-      BoosterType.dps => const Color(0xFF26A69A),
-      BoosterType.tap => AppColors.deepCoral,
-      BoosterType.rush => const Color(0xFFFFB300),
-      BoosterType.autoTap => const Color(0xFF5C6BC0),
-    };
+    final comboPct =
+        ((combo * comboBonusPerStack).clamp(0.0, 0.5) * 100).toStringAsFixed(0);
+    final permanentPct = ((prestigeMultiplier - 1) * 100).clamp(0.0, 9999999.0);
+    final collectionPct = (collectionFraction * 100).clamp(0.0, 9999999.0);
+
+    final now = DateTime.now();
+    final activeBoosters = boosters.where((b) => b.isActive(now)).toList();
+    Duration minRemaining = Duration.zero;
+    double strongestBoost = 1.0;
+    if (activeBoosters.isNotEmpty) {
+      minRemaining = activeBoosters
+          .map((b) => b.remaining(now))
+          .reduce((a, b) => a.compareTo(b) <= 0 ? a : b);
+      strongestBoost = activeBoosters
+          .map((b) => b.multiplier)
+          .fold<double>(1.0, (a, b) => a > b ? a : b);
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.bolt, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            '$label x${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)} · ${_fmt(remaining)}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.dashboard_customize,
+                  size: 18, color: AppColors.deepCoral),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  '전투 요약',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                ),
+              ),
+              if (combo > 1)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.deepCoral.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppColors.deepCoral.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Text(
+                    '콤보 x$combo (+$comboPct%)',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.deepCoral,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _MetricPill(
+                icon: Icons.touch_app,
+                label: '터치',
+                value: '+${NumberFormatter.formatPrecise(tapPower)}',
+                color: const Color(0xFF8D6E00),
+              ),
+              _MetricPill(
+                icon: Icons.nightlight_round,
+                label: '방치',
+                value:
+                    '+${NumberFormatter.format(maxIdleReward)} / ${idleHours}h',
+                color: const Color(0xFF5E35B1),
+              ),
+              _MetricPill(
+                icon: Icons.auto_awesome,
+                label: '영구',
+                value: '+${permanentPct.toStringAsFixed(0)}%',
+                color: const Color(0xFF00695C),
+              ),
+              _MetricPill(
+                icon: Icons.collections_bookmark,
+                label: '수집',
+                value:
+                    '+${collectionPct.toStringAsFixed(collectionFraction >= 1 ? 0 : 1)}%',
+                color: const Color(0xFF6A1B9A),
+              ),
+              if (activeBoosters.isNotEmpty)
+                _MetricPill(
+                  icon: Icons.bolt,
+                  label: '부스터',
+                  value:
+                      '${activeBoosters.length}개 · 최고 x${strongestBoost.toStringAsFixed(strongestBoost % 1 == 0 ? 0 : 1)} · ${_fmtDuration(minRemaining)}',
+                  color: AppColors.deepCoral,
+                  highlight: true,
+                ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  String _fmt(Duration d) {
+  String _fmtDuration(Duration d) {
     final totalSec = d.inSeconds.clamp(0, 1 << 31);
     final m = totalSec ~/ 60;
     final s = totalSec % 60;
-    return '${m}:${s.toString().padLeft(2, '0')}';
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }
 
-class _TapPowerChip extends StatelessWidget {
-  final double tapPower;
-  const _TapPowerChip({required this.tapPower});
+class _MetricPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final bool highlight;
+  const _MetricPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.highlight = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.yellow.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(20),
+        color: color.withValues(alpha: highlight ? 0.16 : 0.11),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: highlight ? 0.45 : 0.28),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.touch_app, size: 18, color: Color(0xFF8D6E00)),
-          const SizedBox(width: 4),
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
           Text(
-            '터치 +${NumberFormatter.formatPrecise(tapPower)}',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF7A5C00),
+            '$label $value',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
           ),
         ],
@@ -404,151 +457,6 @@ class _SlimeProgressBar extends StatelessWidget {
               minHeight: 8,
               backgroundColor: Colors.black12,
               valueColor: AlwaysStoppedAnimation(accent),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ComboChip extends StatelessWidget {
-  final int combo;
-  const _ComboChip({required this.combo});
-
-  @override
-  Widget build(BuildContext context) {
-    final bonus = (combo * 0.01).clamp(0.0, 0.5);
-    final pct = (bonus * 100).toStringAsFixed(0);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.deepCoral.withValues(alpha: 0.9),
-            AppColors.coral.withValues(alpha: 0.9),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.coral.withValues(alpha: 0.35),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.local_fire_department,
-              size: 18, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(
-            '콤보 x$combo · +$pct% 터치',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _IdleChip extends StatelessWidget {
-  final double maxReward;
-  final int hours;
-  const _IdleChip({required this.maxReward, required this.hours});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF9575CD).withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.nightlight_round,
-              size: 18, color: Color(0xFF5E35B1)),
-          const SizedBox(width: 4),
-          Text(
-            '방치 보상 최대 +${NumberFormatter.format(maxReward)} / ${hours}h',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF4527A0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CollectionChip extends StatelessWidget {
-  final double fraction;
-  const _CollectionChip({required this.fraction});
-
-  @override
-  Widget build(BuildContext context) {
-    final pct = (fraction * 100).toStringAsFixed(fraction >= 1 ? 0 : 1);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFAB47BC).withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.collections_bookmark,
-              size: 18, color: Color(0xFF6A1B9A)),
-          const SizedBox(width: 4),
-          Text(
-            '수집 보너스 +$pct% · 터치·동료·초월 모두 적용',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF6A1B9A),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PermanentBoostChip extends StatelessWidget {
-  final double multiplier;
-  const _PermanentBoostChip({required this.multiplier});
-
-  @override
-  Widget build(BuildContext context) {
-    final pct = ((multiplier - 1) * 100).toStringAsFixed(0);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.mint.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.auto_awesome, size: 18, color: Color(0xFF00695C)),
-          const SizedBox(width: 4),
-          Text(
-            '영구 배율 +$pct%',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF00695C),
             ),
           ),
         ],
