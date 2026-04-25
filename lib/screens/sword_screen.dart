@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
+import '../data/achievement_catalog.dart';
 import '../data/sword_catalog.dart';
+import '../models/achievement.dart';
 import '../models/sword.dart';
 import '../providers/game_provider.dart';
 import '../widgets/summon_dialog.dart';
@@ -20,7 +22,7 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: DefaultTabController(
-        length: 2,
+        length: 4,
         child: Column(
           children: [
             const SizedBox(height: 12),
@@ -34,6 +36,8 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
               tabs: [
                 Tab(text: '수집'),
                 Tab(text: '소환'),
+                Tab(text: '미션'),
+                Tab(text: '업적'),
               ],
             ),
             const Expanded(
@@ -41,6 +45,8 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
                 children: [
                   _CollectionView(),
                   _SummonView(),
+                  _MissionHubView(),
+                  _AchievementHubView(),
                 ],
               ),
             ),
@@ -435,9 +441,7 @@ class _SwordDetailSheet extends ConsumerWidget {
             _StatRow(
               label: '레벨',
               value: 'Lv $level / ${SwordDef.maxLevel}',
-              sub: level < SwordDef.maxLevel
-                  ? '중복 획득 시 자동 레벨업'
-                  : '',
+              sub: level < SwordDef.maxLevel ? '중복 획득 시 자동 레벨업' : '',
             ),
             const SizedBox(height: 16),
             FilledButton(
@@ -502,9 +506,8 @@ class _DismantleButton extends ConsumerWidget {
     final notifier = ref.read(gameProvider.notifier);
     final refund = notifier.dismantleRefund(def.id);
     final disabled = equipped || refund <= 0;
-    final hint = equipped
-        ? '장착 중인 검은 분해할 수 없어요'
-        : '분해 시 정수 +$refund (Lv $level 기준)';
+    final hint =
+        equipped ? '장착 중인 검은 분해할 수 없어요' : '분해 시 정수 +$refund (Lv $level 기준)';
     return Column(
       children: [
         OutlinedButton.icon(
@@ -537,8 +540,7 @@ class _DismantleButton extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirm(
-      BuildContext context, WidgetRef ref, int refund) async {
+  Future<void> _confirm(BuildContext context, WidgetRef ref, int refund) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -635,6 +637,551 @@ class _StatRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _MissionHubView extends ConsumerWidget {
+  const _MissionHubView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final game = ref.watch(gameProvider);
+    final notifier = ref.read(gameProvider.notifier);
+    final daily = game.dailyMissions;
+    final weekly = game.weeklyMissions;
+    final dailyDone = daily.where((m) => m.done).length;
+    final weeklyDone = weekly.where((m) => m.done).length;
+    final claimable = [
+      ...daily,
+      ...weekly,
+    ].where((m) => m.done && !m.claimed).length;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _MissionProgressCard(
+            dailyDone: dailyDone,
+            dailyTotal: daily.length,
+            weeklyDone: weeklyDone,
+            weeklyTotal: weekly.length,
+            claimable: claimable,
+          ),
+          const SizedBox(height: 12),
+          _MissionSection(
+            title: '오늘의 미션',
+            accent: const Color(0xFF00897B),
+            missions: daily,
+            onClaim: (id) => notifier.claimMission(id, daily: true),
+          ),
+          const SizedBox(height: 10),
+          _MissionSection(
+            title: '주간 미션',
+            accent: const Color(0xFF7E57C2),
+            missions: weekly,
+            onClaim: (id) => notifier.claimMission(id, daily: false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissionProgressCard extends StatelessWidget {
+  final int dailyDone;
+  final int dailyTotal;
+  final int weeklyDone;
+  final int weeklyTotal;
+  final int claimable;
+  const _MissionProgressCard({
+    required this.dailyDone,
+    required this.dailyTotal,
+    required this.weeklyDone,
+    required this.weeklyTotal,
+    required this.claimable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.mint.withValues(alpha: 0.9),
+            const Color(0xFF7E57C2).withValues(alpha: 0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '미션 보드',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '일일 $dailyDone/$dailyTotal · 주간 $weeklyDone/$weeklyTotal',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.95),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            claimable > 0 ? '수령 가능 보상 $claimable개' : '현재 수령 가능한 보상이 없습니다',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissionSection extends StatelessWidget {
+  final String title;
+  final Color accent;
+  final List<MissionView> missions;
+  final bool Function(String id) onClaim;
+  const _MissionSection({
+    required this.title,
+    required this.accent,
+    required this.missions,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: accent,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final m in missions)
+            _MissionTaskTile(
+              mission: m,
+              accent: accent,
+              onClaim: () => onClaim(m.id),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissionTaskTile extends StatelessWidget {
+  final MissionView mission;
+  final Color accent;
+  final VoidCallback onClaim;
+  const _MissionTaskTile({
+    required this.mission,
+    required this.accent,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = (mission.progress / mission.target).clamp(0.0, 1.0);
+    final claimable = mission.done && !mission.claimed;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.28), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  mission.title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (mission.claimed)
+                const Text(
+                  '수령완료',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                )
+              else if (claimable)
+                FilledButton(
+                  onPressed: onClaim,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.coral,
+                    minimumSize: const Size(58, 30),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
+                  child: const Text(
+                    '수령',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            mission.description,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 6,
+              backgroundColor: Colors.black12,
+              valueColor: AlwaysStoppedAnimation(accent),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${mission.progress}/${mission.target} · 정수 +${mission.rewardEssence} · 코인 +${mission.rewardPrestigeCoins}',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AchievementHubView extends ConsumerStatefulWidget {
+  const _AchievementHubView();
+
+  @override
+  ConsumerState<_AchievementHubView> createState() =>
+      _AchievementHubViewState();
+}
+
+class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
+  AchievementCategory? _filter;
+
+  @override
+  Widget build(BuildContext context) {
+    final game = ref.watch(gameProvider);
+    final achCtx = game.achContext();
+    final total = achievementCatalog.length;
+    final unlockedCount = game.unlockedAchievements.length;
+    final filtered = _filter == null
+        ? achievementCatalog
+        : achievementCatalog.where((a) => a.category == _filter).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '업적 진행도',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.55),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$unlockedCount / $total',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? 0 : unlockedCount / total,
+                    minHeight: 8,
+                    backgroundColor: Colors.black12,
+                    valueColor: const AlwaysStoppedAnimation(AppColors.coral),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 48,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            children: [
+              _AchievementCategoryChip(
+                label: '전체',
+                color: AppColors.coral,
+                selected: _filter == null,
+                onTap: () => setState(() => _filter = null),
+              ),
+              for (final cat in AchievementCategory.values)
+                _AchievementCategoryChip(
+                  label: cat.label,
+                  color: cat.color,
+                  selected: _filter == cat,
+                  onTap: () => setState(() => _filter = cat),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 10),
+            itemCount: filtered.length,
+            itemBuilder: (context, i) {
+              final def = filtered[i];
+              final unlocked = game.isAchievementUnlocked(def.id);
+              final progress = def.progress(achCtx);
+              return _AchievementHubTile(
+                def: def,
+                unlocked: unlocked,
+                progress: progress,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AchievementCategoryChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AchievementCategoryChip({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Material(
+        color: selected ? color : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: color.withValues(alpha: selected ? 1.0 : 0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : color,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AchievementHubTile extends StatelessWidget {
+  final AchievementDef def;
+  final bool unlocked;
+  final AchProgress progress;
+  const _AchievementHubTile({
+    required this.def,
+    required this.unlocked,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = def.category.color;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: unlocked ? color : Colors.black12,
+          width: unlocked ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: unlocked ? 0.25 : 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              def.category.icon,
+              color: unlocked ? color : Colors.black26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        def.name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: unlocked ? Colors.black87 : Colors.black54,
+                        ),
+                      ),
+                    ),
+                    if (unlocked)
+                      Icon(Icons.check_circle, color: color, size: 18),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  def.description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black.withValues(alpha: 0.55),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress.ratio,
+                    minHeight: 5,
+                    backgroundColor: Colors.black12,
+                    valueColor: AlwaysStoppedAnimation(color),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      _progressLabel(progress),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.diamond,
+                        size: 12, color: Color(0xFF7C4DFF)),
+                    const SizedBox(width: 2),
+                    Text(
+                      '+${def.essenceReward}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7C4DFF),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _progressLabel(AchProgress p) {
+    if (p.target == 1) return p.done ? '완료' : '미완료';
+    final cur = _compact(p.current);
+    final tgt = _compact(p.target);
+    return '$cur / $tgt';
+  }
+
+  static String _compact(double v) {
+    if (v >= 1e18) return '${(v / 1e18).toStringAsFixed(2)}Qi';
+    if (v >= 1e15) return '${(v / 1e15).toStringAsFixed(2)}Qa';
+    if (v >= 1e12) return '${(v / 1e12).toStringAsFixed(2)}T';
+    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)}B';
+    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(2)}M';
+    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(2)}K';
+    return v.floor().toString();
   }
 }
 
@@ -775,7 +1322,8 @@ class _SummonButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: primary
                 ? null
-                : Border.all(color: AppColors.coral.withValues(alpha: 0.5), width: 1.5),
+                : Border.all(
+                    color: AppColors.coral.withValues(alpha: 0.5), width: 1.5),
           ),
           child: Row(
             children: [
@@ -843,8 +1391,8 @@ class _RateTable extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: tier.color.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),

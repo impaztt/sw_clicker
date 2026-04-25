@@ -57,7 +57,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           NavigationDestination(
             icon: Icon(Icons.collections_outlined),
             selectedIcon: Icon(Icons.collections),
-            label: '검',
+            label: '도감',
           ),
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
