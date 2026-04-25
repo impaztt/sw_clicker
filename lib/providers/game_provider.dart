@@ -1594,9 +1594,35 @@ class GameNotifier extends Notifier<GameState> {
     _combo = 0;
     _lastTapAt = null;
     _burstFiredThisRun = false;
+    _resetStockMarketOnPrestige();
     _emit(loaded: true);
     unawaited(_persist());
     return true;
+  }
+
+  /// Wipe per-run stock holdings on prestige. Lifetime trading stats
+  /// (totalTradesCount, totalFeesPaid, totalRealizedProfit,
+  /// totalDividendsClaimed) are kept since they're a permanent track.
+  void _resetStockMarketOnPrestige() {
+    final m = _save.market;
+    final eligible = _save.totalGoldEarned >= stockMarketLifetimeGoldTrigger;
+    for (final def in regionCatalog) {
+      final st = m.regions[def.id];
+      if (st == null) continue;
+      st.shares = 0;
+      st.avgCost = 0;
+      st.pendingDividend = 0;
+      st.lastAccrualAt = null;
+      st.currentPrice = def.initialPrice;
+      st.intrinsicPrice = def.initialPrice;
+      st.recentCandles.clear();
+      st.formingCandle = null;
+      // Only the first region stays unlocked — and only if the player has
+      // already crossed the lifetime-gold gate (which is preserved across
+      // prestige). All later regions must be re-earned via the 20%-of-prev
+      // ownership chain in the new run.
+      st.unlocked = def.unlockOrder == 1 && eligible;
+    }
   }
 
   void claimOfflineReward(OfflineReward r) {
