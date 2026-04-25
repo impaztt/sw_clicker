@@ -20,7 +20,7 @@ class PrestigeScreen extends ConsumerWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'Prestige',
+              '환생',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
@@ -30,7 +30,7 @@ class PrestigeScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: Text(
-              'Reset your run, gain permanent currencies, and invest in lasting power.',
+              '현재 회차를 리셋하고 영구 재화를 얻어, 영구 성장을 진행하세요.',
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.black.withValues(alpha: 0.6),
@@ -48,8 +48,8 @@ class PrestigeScreen extends ConsumerWidget {
                     unselectedLabelColor: Colors.black45,
                     indicatorColor: AppColors.coral,
                     tabs: [
-                      Tab(text: 'Reset'),
-                      Tab(text: 'Coin Shop'),
+                      Tab(text: '환생'),
+                      Tab(text: '코인 상점'),
                     ],
                   ),
                   Expanded(
@@ -89,35 +89,35 @@ class _PrestigeOverview extends ConsumerWidget {
         _StatCard(
           icon: Icons.auto_awesome,
           iconColor: const Color(0xFF00695C),
-          label: 'Soul Balance',
+          label: '검의 혼 보유량',
           value: '${game.prestigeSouls}',
-          subValue: 'Permanent soul multiplier +$currentPct%',
+          subValue: '영구 소울 배율 +$currentPct%',
         ),
         const SizedBox(height: 10),
         _StatCard(
           icon: Icons.currency_exchange,
           iconColor: const Color(0xFF7C4DFF),
-          label: 'Prestige Coin Balance',
+          label: '환생 코인 보유량',
           value: '${game.prestigeCoins}',
-          subValue: 'Spend only in the Coin Shop (permanent stats)',
+          subValue: '코인 상점에서만 사용 가능한 영구 재화',
         ),
         const SizedBox(height: 10),
         _StatCard(
           icon: Icons.trending_up,
           iconColor: AppColors.deepCoral,
-          label: 'If You Reset Now',
-          value: '+$soulsGain Souls / +$coinsGain Coins',
+          label: '지금 환생 시 획득',
+          value: '+$soulsGain 소울 / +$coinsGain 코인',
           subValue: canPrestige
-              ? 'Next soul multiplier +$nextPct%'
-              : 'Earn more gold and progression for prestige rewards',
+              ? '환생 후 소울 배율 +$nextPct%'
+              : '골드와 진행도를 더 올리면 보상이 증가합니다',
         ),
         const SizedBox(height: 10),
         _StatCard(
           icon: Icons.history_toggle_off,
           iconColor: AppColors.mint,
-          label: 'Run Progress',
-          value: 'Prestige Count ${game.prestigeCount}',
-          subValue: 'Run gold ${NumberFormatter.format(game.totalGoldEarned)}',
+          label: '현재 회차 진행도',
+          value: '환생 횟수 ${game.prestigeCount}',
+          subValue: '현재 회차 골드 ${NumberFormatter.format(game.totalGoldEarned)}',
         ),
         const SizedBox(height: 18),
         FilledButton(
@@ -138,8 +138,8 @@ class _PrestigeOverview extends ConsumerWidget {
           ),
           child: Text(
             canPrestige
-                ? 'Prestige (+$soulsGain Souls, +$coinsGain Coins)'
-                : 'Not enough reward yet',
+                ? '환생하기 (+$soulsGain 소울, +$coinsGain 코인)'
+                : '아직 보상이 부족합니다',
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -148,7 +148,7 @@ class _PrestigeOverview extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Reset clears current run gold and run upgrades, but keeps all prestige currencies and shop upgrades.',
+          '환생 시 현재 회차 골드와 업그레이드는 초기화되지만,\n소울·코인·코인 상점 업그레이드는 유지됩니다.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 12,
@@ -170,21 +170,21 @@ class _PrestigeOverview extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirm Prestige'),
+        title: const Text('환생 확인'),
         content: Text(
-          'Gain +$soulsGain Souls and +$coinsGain Prestige Coins.\n'
-          'Next soul multiplier: +$nextPct%\n\n'
-          'This will reset current run gold and run upgrades.',
+          '소울 +$soulsGain, 환생 코인 +$coinsGain 을 획득합니다.\n'
+          '환생 후 소울 배율: +$nextPct%\n\n'
+          '현재 회차 골드와 업그레이드는 초기화됩니다.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
-            child: const Text('Prestige'),
+            child: const Text('환생'),
           ),
         ],
       ),
@@ -194,7 +194,7 @@ class _PrestigeOverview extends ConsumerWidget {
     if (!success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Prestige reward is still 0. Progress more first.'),
+          content: Text('환생 보상이 아직 0입니다. 더 진행한 뒤 시도해 주세요.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -215,9 +215,9 @@ class _PrestigeShop extends ConsumerWidget {
         _StatCard(
           icon: Icons.currency_exchange,
           iconColor: const Color(0xFF7C4DFF),
-          label: 'Prestige Coins',
+          label: '환생 코인',
           value: '${game.prestigeCoins}',
-          subValue: 'Only this currency can buy permanent shop upgrades',
+          subValue: '코인 상점에서 영구 업그레이드를 구매할 수 있습니다',
         ),
         const SizedBox(height: 10),
         for (final def in prestigeUpgradeCatalog) ...[
@@ -308,7 +308,7 @@ class _ShopTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Lv $level / ${def.maxLevel}',
+                  '레벨 $level / ${def.maxLevel}',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -320,7 +320,7 @@ class _ShopTile extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Current: ${_effectLabel(def, level)}',
+            '현재 효과: ${_effectLabel(def, level)}',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -330,8 +330,8 @@ class _ShopTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             atMax
-                ? 'Max level reached'
-                : 'Next: ${_effectLabel(def, level + 1)}',
+                ? '최대 레벨입니다'
+                : '다음 효과: ${_effectLabel(def, level + 1)}',
             style: TextStyle(
               fontSize: 12,
               color: Colors.black.withValues(alpha: 0.6),
@@ -347,7 +347,7 @@ class _ShopTile extends StatelessWidget {
                       if (!ok && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Not enough prestige coins'),
+                            content: Text('환생 코인이 부족합니다'),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -360,7 +360,7 @@ class _ShopTile extends StatelessWidget {
                 foregroundColor: Colors.white,
               ),
               child: Text(
-                atMax ? 'MAX' : 'Buy ($cost Coins)',
+                atMax ? '최대' : '구매 ($cost 코인)',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
@@ -375,7 +375,7 @@ class _ShopTile extends StatelessWidget {
     final parts = <String>[];
     if (def.tapBonusPerLevel > 0) {
       final pct = (def.tapBonusPerLevel * clamped * 100).toStringAsFixed(0);
-      parts.add('Tap +$pct%');
+      parts.add('터치 +$pct%');
     }
     if (def.dpsBonusPerLevel > 0) {
       final pct = (def.dpsBonusPerLevel * clamped * 100).toStringAsFixed(0);
@@ -384,7 +384,7 @@ class _ShopTile extends StatelessWidget {
     if (def.coinGainBonusPerLevel > 0) {
       final pct =
           (def.coinGainBonusPerLevel * clamped * 100).toStringAsFixed(0);
-      parts.add('Coin gain +$pct%');
+      parts.add('코인 획득 +$pct%');
     }
     if (parts.isEmpty) return '-';
     return parts.join(' / ');

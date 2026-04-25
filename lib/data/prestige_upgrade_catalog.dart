@@ -5,8 +5,8 @@ import '../models/prestige_upgrade.dart';
 const prestigeUpgradeCatalog = <PrestigeUpgradeDef>[
   PrestigeUpgradeDef(
     id: 'legacy_tap',
-    name: 'Blade Legacy',
-    description: 'Permanent tap power boost.',
+    name: '검의 유산',
+    description: '터치 위력을 영구 강화합니다.',
     icon: Icons.touch_app,
     accent: Color(0xFFFF7043),
     baseCost: 12,
@@ -16,8 +16,8 @@ const prestigeUpgradeCatalog = <PrestigeUpgradeDef>[
   ),
   PrestigeUpgradeDef(
     id: 'legacy_dps',
-    name: 'Engine Legacy',
-    description: 'Permanent DPS boost.',
+    name: '동력의 유산',
+    description: 'DPS를 영구 강화합니다.',
     icon: Icons.bolt,
     accent: Color(0xFF26A69A),
     baseCost: 12,
@@ -27,8 +27,8 @@ const prestigeUpgradeCatalog = <PrestigeUpgradeDef>[
   ),
   PrestigeUpgradeDef(
     id: 'legacy_all',
-    name: 'Transcendent Core',
-    description: 'Permanent boost to both tap and DPS.',
+    name: '초월 핵심',
+    description: '터치와 DPS를 모두 영구 강화합니다.',
     icon: Icons.auto_awesome,
     accent: Color(0xFFFFB300),
     baseCost: 40,
@@ -39,8 +39,8 @@ const prestigeUpgradeCatalog = <PrestigeUpgradeDef>[
   ),
   PrestigeUpgradeDef(
     id: 'legacy_coin',
-    name: 'Soul Recycler',
-    description: 'Gain more prestige coins when resetting.',
+    name: '영혼 재순환',
+    description: '환생 시 획득하는 코인을 늘립니다.',
     icon: Icons.currency_exchange,
     accent: Color(0xFF7C4DFF),
     baseCost: 20,
