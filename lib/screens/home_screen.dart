@@ -125,8 +125,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              DpsDisplay(dps: game.dps),
-              const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _SlimeProgressBar(
@@ -136,6 +134,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   reward: notifier.slimePreviewReward,
                 ),
               ),
+              const SizedBox(height: 10),
+              DpsDisplay(dps: game.dps),
               const Spacer(),
               Center(
                 child: Builder(builder: (_) {
