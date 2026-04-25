@@ -189,50 +189,301 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _CollectionView extends ConsumerWidget {
+class _CollectionView extends ConsumerStatefulWidget {
   const _CollectionView();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CollectionView> createState() => _CollectionViewState();
+}
+
+class _CollectionViewState extends ConsumerState<_CollectionView> {
+  final Set<SwordTier> _collapsed = <SwordTier>{};
+
+  @override
+  Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
-    // Sort: owned first (by tier desc), then locked (by tier desc).
-    final sorted = [...swordCatalog]..sort((a, b) {
-        final aOwned = game.ownsSword(a.id);
-        final bOwned = game.ownsSword(b.id);
-        if (aOwned != bOwned) return aOwned ? -1 : 1;
-        return b.tier.index.compareTo(a.tier.index);
-      });
-    return GridView.builder(
-      padding: const EdgeInsets.all(10),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.7,
-      ),
-      itemCount: sorted.length,
+    // Highest tier first so the showcase grades sit at the top.
+    final tiers = SwordTier.values.reversed.toList();
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
+      itemCount: tiers.length,
       itemBuilder: (context, i) {
-        final def = sorted[i];
-        final level = game.swordLevel(def.id);
-        final owned = level > 0;
-        final equipped = game.equippedSwordId == def.id;
-        return _SwordCard(
-          def: def,
-          level: level,
+        final tier = tiers[i];
+        final defs = swordCatalog.where((d) => d.tier == tier).toList();
+        final owned = <SwordDef>[];
+        final unowned = <SwordDef>[];
+        for (final d in defs) {
+          if (game.ownsSword(d.id)) {
+            owned.add(d);
+          } else {
+            unowned.add(d);
+          }
+        }
+        final collapsed = _collapsed.contains(tier);
+        return _TierSection(
+          tier: tier,
           owned: owned,
-          equipped: equipped,
-          onTap: () => _showDetail(context, ref, def),
+          unowned: unowned,
+          collapsed: collapsed,
+          onToggle: () => setState(() {
+            if (collapsed) {
+              _collapsed.remove(tier);
+            } else {
+              _collapsed.add(tier);
+            }
+          }),
+          equippedId: game.equippedSwordId,
+          levelOf: game.swordLevel,
+          onTapCard: (def) => _showDetail(context, def),
         );
       },
     );
   }
 
-  void _showDetail(BuildContext context, WidgetRef ref, SwordDef def) {
+  void _showDetail(BuildContext context, SwordDef def) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _SwordDetailSheet(def: def),
+    );
+  }
+}
+
+class _TierSection extends StatelessWidget {
+  final SwordTier tier;
+  final List<SwordDef> owned;
+  final List<SwordDef> unowned;
+  final bool collapsed;
+  final VoidCallback onToggle;
+  final String? equippedId;
+  final int Function(String id) levelOf;
+  final void Function(SwordDef def) onTapCard;
+
+  const _TierSection({
+    required this.tier,
+    required this.owned,
+    required this.unowned,
+    required this.collapsed,
+    required this.onToggle,
+    required this.equippedId,
+    required this.levelOf,
+    required this.onTapCard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = owned.length + unowned.length;
+    final ratio = total == 0 ? 0.0 : owned.length / total;
+    final color = tier.color;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: onToggle,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tier.label,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  tier.korLabel,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${owned.length} / $total',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: ratio >= 1
+                                        ? color
+                                        : Colors.black
+                                            .withValues(alpha: 0.65),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                minHeight: 5,
+                                backgroundColor: Colors.black12,
+                                valueColor: AlwaysStoppedAnimation(color),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      AnimatedRotation(
+                        turns: collapsed ? -0.25 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(
+                          Icons.expand_more,
+                          color: Colors.black.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (!collapsed) ...[
+              if (owned.isNotEmpty)
+                _OwnershipSubsection(
+                  label: '획득',
+                  count: owned.length,
+                  accent: color,
+                  defs: owned,
+                  equippedId: equippedId,
+                  levelOf: levelOf,
+                  onTapCard: onTapCard,
+                ),
+              if (unowned.isNotEmpty)
+                _OwnershipSubsection(
+                  label: '미획득',
+                  count: unowned.length,
+                  accent: Colors.black38,
+                  defs: unowned,
+                  equippedId: equippedId,
+                  levelOf: levelOf,
+                  onTapCard: onTapCard,
+                ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OwnershipSubsection extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color accent;
+  final List<SwordDef> defs;
+  final String? equippedId;
+  final int Function(String id) levelOf;
+  final void Function(SwordDef def) onTapCard;
+
+  const _OwnershipSubsection({
+    required this.label,
+    required this.count,
+    required this.accent,
+    required this.defs,
+    required this.equippedId,
+    required this.levelOf,
+    required this.onTapCard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$label  $count',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.7,
+            ),
+            itemCount: defs.length,
+            itemBuilder: (context, i) {
+              final def = defs[i];
+              final level = levelOf(def.id);
+              final owned = level > 0;
+              final equipped = equippedId == def.id;
+              return _SwordCard(
+                def: def,
+                level: level,
+                owned: owned,
+                equipped: equipped,
+                onTap: () => onTapCard(def),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
