@@ -252,11 +252,13 @@ class _BoosterChip extends StatelessWidget {
       BoosterType.dps => 'DPS',
       BoosterType.tap => '터치',
       BoosterType.rush => '러시',
+      BoosterType.autoTap => 'AUTO',
     };
     final color = switch (type) {
       BoosterType.dps => const Color(0xFF26A69A),
       BoosterType.tap => AppColors.deepCoral,
       BoosterType.rush => const Color(0xFFFFB300),
+      BoosterType.autoTap => const Color(0xFF5C6BC0),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

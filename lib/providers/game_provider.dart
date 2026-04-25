@@ -988,14 +988,14 @@ class GameNotifier extends Notifier<GameState> {
         );
       case SkillId.comboSurge:
         _comboSurgeUntil = now.add(const Duration(seconds: 10));
-        result = const SkillResult(
+        result = SkillResult(
           id: SkillId.comboSurge,
           ok: true,
           message: '10초간 콤보 폭주!',
         );
       case SkillId.essenceGather:
         _save.essence += essenceGatherAmount;
-        result = const SkillResult(
+        result = SkillResult(
           id: SkillId.essenceGather,
           ok: true,
           message: '정수 +$essenceGatherAmount',
@@ -1043,6 +1043,7 @@ class GameNotifier extends Notifier<GameState> {
       SwordTier.r => 5,
       SwordTier.sr => 12,
       SwordTier.ssr => 25,
+      SwordTier.lr => 40,
       SwordTier.ur => 60,
     };
   }
