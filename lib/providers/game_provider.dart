@@ -7,6 +7,7 @@ import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
 import '../data/prestige_upgrade_catalog.dart';
 import '../data/producer_catalog.dart';
+import '../data/region_catalog.dart';
 import '../data/sword_catalog.dart';
 import '../data/skill_catalog.dart';
 import '../data/sword_sets.dart';
@@ -16,6 +17,7 @@ import '../models/booster.dart';
 import '../models/producer.dart';
 import '../models/save_data.dart';
 import '../models/skill.dart';
+import '../models/stock_market.dart';
 import '../models/sword.dart';
 import '../services/sync_service.dart';
 
@@ -472,6 +474,7 @@ class GameState {
   final List<MissionView> dailyMissions;
   final List<MissionView> weeklyMissions;
   final Set<String> unlockedFeatures;
+  final StockMarketState market;
   final bool loaded;
 
   const GameState({
@@ -522,10 +525,11 @@ class GameState {
     required this.dailyMissions,
     required this.weeklyMissions,
     required this.unlockedFeatures,
+    required this.market,
     this.loaded = false,
   });
 
-  factory GameState.empty() => const GameState(
+  factory GameState.empty() => GameState(
         gold: 0,
         totalGoldEarned: 0,
         tapPower: 1,
@@ -573,6 +577,7 @@ class GameState {
         dailyMissions: const [],
         weeklyMissions: const [],
         unlockedFeatures: const {},
+        market: StockMarketState(),
         loaded: false,
       );
 
@@ -742,6 +747,10 @@ class GameNotifier extends Notifier<GameState> {
   DateTime? _comboSurgeUntil;
   bool _burstFiredThisRun = false;
   bool _featureUnlocksReady = false;
+  // Accumulator for the 1-second stock price tick driven by the 50ms timer.
+  double _stockTickAcc = 0;
+  bool _spareGaussReady = false;
+  double _spareGauss = 0;
 
   @override
   GameState build() {
@@ -789,6 +798,8 @@ class GameNotifier extends Notifier<GameState> {
     } else {
       _rotateMissionWindowsIfNeeded(now: now, force: true);
     }
+    _bootstrapStockMarket(now: now);
+    _accrueOfflineDividends(now: now);
     _pendingDaily = _evaluateDailyEligibility();
     _emit(loaded: true);
     // Veteran-safe: silently mark anything that's already triggered, without
@@ -986,6 +997,12 @@ class GameNotifier extends Notifier<GameState> {
         _save.totalGoldEarned += gain;
         _save.stats.lifetimeGold += gain;
       }
+      _stockTickAcc += dt;
+      if (_stockTickAcc >= 1.0) {
+        final ticks = _stockTickAcc.floor();
+        _stockTickAcc -= ticks;
+        _runStockSimulation(now: now, secondsElapsed: ticks);
+      }
       _emit(loaded: true);
     });
   }
@@ -1052,6 +1069,7 @@ class GameNotifier extends Notifier<GameState> {
       dailyMissions: _buildMissionViews(daily: true),
       weeklyMissions: _buildMissionViews(daily: false),
       unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
+      market: _save.market,
       loaded: loaded,
     );
     if (loaded) {
@@ -1203,6 +1221,7 @@ class GameNotifier extends Notifier<GameState> {
         dailyMissions: state.dailyMissions,
         weeklyMissions: state.weeklyMissions,
         unlockedFeatures: state.unlockedFeatures,
+        market: state.market,
         loaded: true,
       );
     }
@@ -1271,6 +1290,7 @@ class GameNotifier extends Notifier<GameState> {
       dailyMissions: state.dailyMissions,
       weeklyMissions: state.weeklyMissions,
       unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
+      market: state.market,
       loaded: true,
     );
   }
@@ -1965,6 +1985,344 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   Future<void> persist() => _persist();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Stock market — see docs in region_catalog.dart and stock_market.dart.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Ensure RegionState entries exist for every catalog region. The first
+  /// region (gyeonggi) is unlocked automatically once the lifetime gold
+  /// trigger has been hit; later regions wait for the ownership chain.
+  void _bootstrapStockMarket({required DateTime now}) {
+    final m = _save.market;
+    for (final def in regionCatalog) {
+      final existing = m.regions[def.id];
+      if (existing == null) {
+        m.regions[def.id] = RegionState(
+          regionId: def.id,
+          unlocked: def.unlockOrder == 1 &&
+              _save.totalGoldEarned >= stockMarketLifetimeGoldTrigger,
+          currentPrice: def.initialPrice,
+          intrinsicPrice: def.initialPrice,
+          lastAccrualAt: null,
+        );
+      } else {
+        // Heal corrupt prices, e.g. legacy zeros.
+        if (existing.currentPrice <= 0) existing.currentPrice = def.initialPrice;
+        if (existing.intrinsicPrice <= 0) {
+          existing.intrinsicPrice = def.initialPrice;
+        }
+      }
+    }
+    // First-region auto-unlock for veterans who already crossed the lifetime
+    // gold gate before this system shipped.
+    final first = m.regions[regionCatalog.first.id];
+    if (first != null &&
+        !first.unlocked &&
+        _save.totalGoldEarned >= stockMarketLifetimeGoldTrigger) {
+      first.unlocked = true;
+    }
+    _checkRegionUnlocks();
+  }
+
+  /// Pay missed dividends for the time the user was away. Capped to the same
+  /// offlineMaxHours the rest of the game uses, so an extreme idle window
+  /// can't be farmed.
+  void _accrueOfflineDividends({required DateTime now}) {
+    final m = _save.market;
+    for (final state in m.regions.values) {
+      if (state.shares <= 0) continue;
+      final last = state.lastAccrualAt;
+      if (last == null) {
+        state.lastAccrualAt = now;
+        continue;
+      }
+      var elapsed = now.difference(last);
+      if (elapsed.isNegative) {
+        state.lastAccrualAt = now;
+        continue;
+      }
+      // Cap to offlineMaxHours so an enormous gap doesn't print fortunes.
+      final maxOffline = const Duration(hours: offlineMaxHours);
+      if (elapsed > maxOffline) elapsed = maxOffline;
+      final hours = elapsed.inSeconds / dividendIntervalSeconds;
+      if (hours <= 0) continue;
+      final def = regionDefById(state.regionId);
+      final perHour = state.shares * state.currentPrice * def.hourlyYield;
+      state.pendingDividend += perHour * hours;
+      state.lastAccrualAt = now;
+    }
+  }
+
+  /// Box-Muller transform for standard normal samples.
+  double _randGauss() {
+    if (_spareGaussReady) {
+      _spareGaussReady = false;
+      return _spareGauss;
+    }
+    double u1, u2;
+    do {
+      u1 = _random.nextDouble();
+      u2 = _random.nextDouble();
+    } while (u1 <= 1e-12);
+    final mag = sqrt(-2.0 * log(u1));
+    _spareGauss = mag * sin(2.0 * pi * u2);
+    _spareGaussReady = true;
+    return mag * cos(2.0 * pi * u2);
+  }
+
+  /// Step prices, candles, and dividends forward by [secondsElapsed] seconds.
+  void _runStockSimulation({
+    required DateTime now,
+    required int secondsElapsed,
+  }) {
+    if (secondsElapsed <= 0) return;
+    final m = _save.market;
+    for (final state in m.regions.values) {
+      if (!state.unlocked) continue;
+      final def = regionDefById(state.regionId);
+      // Per-second σ: convert per-minute volatility to per-second.
+      final sigmaPerSec = def.volatilityPerMinute / sqrt(60.0);
+
+      for (var i = 0; i < secondsElapsed; i++) {
+        // Mean-reverting drift toward intrinsic price.
+        final drift = (state.intrinsicPrice - state.currentPrice) * 0.0005;
+        final noise = _randGauss() * sigmaPerSec * state.currentPrice;
+        var event = 0.0;
+        if (_random.nextDouble() < 0.0005) {
+          const shocks = [
+            -0.12, -0.08, -0.05, 0.05, 0.08, 0.12, 0.18,
+          ];
+          event = shocks[_random.nextInt(shocks.length)] * state.currentPrice;
+        }
+        var next = state.currentPrice + drift + noise + event;
+        // Clamp to [0.3x, 3x] of intrinsic price.
+        final lo = state.intrinsicPrice * 0.3;
+        final hi = state.intrinsicPrice * 3.0;
+        if (next < lo) next = lo;
+        if (next > hi) next = hi;
+        state.currentPrice = next;
+        // Slowly inflate intrinsic (~+0.1%/hour). 0.1% per hour ≈
+        // 0.000000278 per second compounded; linear approximation here.
+        state.intrinsicPrice *= 1.0000003;
+
+        // Update / start forming candle.
+        final candleStart = _candleStartFor(now.subtract(
+            Duration(seconds: secondsElapsed - i - 1)));
+        var forming = state.formingCandle;
+        if (forming == null || forming.startedAt != candleStart) {
+          if (forming != null) {
+            state.recentCandles.add(forming);
+            if (state.recentCandles.length > candleHistoryMax) {
+              state.recentCandles.removeAt(0);
+            }
+          }
+          forming = Candle.flat(candleStart, state.currentPrice);
+          state.formingCandle = forming;
+        }
+        if (state.currentPrice > forming.high) forming.high = state.currentPrice;
+        if (state.currentPrice < forming.low) forming.low = state.currentPrice;
+        forming.close = state.currentPrice;
+        // Volume proxy: amplified by recent move magnitude.
+        final pctMove = forming.open == 0
+            ? 0.0
+            : (state.currentPrice - forming.open).abs() / forming.open;
+        forming.volume +=
+            1.0 + pctMove * 5.0 + _random.nextDouble() * 0.4;
+      }
+
+      // Hourly dividend accrual.
+      if (state.shares > 0) {
+        final last = state.lastAccrualAt ?? now;
+        final elapsed = now.difference(last).inSeconds;
+        if (elapsed >= dividendIntervalSeconds) {
+          final hours = elapsed ~/ dividendIntervalSeconds;
+          final perHour =
+              state.shares * state.currentPrice * def.hourlyYield;
+          state.pendingDividend += perHour * hours;
+          state.lastAccrualAt =
+              last.add(Duration(seconds: hours * dividendIntervalSeconds));
+        }
+        if (state.lastAccrualAt == null) state.lastAccrualAt = now;
+      }
+    }
+    _checkRegionUnlocks();
+  }
+
+  DateTime _candleStartFor(DateTime t) {
+    final epochSec = t.millisecondsSinceEpoch ~/ 1000;
+    final bucket = epochSec - (epochSec % candleWindowSeconds);
+    return DateTime.fromMillisecondsSinceEpoch(bucket * 1000, isUtc: false);
+  }
+
+  /// Unlock the next region in the chain when ownership of the previous one
+  /// crosses [regionUnlockOwnershipThreshold].
+  void _checkRegionUnlocks() {
+    final m = _save.market;
+    for (final def in regionCatalog) {
+      final state = m.regions[def.id];
+      if (state == null || !state.unlocked) continue;
+      final next = nextRegionAfter(def.id);
+      if (next == null) continue;
+      final nextState = m.regions[next.id];
+      if (nextState == null || nextState.unlocked) continue;
+      final ownership = state.shares / def.totalShares;
+      if (ownership >= regionUnlockOwnershipThreshold) {
+        nextState.unlocked = true;
+      }
+    }
+  }
+
+  // Read helpers used by the UI.
+
+  RegionDef regionDef(String id) => regionDefById(id);
+
+  RegionState? regionState(String id) => _save.market.regions[id];
+
+  double regionOwnershipFraction(String id) {
+    final st = _save.market.regions[id];
+    if (st == null) return 0;
+    final def = regionDefById(id);
+    return st.shares / def.totalShares;
+  }
+
+  /// Estimated next dividend size if held for one full hour at current price.
+  double regionHourlyDividendEstimate(String id) {
+    final st = _save.market.regions[id];
+    if (st == null || st.shares <= 0) return 0;
+    final def = regionDefById(id);
+    return st.shares * st.currentPrice * def.hourlyYield;
+  }
+
+  /// Total pending dividend across all regions.
+  double get totalPendingDividend {
+    var sum = 0.0;
+    for (final st in _save.market.regions.values) {
+      sum += st.pendingDividend;
+    }
+    return sum;
+  }
+
+  /// Maximum buyable share count given current gold (after fee).
+  int maxBuyableShares(String regionId) {
+    final st = _save.market.regions[regionId];
+    if (st == null || !st.unlocked) return 0;
+    final unitTotalCost = st.currentPrice * (1 + stockTradeFee);
+    if (unitTotalCost <= 0) return 0;
+    final n = (_save.gold / unitTotalCost).floor();
+    return n < 0 ? 0 : n;
+  }
+
+  /// Buy [shares] of [regionId] at current price + 2% fee. Returns the
+  /// actual number purchased (0 on failure).
+  int buyShares(String regionId, int shares) {
+    if (shares <= 0) return 0;
+    final st = _save.market.regions[regionId];
+    if (st == null || !st.unlocked) return 0;
+    final def = regionDefById(regionId);
+    final price = st.currentPrice;
+    final gross = shares * price;
+    final fee = gross * stockTradeFee;
+    final total = gross + fee;
+    if (_save.gold < total) return 0;
+    // Cap at remaining shares so ownership never exceeds 100%.
+    final remaining = def.totalShares - st.shares;
+    final actualShares = shares > remaining ? remaining : shares;
+    if (actualShares <= 0) return 0;
+    final actualGross = actualShares * price;
+    final actualFee = actualGross * stockTradeFee;
+    final actualTotal = actualGross + actualFee;
+
+    _save.gold -= actualTotal;
+    // Update average cost (weighted average).
+    final priorBasis = st.avgCost * st.shares;
+    final newShares = st.shares + actualShares;
+    st.avgCost = (priorBasis + actualGross) / newShares;
+    st.shares = newShares;
+    if (st.lastAccrualAt == null) st.lastAccrualAt = DateTime.now();
+    _save.market.totalTradesCount++;
+    _save.market.totalFeesPaid += actualFee;
+    _checkRegionUnlocks();
+    _emit(loaded: true);
+    unawaited(_persist());
+    return actualShares;
+  }
+
+  /// Sell [shares] of [regionId] at current price minus 2% fee. Returns
+  /// (sharesSold, netProceeds, realizedProfit).
+  ({int sharesSold, double netProceeds, double realizedProfit})
+      sellShares(String regionId, int shares) {
+    if (shares <= 0) {
+      return (sharesSold: 0, netProceeds: 0, realizedProfit: 0);
+    }
+    final st = _save.market.regions[regionId];
+    if (st == null || st.shares <= 0) {
+      return (sharesSold: 0, netProceeds: 0, realizedProfit: 0);
+    }
+    final actual = shares > st.shares ? st.shares : shares;
+    final price = st.currentPrice;
+    final gross = actual * price;
+    final fee = gross * stockTradeFee;
+    final net = gross - fee;
+    final realized = (price - st.avgCost) * actual - fee;
+
+    _save.gold += net;
+    st.shares -= actual;
+    if (st.shares == 0) {
+      st.avgCost = 0;
+      // Stop accruing: a future buy will reset lastAccrualAt.
+      st.lastAccrualAt = null;
+    }
+    _save.market.totalTradesCount++;
+    _save.market.totalFeesPaid += fee;
+    _save.market.totalRealizedProfit += realized;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return (sharesSold: actual, netProceeds: net, realizedProfit: realized);
+  }
+
+  /// Claim pending dividend on a single region. Returns the amount paid out.
+  double claimDividend(String regionId) {
+    final st = _save.market.regions[regionId];
+    if (st == null) return 0;
+    final amount = st.pendingDividend;
+    if (amount <= 0) return 0;
+    st.pendingDividend = 0;
+    _save.gold += amount;
+    _save.totalGoldEarned += amount;
+    _save.stats.lifetimeGold += amount;
+    _save.market.totalDividendsClaimed += amount;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return amount;
+  }
+
+  /// Claim pending dividend on every region at once.
+  double claimAllDividends() {
+    var total = 0.0;
+    for (final st in _save.market.regions.values) {
+      if (st.pendingDividend <= 0) continue;
+      total += st.pendingDividend;
+      st.pendingDividend = 0;
+    }
+    if (total <= 0) return 0;
+    _save.gold += total;
+    _save.totalGoldEarned += total;
+    _save.stats.lifetimeGold += total;
+    _save.market.totalDividendsClaimed += total;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return total;
+  }
+
+  /// Total holdings value at current prices.
+  double get totalHoldingsValue {
+    var sum = 0.0;
+    for (final st in _save.market.regions.values) {
+      sum += st.shares * st.currentPrice;
+    }
+    return sum;
+  }
 }
 
 final gameProvider =

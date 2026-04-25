@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/region_catalog.dart';
 import '../data/sword_sets.dart';
 import '../providers/game_provider.dart';
 
@@ -12,6 +13,7 @@ class FeatureUnlocks {
   static const boosterShop = 'booster_shop';
   static const prestigeTab = 'prestige_tab';
   static const swordSetsView = 'sword_sets_view';
+  static const stockMarket = 'stock_market';
 }
 
 class FeatureUnlockDef {
@@ -92,6 +94,15 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
     icon: Icons.bolt,
     color: const Color(0xFFFF8A65),
     trigger: (s) => s.prestigeCount >= 1,
+  ),
+  FeatureUnlockDef(
+    id: FeatureUnlocks.stockMarket,
+    label: '주식 시장',
+    description:
+        '도감에 주식 탭이 열렸어요. 17개 시·도의 지분을 매수해 시간당 배당을 받아보세요.',
+    icon: Icons.show_chart,
+    color: const Color(0xFFD32F2F),
+    trigger: (s) => s.lifetimeGold >= stockMarketLifetimeGoldTrigger,
   ),
 ];
 

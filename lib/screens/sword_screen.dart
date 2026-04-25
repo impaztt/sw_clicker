@@ -11,6 +11,7 @@ import '../models/sword.dart';
 import '../providers/game_provider.dart';
 import '../widgets/summon_dialog.dart';
 import '../widgets/sword_preview.dart';
+import 'stock_market_screen.dart';
 
 class SwordScreen extends ConsumerStatefulWidget {
   const SwordScreen({super.key});
@@ -33,6 +34,8 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
         const _CodexTab(label: '미션', view: _MissionHubView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
         const _CodexTab(label: '업적', view: _AchievementHubView()),
+      if (game.isFeatureUnlocked(FeatureUnlocks.stockMarket))
+        const _CodexTab(label: '주식', view: StockMarketView()),
     ];
 
     return SafeArea(

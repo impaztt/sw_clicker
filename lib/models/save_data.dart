@@ -1,8 +1,9 @@
 import 'booster.dart';
 import 'game_stats.dart';
+import 'stock_market.dart';
 
 class SaveData {
-  static const currentVersion = 11;
+  static const currentVersion = 12;
 
   int version;
   double gold;
@@ -52,6 +53,9 @@ class SaveData {
   // Progressive feature unlocks (v11)
   Set<String> unlockedFeatures;
 
+  // Regional stock market (v12)
+  StockMarketState market;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -83,6 +87,7 @@ class SaveData {
     Map<String, int>? weeklyMissionProgress,
     Set<String>? weeklyMissionClaimed,
     Set<String>? unlockedFeatures,
+    StockMarketState? market,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -97,7 +102,8 @@ class SaveData {
         dailyMissionClaimed = dailyMissionClaimed ?? <String>{},
         weeklyMissionProgress = weeklyMissionProgress ?? <String, int>{},
         weeklyMissionClaimed = weeklyMissionClaimed ?? <String>{},
-        unlockedFeatures = unlockedFeatures ?? <String>{};
+        unlockedFeatures = unlockedFeatures ?? <String>{},
+        market = market ?? StockMarketState();
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -131,6 +137,7 @@ class SaveData {
         'weeklyMissionProgress': weeklyMissionProgress,
         'weeklyMissionClaimed': weeklyMissionClaimed.toList(),
         'unlockedFeatures': unlockedFeatures.toList(),
+        'market': market.toJson(),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -193,5 +200,9 @@ class SaveData {
                 ?.map((e) => e as String)
                 .toSet() ??
             <String>{},
+        market: json['market'] == null
+            ? StockMarketState()
+            : StockMarketState.fromJson(
+                Map<String, dynamic>.from(json['market'] as Map)),
       );
 }
