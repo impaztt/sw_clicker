@@ -32,27 +32,40 @@ class OfflineRewardDialog extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
-              '다녀오셨군요!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            Text(
+              reward.blockedByClockGuard ? '오프라인 보상 보호' : '다녀오셨군요!',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 6),
-            Text(
-              '${_durationLabel(reward.duration)} 동안 동료들이 활약했어요',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.black.withValues(alpha: 0.6),
+            if (reward.blockedByClockGuard)
+              Text(
+                '기기 시간이 비정상으로 감지되어 이번 오프라인 보상은 지급되지 않았습니다.\n'
+                '시간 자동 설정을 켜고 다시 접속해 주세요.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.redAccent.shade700,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              )
+            else ...[
+              Text(
+                '${_durationLabel(reward.duration)} 동안 동료들이 활약했어요',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.black.withValues(alpha: 0.6),
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '방치 효율 100% · 최대 ${offlineMaxHours}시간 누적',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.black.withValues(alpha: 0.45),
+              const SizedBox(height: 4),
+              Text(
+                '방치 효율 100% · 최대 ${offlineMaxHours}시간 누적',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.black.withValues(alpha: 0.45),
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -70,6 +83,35 @@ class OfflineRewardDialog extends ConsumerWidget {
                 ),
               ],
             ),
+            if (reward.essenceBonus > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.diamond, color: Color(0xFF26A69A), size: 24),
+                  const SizedBox(width: 6),
+                  Text(
+                    '복귀 지원 +${reward.essenceBonus} 정수',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF00695C),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (!reward.blockedByClockGuard) ...[
+              const SizedBox(height: 8),
+              Text(
+                '복귀 추천: 일일/주간 미션부터 처리하면 성장 속도가 빨라집니다.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.black.withValues(alpha: 0.48),
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             FilledButton(
               onPressed: () {

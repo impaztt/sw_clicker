@@ -132,9 +132,7 @@ class _PrestigeOverview extends ConsumerWidget {
             minimumSize: const Size.fromHeight(56),
           ),
           child: Text(
-            canPrestige
-                ? '환생하기 (+$coinsGain 코인)'
-                : '아직 보상이 부족합니다',
+            canPrestige ? '환생하기 (+$coinsGain 코인)' : '아직 보상이 부족합니다',
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -213,6 +211,15 @@ class _PrestigeShop extends ConsumerWidget {
           subValue: '코인 상점에서 영구 업그레이드를 구매할 수 있습니다',
         ),
         const SizedBox(height: 10),
+        _AscensionCoreCard(
+          level: game.ascensionCoreLevel,
+          unlocked: game.ascensionCoreUnlocked,
+          currentMult: game.ascensionCoreMultiplier,
+          nextCost: game.ascensionCoreNextCost,
+          coins: game.prestigeCoins,
+          onBuy: notifier.buyAscensionCore,
+        ),
+        const SizedBox(height: 10),
         for (final def in prestigeUpgradeCatalog) ...[
           _ShopTile(
             def: def,
@@ -223,6 +230,95 @@ class _PrestigeShop extends ConsumerWidget {
           const SizedBox(height: 10),
         ],
       ],
+    );
+  }
+}
+
+class _AscensionCoreCard extends StatelessWidget {
+  final int level;
+  final bool unlocked;
+  final double currentMult;
+  final int nextCost;
+  final int coins;
+  final bool Function() onBuy;
+  const _AscensionCoreCard({
+    required this.level,
+    required this.unlocked,
+    required this.currentMult,
+    required this.nextCost,
+    required this.coins,
+    required this.onBuy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canBuy = unlocked && coins >= nextCost;
+    final pct = ((currentMult - 1) * 100).toStringAsFixed(1);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F8FF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF90CAF9), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_graph, color: Color(0xFF1565C0)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '초월 코어 연구 (중후반 루프)',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            unlocked
+                ? 'Lv $level · 전체 수익 영구 +$pct%'
+                : '해금 조건: 환생 5회 + 초월 유닛 중 하나 Lv 25',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.black.withValues(alpha: 0.72),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: canBuy
+                  ? () {
+                      final ok = onBuy();
+                      if (!ok && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('조건 미달 또는 코인이 부족합니다'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor:
+                    canBuy ? const Color(0xFF1976D2) : Colors.grey.shade300,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(
+                unlocked
+                    ? '연구 업그레이드 (${NumberFormatter.format(nextCost.toDouble())} 코인)'
+                    : '아직 잠겨 있음',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -322,9 +418,7 @@ class _ShopTile extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            atMax
-                ? '최대 레벨입니다'
-                : '다음 효과: ${_effectLabel(def, level + 1)}',
+            atMax ? '최대 레벨입니다' : '다음 효과: ${_effectLabel(def, level + 1)}',
             style: TextStyle(
               fontSize: 12,
               color: Colors.black.withValues(alpha: 0.6),

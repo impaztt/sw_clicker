@@ -62,7 +62,8 @@ class SettingsScreen extends ConsumerWidget {
                 icon: Icons.trending_up,
                 color: const Color(0xFF7E57C2),
                 label: '영구 배율',
-                value: '+${((game.prestigeMultiplier - 1) * 100).toStringAsFixed(0)}%',
+                value:
+                    '+${((game.prestigeMultiplier - 1) * 100).toStringAsFixed(0)}%',
               ),
             ],
           ),
@@ -99,9 +100,50 @@ class SettingsScreen extends ConsumerWidget {
             value: game.darkMode,
             onChanged: (v) => ref.read(gameProvider.notifier).setDarkMode(v),
           ),
+          const SizedBox(height: 8),
+          _ToggleRow(
+            icon: Icons.contrast,
+            label: '고대비 모드',
+            value: game.highContrast,
+            onChanged: (v) =>
+                ref.read(gameProvider.notifier).setHighContrast(v),
+          ),
+          const SizedBox(height: 8),
+          _ToggleRow(
+            icon: Icons.vibration,
+            label: '일반 터치 진동 줄이기',
+            value: game.reduceTapHaptics,
+            onChanged: (v) =>
+                ref.read(gameProvider.notifier).setReduceTapHaptics(v),
+          ),
+          const SizedBox(height: 8),
+          _TextScaleSelector(
+            value: game.textScale,
+            onChanged: (v) => ref.read(gameProvider.notifier).setTextScale(v),
+          ),
           const SizedBox(height: 24),
           _SectionTitle(title: '데이터'),
           const SizedBox(height: 8),
+          if (game.timeGuardTriggered)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+                border:
+                    Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+              ),
+              child: const Text(
+                '기기 시간 조작이 감지되어 오프라인 보상이 제한되었습니다.\n'
+                '시간 자동 설정을 사용해 주세요.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.redAccent,
+                ),
+              ),
+            ),
           _DangerButton(
             onPressed: () => _confirmReset(context, ref),
           ),
@@ -115,8 +157,7 @@ class SettingsScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('정말 초기화할까요?'),
         content: const Text(
           '모든 진행도, 골드, 동료 레벨, 환생 코인, 통계가 삭제돼요.\n'
@@ -367,8 +408,8 @@ class _AchievementLink extends StatelessWidget {
                         value: ratio,
                         minHeight: 6,
                         backgroundColor: Colors.black12,
-                        valueColor: const AlwaysStoppedAnimation(
-                            Color(0xFFD81B60)),
+                        valueColor:
+                            const AlwaysStoppedAnimation(Color(0xFFD81B60)),
                       ),
                     ),
                   ],
@@ -377,6 +418,101 @@ class _AchievementLink extends StatelessWidget {
               const SizedBox(width: 8),
               const Icon(Icons.chevron_right, color: Colors.black45),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TextScaleSelector extends StatelessWidget {
+  final double value;
+  final ValueChanged<double> onChanged;
+  const _TextScaleSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const options = <double>[0.9, 1.0, 1.15, 1.3];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.text_fields, color: AppColors.coral),
+              SizedBox(width: 8),
+              Text(
+                '글자 크기',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final opt in options)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: _ScaleChip(
+                      label: '${(opt * 100).round()}%',
+                      selected: (value - opt).abs() < 0.001,
+                      onTap: () => onChanged(opt),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScaleChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ScaleChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.coral : Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: selected ? Colors.white : Colors.black87,
+              ),
+            ),
           ),
         ),
       ),

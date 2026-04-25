@@ -67,12 +67,18 @@ class GameSettings {
   bool sound;
   bool darkMode;
   bool tutorialSeen;
+  bool highContrast;
+  double textScale;
+  bool reduceTapHaptics;
 
   GameSettings({
     this.haptic = true,
     this.sound = true,
     this.darkMode = false,
     this.tutorialSeen = false,
+    this.highContrast = false,
+    this.textScale = 1.0,
+    this.reduceTapHaptics = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -80,6 +86,9 @@ class GameSettings {
         'sound': sound,
         'darkMode': darkMode,
         'tutorialSeen': tutorialSeen,
+        'highContrast': highContrast,
+        'textScale': textScale,
+        'reduceTapHaptics': reduceTapHaptics,
       };
 
   factory GameSettings.fromJson(Map<String, dynamic> json) => GameSettings(
@@ -87,5 +96,8 @@ class GameSettings {
         sound: json['sound'] as bool? ?? true,
         darkMode: json['darkMode'] as bool? ?? false,
         tutorialSeen: json['tutorialSeen'] as bool? ?? false,
+        highContrast: json['highContrast'] as bool? ?? false,
+        textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+        reduceTapHaptics: json['reduceTapHaptics'] as bool? ?? false,
       );
 }

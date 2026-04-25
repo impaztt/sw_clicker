@@ -2,7 +2,7 @@ import 'booster.dart';
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 9;
+  static const currentVersion = 10;
 
   int version;
   double gold;
@@ -13,6 +13,7 @@ class SaveData {
   int prestigeCount;
   int prestigeCoins;
   Map<String, int> prestigeUpgradeLevels;
+  int ascensionCoreLevel;
   DateTime lastSavedAt;
   GameStats stats;
   GameSettings settings;
@@ -40,6 +41,14 @@ class SaveData {
   // again. Skill is "ready" if missing or in the past.
   Map<String, DateTime> skillReadyAt;
 
+  // Mission progress (v10)
+  int dailyMissionDayKey;
+  int weeklyMissionWeekKey;
+  Map<String, int> dailyMissionProgress;
+  Set<String> dailyMissionClaimed;
+  Map<String, int> weeklyMissionProgress;
+  Set<String> weeklyMissionClaimed;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -50,6 +59,7 @@ class SaveData {
     this.prestigeCount = 0,
     this.prestigeCoins = 0,
     Map<String, int>? prestigeUpgradeLevels,
+    this.ascensionCoreLevel = 0,
     DateTime? lastSavedAt,
     GameStats? stats,
     GameSettings? settings,
@@ -63,6 +73,12 @@ class SaveData {
     List<Booster>? activeBoosters,
     this.tapsSinceSlime = 0,
     Map<String, DateTime>? skillReadyAt,
+    this.dailyMissionDayKey = 0,
+    this.weeklyMissionWeekKey = 0,
+    Map<String, int>? dailyMissionProgress,
+    Set<String>? dailyMissionClaimed,
+    Map<String, int>? weeklyMissionProgress,
+    Set<String>? weeklyMissionClaimed,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -72,7 +88,11 @@ class SaveData {
         ownedSwords = ownedSwords ?? {},
         unlockedAchievements = unlockedAchievements ?? <String>{},
         activeBoosters = activeBoosters ?? <Booster>[],
-        skillReadyAt = skillReadyAt ?? <String, DateTime>{};
+        skillReadyAt = skillReadyAt ?? <String, DateTime>{},
+        dailyMissionProgress = dailyMissionProgress ?? <String, int>{},
+        dailyMissionClaimed = dailyMissionClaimed ?? <String>{},
+        weeklyMissionProgress = weeklyMissionProgress ?? <String, int>{},
+        weeklyMissionClaimed = weeklyMissionClaimed ?? <String>{};
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -84,6 +104,7 @@ class SaveData {
         'prestigeCount': prestigeCount,
         'prestigeCoins': prestigeCoins,
         'prestigeUpgradeLevels': prestigeUpgradeLevels,
+        'ascensionCoreLevel': ascensionCoreLevel,
         'lastSavedAt': lastSavedAt.toIso8601String(),
         'stats': stats.toJson(),
         'settings': settings.toJson(),
@@ -98,6 +119,12 @@ class SaveData {
         'tapsSinceSlime': tapsSinceSlime,
         'skillReadyAt':
             skillReadyAt.map((k, v) => MapEntry(k, v.toIso8601String())),
+        'dailyMissionDayKey': dailyMissionDayKey,
+        'weeklyMissionWeekKey': weeklyMissionWeekKey,
+        'dailyMissionProgress': dailyMissionProgress,
+        'dailyMissionClaimed': dailyMissionClaimed.toList(),
+        'weeklyMissionProgress': weeklyMissionProgress,
+        'weeklyMissionClaimed': weeklyMissionClaimed.toList(),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -113,6 +140,7 @@ class SaveData {
         prestigeCoins: json['prestigeCoins'] as int? ?? 0,
         prestigeUpgradeLevels:
             Map<String, int>.from(json['prestigeUpgradeLevels'] as Map? ?? {}),
+        ascensionCoreLevel: json['ascensionCoreLevel'] as int? ?? 0,
         lastSavedAt: DateTime.tryParse(json['lastSavedAt'] as String? ?? '') ??
             DateTime.now(),
         stats: GameStats.fromJson(json['stats'] as Map<String, dynamic>? ?? {}),
@@ -141,5 +169,19 @@ class SaveData {
             DateTime.tryParse(v as String? ?? '') ?? DateTime.now(),
           ),
         ),
+        dailyMissionDayKey: json['dailyMissionDayKey'] as int? ?? 0,
+        weeklyMissionWeekKey: json['weeklyMissionWeekKey'] as int? ?? 0,
+        dailyMissionProgress:
+            Map<String, int>.from(json['dailyMissionProgress'] as Map? ?? {}),
+        dailyMissionClaimed: (json['dailyMissionClaimed'] as List?)
+                ?.map((e) => e as String)
+                .toSet() ??
+            <String>{},
+        weeklyMissionProgress:
+            Map<String, int>.from(json['weeklyMissionProgress'] as Map? ?? {}),
+        weeklyMissionClaimed: (json['weeklyMissionClaimed'] as List?)
+                ?.map((e) => e as String)
+                .toSet() ??
+            <String>{},
       );
 }

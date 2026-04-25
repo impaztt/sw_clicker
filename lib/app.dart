@@ -44,15 +44,22 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
     AudioService.instance.setEnabled(sound);
 
     final darkMode = ref.watch(gameProvider.select((s) => s.darkMode));
+    final highContrast = ref.watch(gameProvider.select((s) => s.highContrast));
+    final textScale = ref.watch(gameProvider.select((s) => s.textScale));
 
     return MaterialApp(
       title: '검 키우기',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      darkTheme: buildDarkTheme(),
+      theme: buildAppTheme(highContrast: highContrast),
+      darkTheme: buildDarkTheme(highContrast: highContrast),
       themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
-      builder: (context, child) =>
-          AchievementToastHost(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) {
+        final media = MediaQuery.maybeOf(context) ?? const MediaQueryData();
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(textScale)),
+          child: AchievementToastHost(child: child ?? const SizedBox.shrink()),
+        );
+      },
       home: const MainScreen(),
     );
   }

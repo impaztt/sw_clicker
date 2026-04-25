@@ -18,21 +18,22 @@ class AppColors {
   static const darkSurfaceAlt = Color(0xFF2F2F3D);
 }
 
-ThemeData buildAppTheme() {
+ThemeData buildAppTheme({bool highContrast = false}) {
   final scheme = ColorScheme.fromSeed(
-    seedColor: AppColors.coral,
+    seedColor: highContrast ? AppColors.deepCoral : AppColors.coral,
     brightness: Brightness.light,
   ).copyWith(
-    primary: AppColors.coral,
-    secondary: AppColors.mint,
-    tertiary: AppColors.yellow,
+    primary: highContrast ? AppColors.deepCoral : AppColors.coral,
+    secondary: highContrast ? const Color(0xFF00695C) : AppColors.mint,
+    tertiary: highContrast ? const Color(0xFF8D6E00) : AppColors.yellow,
     surface: Colors.white,
+    onSurface: Colors.black,
   );
 
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    scaffoldBackgroundColor: AppColors.cream,
+    scaffoldBackgroundColor: highContrast ? Colors.white : AppColors.cream,
     textTheme: const TextTheme(
       displayLarge: TextStyle(fontWeight: FontWeight.w900),
       headlineLarge: TextStyle(fontWeight: FontWeight.w800),
@@ -75,23 +76,24 @@ ThemeData buildAppTheme() {
   );
 }
 
-ThemeData buildDarkTheme() {
+ThemeData buildDarkTheme({bool highContrast = false}) {
   final scheme = ColorScheme.fromSeed(
-    seedColor: AppColors.coral,
+    seedColor: highContrast ? AppColors.yellow : AppColors.coral,
     brightness: Brightness.dark,
   ).copyWith(
     primary: AppColors.coral,
-    secondary: AppColors.mint,
-    tertiary: AppColors.yellow,
-    surface: AppColors.darkSurface,
+    secondary: highContrast ? Colors.cyanAccent : AppColors.mint,
+    tertiary: highContrast ? Colors.amberAccent : AppColors.yellow,
+    surface: highContrast ? const Color(0xFF111111) : AppColors.darkSurface,
   );
 
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: scheme,
-    scaffoldBackgroundColor: AppColors.darkBackground,
-    cardColor: AppColors.darkSurface,
+    scaffoldBackgroundColor:
+        highContrast ? const Color(0xFF000000) : AppColors.darkBackground,
+    cardColor: highContrast ? const Color(0xFF111111) : AppColors.darkSurface,
     textTheme: const TextTheme(
       displayLarge: TextStyle(fontWeight: FontWeight.w900),
       headlineLarge: TextStyle(fontWeight: FontWeight.w800),

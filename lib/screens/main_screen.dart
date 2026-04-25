@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_provider.dart';
 import '../widgets/daily_bonus_dialog.dart';
 import '../widgets/offline_reward_dialog.dart';
+import '../widgets/onboarding_dialog.dart';
 import 'home_screen.dart';
 import 'prestige_screen.dart';
 import 'settings_screen.dart';
@@ -77,6 +78,15 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     // Offline reward first (time-sensitive context from lastSavedAt), then
     // daily bonus. Both are shown sequentially so the user can't miss one.
     final notifier = ref.read(gameProvider.notifier);
+    final game = ref.read(gameProvider);
+    if (!game.tutorialSeen && mounted) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const OnboardingDialog(),
+      );
+      notifier.setTutorialSeen(true);
+    }
     final offline = notifier.consumeOfflineReward();
     if (offline != null && mounted) {
       await showDialog<void>(

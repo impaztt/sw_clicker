@@ -12,6 +12,7 @@ import '../data/sword_sets.dart';
 import '../data/tap_upgrade_catalog.dart';
 import '../models/achievement.dart';
 import '../models/booster.dart';
+import '../models/producer.dart';
 import '../models/save_data.dart';
 import '../models/skill.dart';
 import '../models/sword.dart';
@@ -30,11 +31,15 @@ const pityThreshold = 80;
 /// Idle earnings config.
 const offlineMaxHours = 12;
 const offlineMaxSeconds = offlineMaxHours * 3600;
+const offlineClockSkewGraceMinutes = 5;
+const offlineHardElapsedHours = 72;
 
 /// Minimum away-time (seconds) before the "welcome back" dialog shows.
 /// Short enough to verify the feature quickly, long enough to skip tab-switch
 /// round-trips.
 const offlineMinSeconds = 30;
+const comebackEssenceStepSeconds = 15 * 60; // +1 essence per 15m
+const comebackEssenceCap = 120;
 
 /// Crit + combo config.
 const critChance = 0.05; // 5%
@@ -161,11 +166,116 @@ const comboSurgeBonus = 2.0; // tap reward × this while surging
 /// Slash burst skill: instant gold equal to current DPS × this seconds.
 const slashBurstWorthSeconds = 300;
 const essenceGatherAmount = 30;
+const ascensionCoreBonusPerLevel = 0.015;
 
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
   (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
 );
+
+enum MissionCycle { daily, weekly }
+
+class MissionDef {
+  final String id;
+  final String title;
+  final String description;
+  final int target;
+  final int rewardEssence;
+  final int rewardPrestigeCoins;
+  final MissionCycle cycle;
+  const MissionDef({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.target,
+    required this.rewardEssence,
+    required this.rewardPrestigeCoins,
+    required this.cycle,
+  });
+}
+
+class MissionView {
+  final String id;
+  final String title;
+  final String description;
+  final int progress;
+  final int target;
+  final int rewardEssence;
+  final int rewardPrestigeCoins;
+  final bool claimed;
+  const MissionView({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.progress,
+    required this.target,
+    required this.rewardEssence,
+    required this.rewardPrestigeCoins,
+    required this.claimed,
+  });
+
+  bool get done => progress >= target;
+}
+
+const dailyMissionDefs = <MissionDef>[
+  MissionDef(
+    id: 'daily_tap_300',
+    title: '집중 훈련',
+    description: '터치 300회',
+    target: 300,
+    rewardEssence: 15,
+    rewardPrestigeCoins: 12,
+    cycle: MissionCycle.daily,
+  ),
+  MissionDef(
+    id: 'daily_upgrade_30',
+    title: '강화 루틴',
+    description: '강화 레벨 30회 구매',
+    target: 30,
+    rewardEssence: 18,
+    rewardPrestigeCoins: 14,
+    cycle: MissionCycle.daily,
+  ),
+  MissionDef(
+    id: 'daily_skill_5',
+    title: '스킬 숙련',
+    description: '스킬 5회 사용',
+    target: 5,
+    rewardEssence: 20,
+    rewardPrestigeCoins: 16,
+    cycle: MissionCycle.daily,
+  ),
+];
+
+const weeklyMissionDefs = <MissionDef>[
+  MissionDef(
+    id: 'weekly_prestige_5',
+    title: '환생 순환',
+    description: '환생 5회 달성',
+    target: 5,
+    rewardEssence: 90,
+    rewardPrestigeCoins: 120,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_slime_40',
+    title: '황금 사냥',
+    description: '슬라임 40마리 처치',
+    target: 40,
+    rewardEssence: 80,
+    rewardPrestigeCoins: 90,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_summon_120',
+    title: '수집 주간',
+    description: '소환 120회',
+    target: 120,
+    rewardEssence: 110,
+    rewardPrestigeCoins: 110,
+    cycle: MissionCycle.weekly,
+  ),
+];
 
 class SummonResult {
   final SwordDef sword;
@@ -225,6 +335,7 @@ class GameState {
   final double dps;
   final int prestigeCoins;
   final int prestigeCount;
+  final int ascensionCoreLevel;
   final Map<String, int> producerLevels;
   final Map<String, int> tapUpgradeLevels;
   final Map<String, int> prestigeUpgradeLevels;
@@ -237,6 +348,9 @@ class GameState {
   final bool haptic;
   final bool sound;
   final bool darkMode;
+  final bool highContrast;
+  final double textScale;
+  final bool reduceTapHaptics;
   final int essence;
   final Map<String, int> ownedSwords;
   final String? equippedSwordId;
@@ -258,6 +372,9 @@ class GameState {
   final int slimesDefeated;
   final int skillsUsed;
   final int boostersPurchased;
+  final bool timeGuardTriggered;
+  final List<MissionView> dailyMissions;
+  final List<MissionView> weeklyMissions;
   final bool loaded;
 
   const GameState({
@@ -267,6 +384,7 @@ class GameState {
     required this.dps,
     required this.prestigeCoins,
     required this.prestigeCount,
+    required this.ascensionCoreLevel,
     required this.producerLevels,
     required this.tapUpgradeLevels,
     required this.prestigeUpgradeLevels,
@@ -279,6 +397,9 @@ class GameState {
     required this.haptic,
     required this.sound,
     required this.darkMode,
+    required this.highContrast,
+    required this.textScale,
+    required this.reduceTapHaptics,
     required this.essence,
     required this.ownedSwords,
     required this.equippedSwordId,
@@ -300,6 +421,9 @@ class GameState {
     required this.slimesDefeated,
     required this.skillsUsed,
     required this.boostersPurchased,
+    required this.timeGuardTriggered,
+    required this.dailyMissions,
+    required this.weeklyMissions,
     this.loaded = false,
   });
 
@@ -310,6 +434,7 @@ class GameState {
         dps: 0,
         prestigeCoins: 0,
         prestigeCount: 0,
+        ascensionCoreLevel: 0,
         producerLevels: {},
         tapUpgradeLevels: {},
         prestigeUpgradeLevels: const {},
@@ -322,6 +447,9 @@ class GameState {
         haptic: true,
         sound: true,
         darkMode: false,
+        highContrast: false,
+        textScale: 1.0,
+        reduceTapHaptics: false,
         essence: 90,
         ownedSwords: {},
         equippedSwordId: null,
@@ -343,11 +471,29 @@ class GameState {
         slimesDefeated: 0,
         skillsUsed: 0,
         boostersPurchased: 0,
+        timeGuardTriggered: false,
+        dailyMissions: const [],
+        weeklyMissions: const [],
         loaded: false,
       );
 
   double get prestigeMultiplier =>
       1.0 + prestigeGlobalBonusFraction(prestigeUpgradeLevels);
+
+  double get ascensionCoreMultiplier =>
+      1.0 + ascensionCoreLevel * ascensionCoreBonusPerLevel;
+
+  bool get ascensionCoreUnlocked {
+    if (prestigeCount < 5) return false;
+    for (final def in producerCatalog) {
+      if (def.category != ProducerCategory.transcendent) continue;
+      final lv = producerLevels[def.id] ?? 0;
+      if (lv >= 25) return true;
+    }
+    return false;
+  }
+
+  int get ascensionCoreNextCost => ascensionCoreCostAt(ascensionCoreLevel);
 
   int get prestigeCoinsAvailable => _calcPrestigeCoinsFromProgress(
         totalGoldEarned: totalGoldEarned,
@@ -445,7 +591,14 @@ class GameState {
 class OfflineReward {
   final Duration duration;
   final double gold;
-  OfflineReward(this.duration, this.gold);
+  final int essenceBonus;
+  final bool blockedByClockGuard;
+  const OfflineReward({
+    required this.duration,
+    required this.gold,
+    this.essenceBonus = 0,
+    this.blockedByClockGuard = false,
+  });
 }
 
 const _milestoneEssence = <int, int>{
@@ -463,6 +616,12 @@ int _milestoneEssenceUpTo(int level) {
   return total;
 }
 
+int ascensionCoreCostAt(int level) {
+  final cost = 250 * pow(1.22, level);
+  if (cost.isNaN || cost.isInfinite) return 2147483647;
+  return cost.round().clamp(0, 2147483647).toInt();
+}
+
 class GameNotifier extends Notifier<GameState> {
   final _syncService = SyncService();
   final _random = Random();
@@ -476,6 +635,7 @@ class GameNotifier extends Notifier<GameState> {
   SaveData _save = SaveData();
   OfflineReward? _pendingOffline;
   DailyBonus? _pendingDaily;
+  bool _timeGuardTriggered = false;
   int _combo = 0;
   DateTime? _lastTapAt;
   DateTime? _comboSurgeUntil;
@@ -498,18 +658,33 @@ class GameNotifier extends Notifier<GameState> {
 
   Future<void> _initialize() async {
     final loaded = await _syncService.loadResolved();
+    final now = DateTime.now();
     if (loaded != null) {
       _save = loaded;
+      _sanitizeLoadedSave();
       _migrateLegacySoulsToOverallUpgrade();
-      final elapsed = DateTime.now().difference(loaded.lastSavedAt);
-      final cappedSeconds = elapsed.inSeconds.clamp(0, offlineMaxSeconds);
+      _rotateMissionWindowsIfNeeded(now: now, force: true);
+      final elapsed = _safeOfflineElapsed(now, loaded.lastSavedAt);
+      final cappedSeconds =
+          elapsed.inSeconds.clamp(0, offlineMaxSeconds).toInt();
       final dpsNow = _calcDps();
-      if (cappedSeconds >= offlineMinSeconds && dpsNow > 0) {
+      if (_timeGuardTriggered) {
+        _pendingOffline = const OfflineReward(
+          duration: Duration.zero,
+          gold: 0,
+          blockedByClockGuard: true,
+        );
+      } else if (cappedSeconds >= offlineMinSeconds && dpsNow > 0) {
+        final essenceBonus = min(
+            comebackEssenceCap, cappedSeconds ~/ comebackEssenceStepSeconds);
         _pendingOffline = OfflineReward(
-          Duration(seconds: cappedSeconds),
-          dpsNow * cappedSeconds,
+          duration: Duration(seconds: cappedSeconds),
+          gold: dpsNow * cappedSeconds,
+          essenceBonus: essenceBonus,
         );
       }
+    } else {
+      _rotateMissionWindowsIfNeeded(now: now, force: true);
     }
     _pendingDaily = _evaluateDailyEligibility();
     _emit(loaded: true);
@@ -517,14 +692,151 @@ class GameNotifier extends Notifier<GameState> {
     _startAutoSave();
   }
 
+  Duration _safeOfflineElapsed(DateTime now, DateTime lastSavedAt) {
+    final skewLimit = now.add(
+      const Duration(minutes: offlineClockSkewGraceMinutes),
+    );
+    if (lastSavedAt.isAfter(skewLimit)) {
+      _timeGuardTriggered = true;
+      return Duration.zero;
+    }
+    final elapsed = now.difference(lastSavedAt);
+    if (elapsed.inHours > offlineHardElapsedHours) {
+      return const Duration(seconds: offlineMaxSeconds);
+    }
+    return elapsed;
+  }
+
   void _migrateLegacySoulsToOverallUpgrade() {
     final souls = _save.prestigeSouls;
     if (souls <= 0) return;
     final def = prestigeUpgradeById(prestigeOverallUpgradeId);
     final prev = _save.prestigeUpgradeLevels[prestigeOverallUpgradeId] ?? 0;
-    final migrated = (prev + souls).clamp(0, def.maxLevel);
+    final migrated = (prev + souls).clamp(0, def.maxLevel).toInt();
     _save.prestigeUpgradeLevels[prestigeOverallUpgradeId] = migrated;
     _save.prestigeSouls = 0;
+  }
+
+  void _sanitizeLoadedSave() {
+    _save.gold = _finiteClamp(_save.gold, 0, 1e120);
+    _save.totalGoldEarned = _finiteClamp(_save.totalGoldEarned, 0, 1e120);
+    _save.prestigeCoins = _intClamp(_save.prestigeCoins, 0, 2147483647);
+    _save.prestigeCount = _intClamp(_save.prestigeCount, 0, 1000000);
+    _save.ascensionCoreLevel = _intClamp(_save.ascensionCoreLevel, 0, 1000000);
+    _save.essence = _intClamp(_save.essence, 0, 2147483647);
+    _save.dailyStreak = _intClamp(_save.dailyStreak, 0, 100000);
+    _save.tapsSinceSlime =
+        _intClamp(_save.tapsSinceSlime, 0, slimeSpawnEvery - 1);
+    _save.stats.totalTaps = _intClamp(_save.stats.totalTaps, 0, 2147483647);
+    _save.stats.totalSummons =
+        _intClamp(_save.stats.totalSummons, 0, 2147483647);
+    _save.stats.totalTapUpgradesBought =
+        _intClamp(_save.stats.totalTapUpgradesBought, 0, 2147483647);
+    _save.stats.totalCrits = _intClamp(_save.stats.totalCrits, 0, 2147483647);
+    _save.stats.maxCombo = _intClamp(_save.stats.maxCombo, 0, comboMax);
+    _save.stats.comboBurstCount =
+        _intClamp(_save.stats.comboBurstCount, 0, 2147483647);
+    _save.stats.slimesDefeated =
+        _intClamp(_save.stats.slimesDefeated, 0, 2147483647);
+    _save.stats.skillsUsed = _intClamp(_save.stats.skillsUsed, 0, 2147483647);
+    _save.stats.boostersPurchased =
+        _intClamp(_save.stats.boostersPurchased, 0, 2147483647);
+    _save.settings.textScale =
+        _save.settings.textScale.clamp(0.9, 1.3).toDouble();
+
+    _sanitizeLevelMap(
+      _save.producerLevels,
+      allowed: producerCatalog.map((e) => e.id).toSet(),
+      maxLevel: 1000000,
+    );
+    _sanitizeLevelMap(
+      _save.tapUpgradeLevels,
+      allowed: tapUpgradeCatalog.map((e) => e.id).toSet(),
+      maxLevel: 1000000,
+    );
+    _sanitizeLevelMap(
+      _save.prestigeUpgradeLevels,
+      allowed: prestigeUpgradeCatalog.map((e) => e.id).toSet(),
+      maxLevel: 1000000,
+    );
+    _sanitizeLevelMap(
+      _save.ownedSwords,
+      allowed: swordCatalog.map((e) => e.id).toSet(),
+      maxLevel: SwordDef.maxLevel,
+    );
+    final equipped = _save.equippedSwordId;
+    if (equipped != null && (_save.ownedSwords[equipped] ?? 0) <= 0) {
+      _save.equippedSwordId = null;
+    }
+
+    final skillIds = skillCatalog.map((e) => e.id.id).toSet();
+    _save.skillReadyAt.removeWhere((k, v) => !skillIds.contains(k));
+    _save.dailyMissionProgress
+        .removeWhere((k, v) => !_dailyMissionById.containsKey(k) || v < 0);
+    _save.weeklyMissionProgress
+        .removeWhere((k, v) => !_weeklyMissionById.containsKey(k) || v < 0);
+    _save.dailyMissionClaimed
+        .removeWhere((id) => !_dailyMissionById.containsKey(id));
+    _save.weeklyMissionClaimed
+        .removeWhere((id) => !_weeklyMissionById.containsKey(id));
+  }
+
+  double _finiteClamp(double value, double minValue, double maxValue) {
+    if (value.isNaN || value.isInfinite) return minValue;
+    if (value < minValue) return minValue;
+    if (value > maxValue) return maxValue;
+    return value;
+  }
+
+  int _intClamp(int value, int minValue, int maxValue) {
+    if (value < minValue) return minValue;
+    if (value > maxValue) return maxValue;
+    return value;
+  }
+
+  void _sanitizeLevelMap(
+    Map<String, int> source, {
+    required Set<String> allowed,
+    required int maxLevel,
+  }) {
+    source.removeWhere(
+        (id, lv) => !allowed.contains(id) || lv < 0 || lv > maxLevel);
+  }
+
+  static final Map<String, MissionDef> _dailyMissionById = {
+    for (final m in dailyMissionDefs) m.id: m,
+  };
+  static final Map<String, MissionDef> _weeklyMissionById = {
+    for (final m in weeklyMissionDefs) m.id: m,
+  };
+
+  int _dayKey(DateTime now) => now.year * 10000 + now.month * 100 + now.day;
+
+  int _weekKey(DateTime now) {
+    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
+    final thursday = monday.add(const Duration(days: 3));
+    final year = thursday.year;
+    final firstThursday = DateTime(year, 1, 4);
+    final firstMonday = firstThursday
+        .subtract(Duration(days: firstThursday.weekday - DateTime.monday));
+    final week = (monday.difference(firstMonday).inDays ~/ 7) + 1;
+    return year * 100 + week;
+  }
+
+  void _rotateMissionWindowsIfNeeded({DateTime? now, bool force = false}) {
+    final t = now ?? DateTime.now();
+    final dayKey = _dayKey(t);
+    final weekKey = _weekKey(t);
+    if (force || _save.dailyMissionDayKey != dayKey) {
+      _save.dailyMissionDayKey = dayKey;
+      _save.dailyMissionProgress.clear();
+      _save.dailyMissionClaimed.clear();
+    }
+    if (force || _save.weeklyMissionWeekKey != weekKey) {
+      _save.weeklyMissionWeekKey = weekKey;
+      _save.weeklyMissionProgress.clear();
+      _save.weeklyMissionClaimed.clear();
+    }
   }
 
   /// Decide whether the user is eligible for a daily bonus right now.
@@ -557,6 +869,7 @@ class GameNotifier extends Notifier<GameState> {
         final whole = _playTimeAcc.floor();
         _save.stats.playTimeSeconds += whole;
         _playTimeAcc -= whole;
+        _rotateMissionWindowsIfNeeded(now: now);
       }
       final dps = _calcDps();
       if (dps > _save.stats.maxDpsEver) _save.stats.maxDpsEver = dps;
@@ -589,6 +902,7 @@ class GameNotifier extends Notifier<GameState> {
       dps: _calcDps(),
       prestigeCoins: _save.prestigeCoins,
       prestigeCount: _save.prestigeCount,
+      ascensionCoreLevel: _save.ascensionCoreLevel,
       producerLevels: Map.unmodifiable(_save.producerLevels),
       tapUpgradeLevels: Map.unmodifiable(_save.tapUpgradeLevels),
       prestigeUpgradeLevels: Map.unmodifiable(_save.prestigeUpgradeLevels),
@@ -601,6 +915,9 @@ class GameNotifier extends Notifier<GameState> {
       haptic: _save.settings.haptic,
       sound: _save.settings.sound,
       darkMode: _save.settings.darkMode,
+      highContrast: _save.settings.highContrast,
+      textScale: _save.settings.textScale,
+      reduceTapHaptics: _save.settings.reduceTapHaptics,
       essence: _save.essence,
       ownedSwords: Map.unmodifiable(_save.ownedSwords),
       equippedSwordId: _save.equippedSwordId,
@@ -614,8 +931,9 @@ class GameNotifier extends Notifier<GameState> {
       maxDailyStreak: _save.stats.maxDailyStreak,
       lastDailyClaimAt: _save.lastDailyClaimAt,
       activeBoosters: List.unmodifiable(_save.activeBoosters),
-      tapsUntilSlime:
-          (slimeSpawnEvery - _save.tapsSinceSlime).clamp(0, slimeSpawnEvery),
+      tapsUntilSlime: (slimeSpawnEvery - _save.tapsSinceSlime)
+          .clamp(0, slimeSpawnEvery)
+          .toInt(),
       autoTapping: _autoTapActive(),
       tutorialSeen: _save.settings.tutorialSeen,
       skillReadyAt: Map.unmodifiable(_save.skillReadyAt),
@@ -623,6 +941,9 @@ class GameNotifier extends Notifier<GameState> {
       slimesDefeated: _save.stats.slimesDefeated,
       skillsUsed: _save.stats.skillsUsed,
       boostersPurchased: _save.stats.boostersPurchased,
+      timeGuardTriggered: _timeGuardTriggered,
+      dailyMissions: _buildMissionViews(daily: true),
+      weeklyMissions: _buildMissionViews(daily: false),
       loaded: loaded,
     );
     if (loaded) _checkAchievements();
@@ -662,6 +983,39 @@ class GameNotifier extends Notifier<GameState> {
     return 1.0 + bonus;
   }
 
+  List<MissionView> _buildMissionViews({required bool daily}) {
+    final defs = daily ? dailyMissionDefs : weeklyMissionDefs;
+    final progress =
+        daily ? _save.dailyMissionProgress : _save.weeklyMissionProgress;
+    final claimed =
+        daily ? _save.dailyMissionClaimed : _save.weeklyMissionClaimed;
+    return [
+      for (final def in defs)
+        MissionView(
+          id: def.id,
+          title: def.title,
+          description: def.description,
+          progress: (progress[def.id] ?? 0).clamp(0, def.target).toInt(),
+          target: def.target,
+          rewardEssence: def.rewardEssence,
+          rewardPrestigeCoins: def.rewardPrestigeCoins,
+          claimed: claimed.contains(def.id),
+        ),
+    ];
+  }
+
+  void _incMission(String id, int amount, {required bool daily}) {
+    if (amount <= 0) return;
+    _rotateMissionWindowsIfNeeded();
+    final defs = daily ? _dailyMissionById : _weeklyMissionById;
+    final def = defs[id];
+    if (def == null) return;
+    final progress =
+        daily ? _save.dailyMissionProgress : _save.weeklyMissionProgress;
+    final cur = progress[id] ?? 0;
+    progress[id] = (cur + amount).clamp(0, def.target).toInt();
+  }
+
   void _checkAchievements() {
     final ctx = state.achContext();
     bool anyChanged = false;
@@ -697,6 +1051,7 @@ class GameNotifier extends Notifier<GameState> {
         dps: state.dps,
         prestigeCoins: state.prestigeCoins,
         prestigeCount: state.prestigeCount,
+        ascensionCoreLevel: state.ascensionCoreLevel,
         producerLevels: state.producerLevels,
         tapUpgradeLevels: state.tapUpgradeLevels,
         prestigeUpgradeLevels: state.prestigeUpgradeLevels,
@@ -709,6 +1064,9 @@ class GameNotifier extends Notifier<GameState> {
         haptic: state.haptic,
         sound: state.sound,
         darkMode: state.darkMode,
+        highContrast: state.highContrast,
+        textScale: state.textScale,
+        reduceTapHaptics: state.reduceTapHaptics,
         essence: _save.essence,
         ownedSwords: state.ownedSwords,
         equippedSwordId: state.equippedSwordId,
@@ -730,6 +1088,9 @@ class GameNotifier extends Notifier<GameState> {
         slimesDefeated: state.slimesDefeated,
         skillsUsed: state.skillsUsed,
         boostersPurchased: state.boostersPurchased,
+        timeGuardTriggered: state.timeGuardTriggered,
+        dailyMissions: state.dailyMissions,
+        weeklyMissions: state.weeklyMissions,
         loaded: true,
       );
     }
@@ -737,6 +1098,9 @@ class GameNotifier extends Notifier<GameState> {
 
   double _prestigeMult() =>
       1.0 + prestigeGlobalBonusFraction(_save.prestigeUpgradeLevels);
+
+  double _ascensionCoreMult() =>
+      1.0 + _save.ascensionCoreLevel * ascensionCoreBonusPerLevel;
 
   double _prestigeShopTapMult() =>
       1.0 + prestigeTapBonusFraction(_save.prestigeUpgradeLevels);
@@ -793,6 +1157,7 @@ class GameNotifier extends Notifier<GameState> {
     }
     return base *
         _prestigeMult() *
+        _ascensionCoreMult() *
         _prestigeShopTapMult() *
         _equippedTapMult() *
         _boosterTapMult() *
@@ -808,6 +1173,7 @@ class GameNotifier extends Notifier<GameState> {
     }
     return sum *
         _prestigeMult() *
+        _ascensionCoreMult() *
         _prestigeShopDpsMult() *
         _equippedDpsMult() *
         _boosterDpsMult() *
@@ -824,6 +1190,7 @@ class GameNotifier extends Notifier<GameState> {
   /// visibly improves the "DPS +N" preview on companion/transcendent buys).
   double get dpsMultiplier =>
       _prestigeMult() *
+      _ascensionCoreMult() *
       _prestigeShopDpsMult() *
       _equippedDpsMult() *
       _boosterDpsMult() *
@@ -833,6 +1200,7 @@ class GameNotifier extends Notifier<GameState> {
   /// Counterpart of [dpsMultiplier] for tap-power upgrades.
   double get tapMultiplier =>
       _prestigeMult() *
+      _ascensionCoreMult() *
       _prestigeShopTapMult() *
       _equippedTapMult() *
       _boosterTapMult() *
@@ -878,7 +1246,9 @@ class GameNotifier extends Notifier<GameState> {
         now.difference(_lastTapAt!).inMilliseconds <= comboWindowMs;
     final surge = _comboSurgeUntil != null && now.isBefore(_comboSurgeUntil!);
     final increment = surge ? comboSurgePerTap : 1;
-    _combo = withinWindow ? (_combo + increment).clamp(0, comboMax) : increment;
+    _combo = withinWindow
+        ? (_combo + increment).clamp(0, comboMax).toInt()
+        : increment;
     _lastTapAt = now;
     if (_combo > _save.stats.maxCombo) _save.stats.maxCombo = _combo;
 
@@ -893,6 +1263,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += amount;
     _save.stats.lifetimeGold += amount;
     _save.stats.totalTaps++;
+    _incMission('daily_tap_300', 1, daily: true);
     if (isCrit) _save.stats.totalCrits++;
 
     _save.tapsSinceSlime++;
@@ -944,6 +1315,7 @@ class GameNotifier extends Notifier<GameState> {
     final newLv = oldLv + n;
     _save.gold -= cost;
     _save.producerLevels[id] = newLv;
+    _incMission('daily_upgrade_30', n, daily: true);
     final essenceGain =
         _milestoneEssenceUpTo(newLv) - _milestoneEssenceUpTo(oldLv);
     if (essenceGain > 0) _save.essence += essenceGain;
@@ -962,6 +1334,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.gold -= cost;
     _save.tapUpgradeLevels[id] = lv + n;
     _save.stats.totalTapUpgradesBought += n;
+    _incMission('daily_upgrade_30', n, daily: true);
     _emit(loaded: true);
     unawaited(_persist());
     return n;
@@ -980,11 +1353,32 @@ class GameNotifier extends Notifier<GameState> {
     return true;
   }
 
+  bool _canUnlockAscensionCore() {
+    if (_save.prestigeCount < 5) return false;
+    for (final def in producerCatalog) {
+      if (def.category != ProducerCategory.transcendent) continue;
+      if ((_save.producerLevels[def.id] ?? 0) >= 25) return true;
+    }
+    return false;
+  }
+
+  bool buyAscensionCore() {
+    if (!_canUnlockAscensionCore()) return false;
+    final cost = ascensionCoreCostAt(_save.ascensionCoreLevel);
+    if (_save.prestigeCoins < cost) return false;
+    _save.prestigeCoins -= cost;
+    _save.ascensionCoreLevel += 1;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return true;
+  }
+
   bool prestige() {
     final coins = state.prestigeCoinsAvailable;
     if (coins <= 0) return false;
     _save.prestigeCoins += coins;
     _save.prestigeCount += 1;
+    _incMission('weekly_prestige_5', 1, daily: false);
     _save.essence += coins * 3;
     _save.gold = 0;
     _save.totalGoldEarned = 0;
@@ -1002,6 +1396,9 @@ class GameNotifier extends Notifier<GameState> {
     _save.gold += r.gold;
     _save.totalGoldEarned += r.gold;
     _save.stats.lifetimeGold += r.gold;
+    if (r.essenceBonus > 0) {
+      _save.essence += r.essenceBonus;
+    }
     _emit(loaded: true);
     unawaited(_persist());
   }
@@ -1030,6 +1427,24 @@ class GameNotifier extends Notifier<GameState> {
     unawaited(_persist());
   }
 
+  void setHighContrast(bool value) {
+    _save.settings.highContrast = value;
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  void setTextScale(double value) {
+    _save.settings.textScale = value.clamp(0.9, 1.3).toDouble();
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  void setReduceTapHaptics(bool value) {
+    _save.settings.reduceTapHaptics = value;
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
   void setTutorialSeen(bool value) {
     _save.settings.tutorialSeen = value;
     _emit(loaded: true);
@@ -1052,6 +1467,25 @@ class GameNotifier extends Notifier<GameState> {
     _save.lastDailyClaimAt = DateTime.now();
     _emit(loaded: true);
     unawaited(_persist());
+  }
+
+  bool claimMission(String id, {required bool daily}) {
+    _rotateMissionWindowsIfNeeded();
+    final defs = daily ? _dailyMissionById : _weeklyMissionById;
+    final def = defs[id];
+    if (def == null) return false;
+    final progress =
+        daily ? _save.dailyMissionProgress : _save.weeklyMissionProgress;
+    final claimed =
+        daily ? _save.dailyMissionClaimed : _save.weeklyMissionClaimed;
+    if (claimed.contains(id)) return false;
+    if ((progress[id] ?? 0) < def.target) return false;
+    claimed.add(id);
+    _save.essence += def.rewardEssence;
+    _save.prestigeCoins += def.rewardPrestigeCoins;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return true;
   }
 
   // ============ Boosters + ads ============
@@ -1171,6 +1605,7 @@ class GameNotifier extends Notifier<GameState> {
     }
     _save.skillReadyAt[id.id] = now.add(def.cooldown);
     _save.stats.skillsUsed++;
+    _incMission('daily_skill_5', 1, daily: true);
     _emit(loaded: true);
     unawaited(_persist());
     return result;
@@ -1185,6 +1620,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += reward;
     _save.stats.lifetimeGold += reward;
     _save.stats.slimesDefeated++;
+    _incMission('weekly_slime_40', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
     return reward;
@@ -1239,6 +1675,7 @@ class GameNotifier extends Notifier<GameState> {
     _save = SaveData();
     _pendingOffline = null;
     _pendingDaily = null;
+    _timeGuardTriggered = false;
     _combo = 0;
     _lastTapAt = null;
     _emit(loaded: true);
@@ -1305,6 +1742,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.essence < summonCostSingle) return null;
     _save.essence -= summonCostSingle;
     final r = _doOnePull(guaranteedRPlus: false);
+    _incMission('weekly_summon_120', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
     return r;
@@ -1318,6 +1756,7 @@ class GameNotifier extends Notifier<GameState> {
       final isLast = i == 9;
       results.add(_doOnePull(guaranteedRPlus: isLast));
     }
+    _incMission('weekly_summon_120', results.length, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
     return results;

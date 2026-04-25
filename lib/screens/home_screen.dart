@@ -37,7 +37,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final result = ref.read(gameProvider.notifier).tapWithFeedback();
     final state = ref.read(gameProvider);
     if (state.haptic) {
-      if (result.isCrit) {
+      if (state.reduceTapHaptics) {
+        if (result.isCrit) HapticFeedback.mediumImpact();
+      } else if (result.isCrit) {
         HapticFeedback.mediumImpact();
       } else {
         HapticFeedback.lightImpact();
@@ -136,6 +138,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 10),
               DpsDisplay(dps: game.dps),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _MissionBoard(
+                  daily: game.dailyMissions,
+                  weekly: game.weeklyMissions,
+                  onClaim: (id, daily) =>
+                      notifier.claimMission(id, daily: daily),
+                ),
+              ),
               const Spacer(),
               Center(
                 child: Builder(builder: (_) {
@@ -167,7 +179,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (game.prestigeMultiplier > 1)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: _PermanentBoostChip(multiplier: game.prestigeMultiplier),
+                  child:
+                      _PermanentBoostChip(multiplier: game.prestigeMultiplier),
                 ),
               if (notifier.collectionBonusFraction > 0)
                 Padding(
@@ -230,6 +243,167 @@ class _ShopFab extends StatelessWidget {
           height: 52,
           child: Icon(Icons.bolt, color: Colors.white, size: 28),
         ),
+      ),
+    );
+  }
+}
+
+class _MissionBoard extends StatelessWidget {
+  final List<MissionView> daily;
+  final List<MissionView> weekly;
+  final bool Function(String id, bool daily) onClaim;
+  const _MissionBoard({
+    required this.daily,
+    required this.weekly,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.assignment_turned_in,
+                  color: AppColors.deepCoral, size: 18),
+              SizedBox(width: 6),
+              Text(
+                '오늘의 미션',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final m in daily)
+            _MissionTile(
+              mission: m,
+              accent: const Color(0xFF00897B),
+              onClaim: () => onClaim(m.id, true),
+            ),
+          const SizedBox(height: 6),
+          Text(
+            '주간 미션',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Colors.black.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final m in weekly)
+            _MissionTile(
+              mission: m,
+              accent: const Color(0xFF7E57C2),
+              onClaim: () => onClaim(m.id, false),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissionTile extends StatelessWidget {
+  final MissionView mission;
+  final Color accent;
+  final VoidCallback onClaim;
+  const _MissionTile({
+    required this.mission,
+    required this.accent,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = (mission.progress / mission.target).clamp(0.0, 1.0);
+    final claimable = mission.done && !mission.claimed;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.28), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  mission.title,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (mission.claimed)
+                const Text(
+                  '수령완료',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                )
+              else if (claimable)
+                InkWell(
+                  onTap: onClaim,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.coral,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '수령',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            mission.description,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 6,
+              backgroundColor: Colors.black12,
+              valueColor: AlwaysStoppedAnimation(accent),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${mission.progress}/${mission.target} · 보상 정수 +${mission.rewardEssence}, 코인 +${mission.rewardPrestigeCoins}',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -367,12 +541,8 @@ class _SlimeProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ratio = active
-        ? 1.0
-        : ((total - remaining) / total).clamp(0.0, 1.0);
-    final accent = active
-        ? const Color(0xFFE53935)
-        : const Color(0xFFFFB300);
+    final ratio = active ? 1.0 : ((total - remaining) / total).clamp(0.0, 1.0);
+    final accent = active ? const Color(0xFFE53935) : const Color(0xFFFFB300);
     final label = active
         ? '🟡 슬라임 출현! 처치 보상 +${NumberFormatter.format(reward)}'
         : '🟡 슬라임까지 $remaining회 · 처치 시 +${NumberFormatter.format(reward)}';
