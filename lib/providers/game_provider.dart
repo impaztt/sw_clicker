@@ -245,6 +245,51 @@ const dailyMissionDefs = <MissionDef>[
     rewardPrestigeCoins: 16,
     cycle: MissionCycle.daily,
   ),
+  MissionDef(
+    id: 'daily_crit_30',
+    title: '정밀 타격',
+    description: '치명타 30회 발동',
+    target: 30,
+    rewardEssence: 18,
+    rewardPrestigeCoins: 14,
+    cycle: MissionCycle.daily,
+  ),
+  MissionDef(
+    id: 'daily_slime_5',
+    title: '슬라임 처치',
+    description: '슬라임 5마리 처치',
+    target: 5,
+    rewardEssence: 16,
+    rewardPrestigeCoins: 12,
+    cycle: MissionCycle.daily,
+  ),
+  MissionDef(
+    id: 'daily_summon_15',
+    title: '소환 의식',
+    description: '소환 15회',
+    target: 15,
+    rewardEssence: 22,
+    rewardPrestigeCoins: 18,
+    cycle: MissionCycle.daily,
+  ),
+  MissionDef(
+    id: 'daily_combo_burst',
+    title: '콤보 폭발',
+    description: '콤보 버스트 1회 발동',
+    target: 1,
+    rewardEssence: 14,
+    rewardPrestigeCoins: 10,
+    cycle: MissionCycle.daily,
+  ),
+  MissionDef(
+    id: 'daily_booster_1',
+    title: '가속 점검',
+    description: '부스터 1회 사용',
+    target: 1,
+    rewardEssence: 20,
+    rewardPrestigeCoins: 14,
+    cycle: MissionCycle.daily,
+  ),
 ];
 
 const weeklyMissionDefs = <MissionDef>[
@@ -273,6 +318,51 @@ const weeklyMissionDefs = <MissionDef>[
     target: 120,
     rewardEssence: 110,
     rewardPrestigeCoins: 110,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_tap_5000',
+    title: '터치 마라톤',
+    description: '터치 5000회',
+    target: 5000,
+    rewardEssence: 75,
+    rewardPrestigeCoins: 80,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_upgrade_200',
+    title: '강화 매니아',
+    description: '강화 200회 구매',
+    target: 200,
+    rewardEssence: 100,
+    rewardPrestigeCoins: 110,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_skill_50',
+    title: '스킬 마스터',
+    description: '스킬 50회 사용',
+    target: 50,
+    rewardEssence: 90,
+    rewardPrestigeCoins: 100,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_crit_300',
+    title: '폭풍 일격',
+    description: '치명타 300회 발동',
+    target: 300,
+    rewardEssence: 80,
+    rewardPrestigeCoins: 90,
+    cycle: MissionCycle.weekly,
+  ),
+  MissionDef(
+    id: 'weekly_booster_5',
+    title: '가속 의존',
+    description: '부스터 5회 사용',
+    target: 5,
+    rewardEssence: 120,
+    rewardPrestigeCoins: 130,
     cycle: MissionCycle.weekly,
   ),
 ];
@@ -1264,7 +1354,12 @@ class GameNotifier extends Notifier<GameState> {
     _save.stats.lifetimeGold += amount;
     _save.stats.totalTaps++;
     _incMission('daily_tap_300', 1, daily: true);
-    if (isCrit) _save.stats.totalCrits++;
+    _incMission('weekly_tap_5000', 1, daily: false);
+    if (isCrit) {
+      _save.stats.totalCrits++;
+      _incMission('daily_crit_30', 1, daily: true);
+      _incMission('weekly_crit_300', 1, daily: false);
+    }
 
     _save.tapsSinceSlime++;
     final slimeSpawned = _save.tapsSinceSlime >= slimeSpawnEvery;
@@ -1281,6 +1376,7 @@ class GameNotifier extends Notifier<GameState> {
       _save.totalGoldEarned += burstAmount;
       _save.stats.lifetimeGold += burstAmount;
       _save.stats.comboBurstCount++;
+      _incMission('daily_combo_burst', 1, daily: true);
     }
 
     _scheduleComboDecay();
@@ -1316,6 +1412,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.gold -= cost;
     _save.producerLevels[id] = newLv;
     _incMission('daily_upgrade_30', n, daily: true);
+    _incMission('weekly_upgrade_200', n, daily: false);
     final essenceGain =
         _milestoneEssenceUpTo(newLv) - _milestoneEssenceUpTo(oldLv);
     if (essenceGain > 0) _save.essence += essenceGain;
@@ -1335,6 +1432,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.tapUpgradeLevels[id] = lv + n;
     _save.stats.totalTapUpgradesBought += n;
     _incMission('daily_upgrade_30', n, daily: true);
+    _incMission('weekly_upgrade_200', n, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
     return n;
@@ -1496,6 +1594,8 @@ class GameNotifier extends Notifier<GameState> {
     _save.essence -= offer.essenceCost;
     _applyBooster(offer.type, offer.multiplier, offer.durationSec);
     _save.stats.boostersPurchased++;
+    _incMission('daily_booster_1', 1, daily: true);
+    _incMission('weekly_booster_5', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
     return true;
@@ -1507,6 +1607,8 @@ class GameNotifier extends Notifier<GameState> {
   void grantAdBooster(BoosterOffer offer) {
     _applyBooster(offer.type, offer.multiplier, offer.durationSec);
     _save.stats.boostersPurchased++;
+    _incMission('daily_booster_1', 1, daily: true);
+    _incMission('weekly_booster_5', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
   }
@@ -1606,6 +1708,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.skillReadyAt[id.id] = now.add(def.cooldown);
     _save.stats.skillsUsed++;
     _incMission('daily_skill_5', 1, daily: true);
+    _incMission('weekly_skill_50', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
     return result;
@@ -1620,6 +1723,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += reward;
     _save.stats.lifetimeGold += reward;
     _save.stats.slimesDefeated++;
+    _incMission('daily_slime_5', 1, daily: true);
     _incMission('weekly_slime_40', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
@@ -1742,6 +1846,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.essence < summonCostSingle) return null;
     _save.essence -= summonCostSingle;
     final r = _doOnePull(guaranteedRPlus: false);
+    _incMission('daily_summon_15', 1, daily: true);
     _incMission('weekly_summon_120', 1, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
@@ -1756,6 +1861,7 @@ class GameNotifier extends Notifier<GameState> {
       final isLast = i == 9;
       results.add(_doOnePull(guaranteedRPlus: isLast));
     }
+    _incMission('daily_summon_15', results.length, daily: true);
     _incMission('weekly_summon_120', results.length, daily: false);
     _emit(loaded: true);
     unawaited(_persist());
