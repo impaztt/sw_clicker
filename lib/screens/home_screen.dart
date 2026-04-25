@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/number_format.dart';
 import '../core/theme.dart';
+import '../data/feature_unlocks.dart';
 import '../models/booster.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
@@ -178,11 +179,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTimeout: () => _slimeTimedOut(slime.id),
               ),
             ),
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: _ShopFab(onTap: _openBoosterShop),
-          ),
+          if (game.isFeatureUnlocked(FeatureUnlocks.boosterShop))
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: _ShopFab(onTap: _openBoosterShop),
+            ),
         ],
       ),
     );

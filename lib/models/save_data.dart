@@ -2,7 +2,7 @@ import 'booster.dart';
 import 'game_stats.dart';
 
 class SaveData {
-  static const currentVersion = 10;
+  static const currentVersion = 11;
 
   int version;
   double gold;
@@ -49,6 +49,9 @@ class SaveData {
   Map<String, int> weeklyMissionProgress;
   Set<String> weeklyMissionClaimed;
 
+  // Progressive feature unlocks (v11)
+  Set<String> unlockedFeatures;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -79,6 +82,7 @@ class SaveData {
     Set<String>? dailyMissionClaimed,
     Map<String, int>? weeklyMissionProgress,
     Set<String>? weeklyMissionClaimed,
+    Set<String>? unlockedFeatures,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -92,7 +96,8 @@ class SaveData {
         dailyMissionProgress = dailyMissionProgress ?? <String, int>{},
         dailyMissionClaimed = dailyMissionClaimed ?? <String>{},
         weeklyMissionProgress = weeklyMissionProgress ?? <String, int>{},
-        weeklyMissionClaimed = weeklyMissionClaimed ?? <String>{};
+        weeklyMissionClaimed = weeklyMissionClaimed ?? <String>{},
+        unlockedFeatures = unlockedFeatures ?? <String>{};
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -125,6 +130,7 @@ class SaveData {
         'dailyMissionClaimed': dailyMissionClaimed.toList(),
         'weeklyMissionProgress': weeklyMissionProgress,
         'weeklyMissionClaimed': weeklyMissionClaimed.toList(),
+        'unlockedFeatures': unlockedFeatures.toList(),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -180,6 +186,10 @@ class SaveData {
         weeklyMissionProgress:
             Map<String, int>.from(json['weeklyMissionProgress'] as Map? ?? {}),
         weeklyMissionClaimed: (json['weeklyMissionClaimed'] as List?)
+                ?.map((e) => e as String)
+                .toSet() ??
+            <String>{},
+        unlockedFeatures: (json['unlockedFeatures'] as List?)
                 ?.map((e) => e as String)
                 .toSet() ??
             <String>{},

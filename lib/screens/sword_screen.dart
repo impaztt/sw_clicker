@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
 import '../data/achievement_catalog.dart';
+import '../data/feature_unlocks.dart';
 import '../data/sword_catalog.dart';
+import '../data/sword_sets.dart';
 import '../models/achievement.dart';
 import '../models/sword.dart';
 import '../providers/game_provider.dart';
@@ -20,41 +22,55 @@ class SwordScreen extends ConsumerStatefulWidget {
 class _SwordScreenState extends ConsumerState<SwordScreen> {
   @override
   Widget build(BuildContext context) {
+    final game = ref.watch(gameProvider);
+    final tabs = <_CodexTab>[
+      const _CodexTab(label: '수집', view: _CollectionView()),
+      if (game.isFeatureUnlocked(FeatureUnlocks.swordSetsView))
+        const _CodexTab(label: '세트', view: _SwordSetsView()),
+      if (game.isFeatureUnlocked(FeatureUnlocks.summonTab))
+        const _CodexTab(label: '소환', view: _SummonView()),
+      if (game.isFeatureUnlocked(FeatureUnlocks.missionsTab))
+        const _CodexTab(label: '미션', view: _MissionHubView()),
+      if (game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
+        const _CodexTab(label: '업적', view: _AchievementHubView()),
+    ];
+
     return SafeArea(
       child: DefaultTabController(
-        length: 4,
+        length: tabs.length,
         child: Column(
           children: [
             const SizedBox(height: 12),
             const _HeaderBar(),
             const SizedBox(height: 8),
-            const TabBar(
-              labelColor: AppColors.deepCoral,
-              unselectedLabelColor: Colors.black45,
-              indicatorColor: AppColors.coral,
-              labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-              tabs: [
-                Tab(text: '수집'),
-                Tab(text: '소환'),
-                Tab(text: '미션'),
-                Tab(text: '업적'),
-              ],
-            ),
-            const Expanded(
-              child: TabBarView(
-                children: [
-                  _CollectionView(),
-                  _SummonView(),
-                  _MissionHubView(),
-                  _AchievementHubView(),
-                ],
+            if (tabs.length > 1)
+              TabBar(
+                labelColor: AppColors.deepCoral,
+                unselectedLabelColor: Colors.black45,
+                indicatorColor: AppColors.coral,
+                labelStyle:
+                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                isScrollable: tabs.length >= 5,
+                tabs: [for (final t in tabs) Tab(text: t.label)],
               ),
+            Expanded(
+              child: tabs.length == 1
+                  ? tabs.first.view
+                  : TabBarView(
+                      children: [for (final t in tabs) t.view],
+                    ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _CodexTab {
+  final String label;
+  final Widget view;
+  const _CodexTab({required this.label, required this.view});
 }
 
 class _HeaderBar extends ConsumerWidget {
@@ -1751,6 +1767,340 @@ class _SourceRow extends StatelessWidget {
             child: Text(
               text,
               style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwordSetsView extends ConsumerWidget {
+  const _SwordSetsView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final game = ref.watch(gameProvider);
+    final completed = <SwordSet>[];
+    final inProgress = <SwordSet>[];
+    final untouched = <SwordSet>[];
+    for (final s in swordSets) {
+      final ownedCount =
+          s.swordIds.where((id) => game.ownsSword(id)).length;
+      if (ownedCount == s.swordIds.length) {
+        completed.add(s);
+      } else if (ownedCount > 0) {
+        inProgress.add(s);
+      } else {
+        untouched.add(s);
+      }
+    }
+    final ordered = [...completed, ...inProgress, ...untouched];
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      itemCount: ordered.length + 1,
+      itemBuilder: (context, i) {
+        if (i == 0) {
+          return _SwordSetsHeader(
+            completed: completed.length,
+            total: swordSets.length,
+          );
+        }
+        final s = ordered[i - 1];
+        return _SwordSetCard(set: s, game: game);
+      },
+    );
+  }
+}
+
+class _SwordSetsHeader extends StatelessWidget {
+  final int completed;
+  final int total;
+  const _SwordSetsHeader({required this.completed, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFEC407A).withValues(alpha: 0.85),
+            const Color(0xFF7C4DFF).withValues(alpha: 0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '검 세트 컬렉션',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$completed / $total 세트 완성',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.95),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '같은 세트의 검을 모두 모으면 영구적으로 터치·DPS 배율이 증가합니다.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwordSetCard extends StatelessWidget {
+  final SwordSet set;
+  final GameState game;
+  const _SwordSetCard({required this.set, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    final ownedIds = <String>[];
+    final missingIds = <String>[];
+    for (final id in set.swordIds) {
+      if (game.ownsSword(id)) {
+        ownedIds.add(id);
+      } else {
+        missingIds.add(id);
+      }
+    }
+    final ratio = ownedIds.length / set.swordIds.length;
+    final completed = ratio >= 1.0;
+    final accent =
+        completed ? const Color(0xFFEC407A) : const Color(0xFF7C4DFF);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: completed ? accent : Colors.black12,
+          width: completed ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          set.name,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        if (completed)
+                          Icon(Icons.check_circle, color: accent, size: 18),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      set.description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${ownedIds.length} / ${set.swordIds.length}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: completed ? accent : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 6,
+              backgroundColor: Colors.black12,
+              valueColor: AlwaysStoppedAnimation(accent),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (set.tapBonus > 0)
+                _BonusChip(
+                  icon: Icons.touch_app,
+                  label: '터치',
+                  value: '+${(set.tapBonus * 100).toStringAsFixed(0)}%',
+                  active: completed,
+                ),
+              if (set.tapBonus > 0 && set.dpsBonus > 0)
+                const SizedBox(width: 6),
+              if (set.dpsBonus > 0)
+                _BonusChip(
+                  icon: Icons.bolt,
+                  label: 'DPS',
+                  value: '+${(set.dpsBonus * 100).toStringAsFixed(0)}%',
+                  active: completed,
+                ),
+              const Spacer(),
+              if (!completed)
+                Text(
+                  '미보유 ${missingIds.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.5),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final id in set.swordIds)
+                _SetSwordChip(
+                  swordId: id,
+                  owned: game.ownsSword(id),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BonusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool active;
+  const _BonusChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.active,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        active ? const Color(0xFFEC407A) : Colors.black.withValues(alpha: 0.4);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: active
+            ? color.withValues(alpha: 0.14)
+            : Colors.black.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: active ? 0.7 : 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$label $value',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetSwordChip extends StatelessWidget {
+  final String swordId;
+  final bool owned;
+  const _SetSwordChip({required this.swordId, required this.owned});
+
+  @override
+  Widget build(BuildContext context) {
+    final def = swordCatalog.firstWhere(
+      (s) => s.id == swordId,
+      orElse: () => swordCatalog.first,
+    );
+    final tierColor = def.tier.color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: owned
+            ? tierColor.withValues(alpha: 0.14)
+            : Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: owned ? tierColor.withValues(alpha: 0.6) : Colors.black12,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            owned ? Icons.check : Icons.lock_outline,
+            size: 11,
+            color: owned ? tierColor : Colors.black38,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            owned ? def.name : '???',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: owned ? tierColor : Colors.black38,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            def.tier.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: owned ? tierColor : Colors.black38,
             ),
           ),
         ],

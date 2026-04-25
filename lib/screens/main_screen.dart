@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/feature_unlocks.dart';
 import '../providers/game_provider.dart';
 import '../widgets/daily_bonus_dialog.dart';
 import '../widgets/offline_reward_dialog.dart';
@@ -30,6 +31,46 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     SettingsScreen(),
   ];
 
+  static const _navHome = 0;
+  static const _navUpgrade = 1;
+  static const _navCodex = 2;
+  static const _navPrestige = 3;
+  static const _navSettings = 4;
+
+  static const _allDestinations = <_NavDestSpec>[
+    _NavDestSpec(
+      pageIndex: _navHome,
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      label: '홈',
+    ),
+    _NavDestSpec(
+      pageIndex: _navUpgrade,
+      icon: Icons.upgrade_outlined,
+      selectedIcon: Icons.upgrade_rounded,
+      label: '강화',
+    ),
+    _NavDestSpec(
+      pageIndex: _navCodex,
+      icon: Icons.collections_outlined,
+      selectedIcon: Icons.collections,
+      label: '도감',
+    ),
+    _NavDestSpec(
+      pageIndex: _navPrestige,
+      icon: Icons.auto_awesome_outlined,
+      selectedIcon: Icons.auto_awesome,
+      label: '환생',
+      featureId: FeatureUnlocks.prestigeTab,
+    ),
+    _NavDestSpec(
+      pageIndex: _navSettings,
+      icon: Icons.tune_outlined,
+      selectedIcon: Icons.tune_rounded,
+      label: '설정',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
@@ -38,37 +79,31 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _runBootDialogs());
     }
 
+    final visible = _allDestinations
+        .where((d) => d.featureId == null || game.isFeatureUnlocked(d.featureId!))
+        .toList();
+    // Map current page index back to a slot in the visible list. If the
+    // destination just got hidden (shouldn't happen — unlocks are sticky),
+    // fall back to home.
+    var slot = visible.indexWhere((d) => d.pageIndex == _index);
+    if (slot < 0) {
+      slot = 0;
+      _index = visible.first.pageIndex;
+    }
+
     return Scaffold(
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: '홈',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.upgrade_outlined),
-            selectedIcon: Icon(Icons.upgrade_rounded),
-            label: '강화',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.collections_outlined),
-            selectedIcon: Icon(Icons.collections),
-            label: '도감',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: '환생',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune_rounded),
-            label: '설정',
-          ),
+        selectedIndex: slot,
+        onDestinationSelected: (i) =>
+            setState(() => _index = visible[i].pageIndex),
+        destinations: [
+          for (final d in visible)
+            NavigationDestination(
+              icon: Icon(d.icon),
+              selectedIcon: Icon(d.selectedIcon),
+              label: d.label,
+            ),
         ],
       ),
     );
@@ -104,4 +139,19 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       );
     }
   }
+}
+
+class _NavDestSpec {
+  final int pageIndex;
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final String? featureId;
+  const _NavDestSpec({
+    required this.pageIndex,
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    this.featureId,
+  });
 }

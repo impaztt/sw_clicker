@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/achievement_catalog.dart';
+import '../data/feature_unlocks.dart';
 import '../data/prestige_upgrade_catalog.dart';
 import '../data/producer_catalog.dart';
 import '../data/sword_catalog.dart';
@@ -171,6 +172,11 @@ const ascensionCoreBonusPerLevel = 0.015;
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
   (ref) => ref.watch(gameProvider.notifier)._achievementUnlocks.stream,
+);
+
+/// Stream of newly unlocked features (for toast UI).
+final featureUnlockProvider = StreamProvider<FeatureUnlockDef>(
+  (ref) => ref.watch(gameProvider.notifier)._featureUnlocks.stream,
 );
 
 enum MissionCycle { daily, weekly }
@@ -465,6 +471,7 @@ class GameState {
   final bool timeGuardTriggered;
   final List<MissionView> dailyMissions;
   final List<MissionView> weeklyMissions;
+  final Set<String> unlockedFeatures;
   final bool loaded;
 
   const GameState({
@@ -514,6 +521,7 @@ class GameState {
     required this.timeGuardTriggered,
     required this.dailyMissions,
     required this.weeklyMissions,
+    required this.unlockedFeatures,
     this.loaded = false,
   });
 
@@ -564,6 +572,7 @@ class GameState {
         timeGuardTriggered: false,
         dailyMissions: const [],
         weeklyMissions: const [],
+        unlockedFeatures: const {},
         loaded: false,
       );
 
@@ -599,6 +608,7 @@ class GameState {
   int prestigeUpgradeLevel(String id) => prestigeUpgradeLevels[id] ?? 0;
   int swordLevel(String id) => ownedSwords[id] ?? 0;
   bool ownsSword(String id) => (ownedSwords[id] ?? 0) > 0;
+  bool isFeatureUnlocked(String id) => unlockedFeatures.contains(id);
 
   SwordDef? get equippedSword {
     final id = equippedSwordId;
@@ -716,6 +726,7 @@ class GameNotifier extends Notifier<GameState> {
   final _syncService = SyncService();
   final _random = Random();
   final _achievementUnlocks = StreamController<AchievementDef>.broadcast();
+  final _featureUnlocks = StreamController<FeatureUnlockDef>.broadcast();
   Timer? _tickTimer;
   Timer? _saveTimer;
   Timer? _comboDecayTimer;
@@ -730,6 +741,7 @@ class GameNotifier extends Notifier<GameState> {
   DateTime? _lastTapAt;
   DateTime? _comboSurgeUntil;
   bool _burstFiredThisRun = false;
+  bool _featureUnlocksReady = false;
 
   @override
   GameState build() {
@@ -744,6 +756,7 @@ class GameNotifier extends Notifier<GameState> {
     _comboDecayTimer?.cancel();
     _autoTapTimer?.cancel();
     _achievementUnlocks.close();
+    _featureUnlocks.close();
   }
 
   Future<void> _initialize() async {
@@ -778,6 +791,10 @@ class GameNotifier extends Notifier<GameState> {
     }
     _pendingDaily = _evaluateDailyEligibility();
     _emit(loaded: true);
+    // Veteran-safe: silently mark anything that's already triggered, without
+    // spamming toasts for unlocks the player earned in past sessions.
+    _evaluateFeatureUnlocks(silent: true);
+    _featureUnlocksReady = true;
     _startTicker();
     _startAutoSave();
   }
@@ -1034,9 +1051,13 @@ class GameNotifier extends Notifier<GameState> {
       timeGuardTriggered: _timeGuardTriggered,
       dailyMissions: _buildMissionViews(daily: true),
       weeklyMissions: _buildMissionViews(daily: false),
+      unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
       loaded: loaded,
     );
-    if (loaded) _checkAchievements();
+    if (loaded) {
+      _checkAchievements();
+      if (_featureUnlocksReady) _evaluateFeatureUnlocks();
+    }
   }
 
   bool _autoTapActive() {
@@ -1181,9 +1202,77 @@ class GameNotifier extends Notifier<GameState> {
         timeGuardTriggered: state.timeGuardTriggered,
         dailyMissions: state.dailyMissions,
         weeklyMissions: state.weeklyMissions,
+        unlockedFeatures: state.unlockedFeatures,
         loaded: true,
       );
     }
+  }
+
+  /// Evaluate all feature unlock triggers against current state. New unlocks
+  /// are added to the save and broadcast on [_featureUnlocks] (unless
+  /// [silent] is true — used on initial load to avoid spamming toasts for
+  /// pre-existing veteran progress).
+  void _evaluateFeatureUnlocks({bool silent = false}) {
+    final s = state;
+    var anyChanged = false;
+    for (final def in featureUnlockCatalog) {
+      if (_save.unlockedFeatures.contains(def.id)) continue;
+      if (!def.trigger(s)) continue;
+      _save.unlockedFeatures.add(def.id);
+      anyChanged = true;
+      if (!silent) _featureUnlocks.add(def);
+    }
+    if (!anyChanged) return;
+    state = GameState(
+      gold: state.gold,
+      totalGoldEarned: state.totalGoldEarned,
+      tapPower: state.tapPower,
+      dps: state.dps,
+      prestigeCoins: state.prestigeCoins,
+      prestigeCount: state.prestigeCount,
+      ascensionCoreLevel: state.ascensionCoreLevel,
+      producerLevels: state.producerLevels,
+      tapUpgradeLevels: state.tapUpgradeLevels,
+      prestigeUpgradeLevels: state.prestigeUpgradeLevels,
+      totalTaps: state.totalTaps,
+      playTimeSeconds: state.playTimeSeconds,
+      maxDpsEver: state.maxDpsEver,
+      lifetimeGold: state.lifetimeGold,
+      totalSummons: state.totalSummons,
+      totalTapUpgradesBought: state.totalTapUpgradesBought,
+      haptic: state.haptic,
+      sound: state.sound,
+      darkMode: state.darkMode,
+      highContrast: state.highContrast,
+      textScale: state.textScale,
+      reduceTapHaptics: state.reduceTapHaptics,
+      essence: state.essence,
+      ownedSwords: state.ownedSwords,
+      equippedSwordId: state.equippedSwordId,
+      summonsSinceHighRare: state.summonsSinceHighRare,
+      unlockedAchievements: state.unlockedAchievements,
+      combo: state.combo,
+      totalCrits: state.totalCrits,
+      maxCombo: state.maxCombo,
+      comboBurstCount: state.comboBurstCount,
+      dailyStreak: state.dailyStreak,
+      maxDailyStreak: state.maxDailyStreak,
+      lastDailyClaimAt: state.lastDailyClaimAt,
+      activeBoosters: state.activeBoosters,
+      tapsUntilSlime: state.tapsUntilSlime,
+      autoTapping: state.autoTapping,
+      tutorialSeen: state.tutorialSeen,
+      skillReadyAt: state.skillReadyAt,
+      completedSetIds: state.completedSetIds,
+      slimesDefeated: state.slimesDefeated,
+      skillsUsed: state.skillsUsed,
+      boostersPurchased: state.boostersPurchased,
+      timeGuardTriggered: state.timeGuardTriggered,
+      dailyMissions: state.dailyMissions,
+      weeklyMissions: state.weeklyMissions,
+      unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
+      loaded: true,
+    );
   }
 
   double _prestigeMult() =>

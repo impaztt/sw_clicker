@@ -6,6 +6,7 @@ import 'providers/game_provider.dart';
 import 'screens/main_screen.dart';
 import 'services/audio_service.dart';
 import 'widgets/achievement_toast.dart';
+import 'widgets/feature_unlock_toast.dart';
 
 class SwClickerApp extends ConsumerStatefulWidget {
   const SwClickerApp({super.key});
@@ -57,7 +58,11 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
         final media = MediaQuery.maybeOf(context) ?? const MediaQueryData();
         return MediaQuery(
           data: media.copyWith(textScaler: TextScaler.linear(textScale)),
-          child: AchievementToastHost(child: child ?? const SizedBox.shrink()),
+          child: AchievementToastHost(
+            child: FeatureUnlockToastHost(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         );
       },
       home: const MainScreen(),
