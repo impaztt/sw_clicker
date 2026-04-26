@@ -1,3 +1,4 @@
+import 'challenge_achievement_catalog.dart';
 import 'prestige_upgrade_catalog.dart';
 import '../models/achievement.dart';
 
@@ -1862,6 +1863,11 @@ final achievementCatalog = <AchievementDef>[
     current: (c) => c.prestigeCoins.toDouble(),
     target: 10000,
   ),
+
+  // ============ Phase 3 — 챌린지 업적 (조건형) ============
+  // Defined in challenge_achievement_catalog.dart and merged here so the
+  // milestone progress percentage and lookup helpers see them.
+  ...challengeAchievementCatalog,
 ];
 
 AchievementDef? achievementById(String id) {

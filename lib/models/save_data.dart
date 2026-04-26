@@ -1,5 +1,6 @@
 import 'booster.dart';
 import 'game_stats.dart';
+import 'run_stats.dart';
 import 'stock_market.dart';
 
 class SaveData {
@@ -59,6 +60,9 @@ class SaveData {
   // Repeating-achievement progress (v13). Map id -> cleared stage count.
   Map<String, int> repeatingAchievementStages;
 
+  // Per-prestige run-scoped stats (v13). Reset on prestige().
+  RunStats run;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -92,6 +96,7 @@ class SaveData {
     Set<String>? unlockedFeatures,
     StockMarketState? market,
     Map<String, int>? repeatingAchievementStages,
+    RunStats? run,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -109,7 +114,8 @@ class SaveData {
         unlockedFeatures = unlockedFeatures ?? <String>{},
         market = market ?? StockMarketState(),
         repeatingAchievementStages =
-            repeatingAchievementStages ?? <String, int>{};
+            repeatingAchievementStages ?? <String, int>{},
+        run = run ?? RunStats();
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -145,6 +151,7 @@ class SaveData {
         'unlockedFeatures': unlockedFeatures.toList(),
         'market': market.toJson(),
         'repeatingAchievementStages': repeatingAchievementStages,
+        'run': run.toJson(),
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -213,5 +220,8 @@ class SaveData {
                 Map<String, dynamic>.from(json['market'] as Map)),
         repeatingAchievementStages: Map<String, int>.from(
             json['repeatingAchievementStages'] as Map? ?? const {}),
+        run: json['run'] == null
+            ? RunStats()
+            : RunStats.fromJson(Map<String, dynamic>.from(json['run'] as Map)),
       );
 }

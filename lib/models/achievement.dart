@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'run_stats.dart';
+
 enum AchievementCategory {
   tap,
   gold,
@@ -141,6 +143,8 @@ class AchContext {
   final double totalGoldSpent;
   final int prestigeCoins;
   final int essence;
+  // v13 — current-run scoped counters for challenge achievements.
+  final RunStats run;
 
   const AchContext({
     required this.totalTaps,
@@ -182,6 +186,7 @@ class AchContext {
     required this.totalGoldSpent,
     required this.prestigeCoins,
     required this.essence,
+    required this.run,
   });
 }
 

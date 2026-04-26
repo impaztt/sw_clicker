@@ -16,6 +16,7 @@ import '../data/tap_upgrade_catalog.dart';
 import '../models/achievement.dart';
 import '../models/booster.dart';
 import '../models/producer.dart';
+import '../models/run_stats.dart';
 import '../models/save_data.dart';
 import '../models/skill.dart';
 import '../models/stock_market.dart';
@@ -478,6 +479,7 @@ class GameState {
   final Set<String> unlockedFeatures;
   final StockMarketState market;
   final Map<String, int> repeatingAchievementStages;
+  final RunStats run;
   final bool loaded;
 
   const GameState({
@@ -531,6 +533,7 @@ class GameState {
     required this.unlockedFeatures,
     required this.market,
     required this.repeatingAchievementStages,
+    required this.run,
     this.loaded = false,
   });
 
@@ -585,6 +588,7 @@ class GameState {
         unlockedFeatures: const {},
         market: StockMarketState(),
         repeatingAchievementStages: const {},
+        run: RunStats(),
         loaded: false,
       );
 
@@ -721,6 +725,7 @@ class GameState {
       totalGoldSpent: totalGoldSpent,
       prestigeCoins: prestigeCoins,
       essence: essence,
+      run: run,
     );
   }
 }
@@ -1023,11 +1028,13 @@ class GameNotifier extends Notifier<GameState> {
       }
       final dps = _calcDps();
       if (dps > _save.stats.maxDpsEver) _save.stats.maxDpsEver = dps;
+      if (dps > _save.run.dpsPeak) _save.run.dpsPeak = dps;
       if (dps > 0) {
         final gain = dps * dt;
         _save.gold += gain;
         _save.totalGoldEarned += gain;
         _save.stats.lifetimeGold += gain;
+        _save.run.goldEarned += gain;
       }
       _stockTickAcc += dt;
       if (_stockTickAcc >= stockPriceTickSeconds) {
@@ -1105,6 +1112,7 @@ class GameNotifier extends Notifier<GameState> {
       market: _save.market,
       repeatingAchievementStages:
           Map.unmodifiable(_save.repeatingAchievementStages),
+      run: _save.run,
       loaded: loaded,
     );
     if (loaded) {
@@ -1260,6 +1268,7 @@ class GameNotifier extends Notifier<GameState> {
         unlockedFeatures: state.unlockedFeatures,
         market: state.market,
         repeatingAchievementStages: state.repeatingAchievementStages,
+        run: state.run,
         loaded: true,
       );
     }
@@ -1342,6 +1351,7 @@ class GameNotifier extends Notifier<GameState> {
       market: state.market,
       repeatingAchievementStages:
           Map.unmodifiable(_save.repeatingAchievementStages),
+      run: state.run,
       loaded: true,
     );
   }
@@ -1412,6 +1422,7 @@ class GameNotifier extends Notifier<GameState> {
       unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
       market: state.market,
       repeatingAchievementStages: state.repeatingAchievementStages,
+      run: state.run,
       loaded: true,
     );
   }
@@ -1583,13 +1594,17 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += amount;
     _save.stats.lifetimeGold += amount;
     _save.stats.totalTaps++;
+    _save.run.taps++;
+    _save.run.goldEarned += amount;
     _incMission('daily_tap_300', 1, daily: true);
     _incMission('weekly_tap_5000', 1, daily: false);
     if (isCrit) {
       _save.stats.totalCrits++;
+      _save.run.crits++;
       _incMission('daily_crit_30', 1, daily: true);
       _incMission('weekly_crit_300', 1, daily: false);
     }
+    if (_combo > _save.run.maxCombo) _save.run.maxCombo = _combo;
 
     _save.tapsSinceSlime++;
     final slimeSpawned = _save.tapsSinceSlime >= slimeSpawnEvery;
@@ -1606,6 +1621,7 @@ class GameNotifier extends Notifier<GameState> {
       _save.totalGoldEarned += burstAmount;
       _save.stats.lifetimeGold += burstAmount;
       _save.stats.comboBurstCount++;
+      _save.run.comboBursts++;
       _incMission('daily_combo_burst', 1, daily: true);
     }
 
@@ -1641,6 +1657,8 @@ class GameNotifier extends Notifier<GameState> {
     final newLv = oldLv + n;
     _save.gold -= cost;
     _save.stats.totalGoldSpent += cost;
+    _save.run.goldSpent += cost;
+    _save.run.producerLevelsBought += n;
     _save.producerLevels[id] = newLv;
     _incMission('daily_upgrade_30', n, daily: true);
     _incMission('weekly_upgrade_200', n, daily: false);
@@ -1661,6 +1679,9 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.gold < cost) return 0;
     _save.gold -= cost;
     _save.stats.totalGoldSpent += cost;
+    _save.run.goldSpent += cost;
+    _save.run.tapUpgradesBought += n;
+    _save.run.boughtAnyTapUpgrade = true;
     _save.tapUpgradeLevels[id] = lv + n;
     _save.stats.totalTapUpgradesBought += n;
     _incMission('daily_upgrade_30', n, daily: true);
@@ -1718,9 +1739,29 @@ class GameNotifier extends Notifier<GameState> {
     _lastTapAt = null;
     _burstFiredThisRun = false;
     _resetStockMarketOnPrestige();
+    _unlockNoXChallenges();
+    _save.run.reset();
     _emit(loaded: true);
     unawaited(_persist());
     return true;
+  }
+
+  /// Fire challenge achievements that depend on "no X this run" conditions
+  /// — they need to read run state at the moment of prestige completion,
+  /// before reset wipes it.
+  void _unlockNoXChallenges() {
+    if (_save.prestigeCount < 1) return;
+    void unlock(String id) {
+      if (_save.unlockedAchievements.contains(id)) return;
+      final def = achievementById(id);
+      if (def == null) return;
+      _save.unlockedAchievements.add(def.id);
+      _save.essence += def.essenceReward;
+      _achievementUnlocks.add(def);
+    }
+    if (!_save.run.usedAnySkill) unlock('ch_no_skill');
+    if (!_save.run.usedAnyBooster) unlock('ch_no_booster');
+    if (!_save.run.boughtAnyTapUpgrade) unlock('ch_no_tap_upgrade');
   }
 
   /// Wipe per-run stock holdings on prestige. Lifetime trading stats
@@ -1852,6 +1893,8 @@ class GameNotifier extends Notifier<GameState> {
     _save.essence -= offer.essenceCost;
     _applyBooster(offer.type, offer.multiplier, offer.durationSec);
     _save.stats.boostersPurchased++;
+    _save.run.boostersUsed++;
+    _save.run.usedAnyBooster = true;
     _incMission('daily_booster_1', 1, daily: true);
     _incMission('weekly_booster_5', 1, daily: false);
     _emit(loaded: true);
@@ -1865,6 +1908,8 @@ class GameNotifier extends Notifier<GameState> {
   void grantAdBooster(BoosterOffer offer) {
     _applyBooster(offer.type, offer.multiplier, offer.durationSec);
     _save.stats.boostersPurchased++;
+    _save.run.boostersUsed++;
+    _save.run.usedAnyBooster = true;
     _incMission('daily_booster_1', 1, daily: true);
     _incMission('weekly_booster_5', 1, daily: false);
     _emit(loaded: true);
@@ -1965,6 +2010,8 @@ class GameNotifier extends Notifier<GameState> {
     }
     _save.skillReadyAt[id.id] = now.add(def.cooldown);
     _save.stats.skillsUsed++;
+    _save.run.skillsUsed++;
+    _save.run.usedAnySkill = true;
     _incMission('daily_skill_5', 1, daily: true);
     _incMission('weekly_skill_50', 1, daily: false);
     _emit(loaded: true);
@@ -1981,6 +2028,7 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += reward;
     _save.stats.lifetimeGold += reward;
     _save.stats.slimesDefeated++;
+    _save.run.slimesDefeated++;
     _incMission('daily_slime_5', 1, daily: true);
     _incMission('weekly_slime_40', 1, daily: false);
     _emit(loaded: true);
@@ -2027,6 +2075,7 @@ class GameNotifier extends Notifier<GameState> {
     if (refund <= 0) return 0;
     _save.ownedSwords.remove(swordId);
     _save.essence += refund;
+    _save.run.swordDismantles++;
     _emit(loaded: true);
     unawaited(_persist());
     return refund;
@@ -2104,6 +2153,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.essence < summonCostSingle) return null;
     _save.essence -= summonCostSingle;
     final r = _doOnePull(guaranteedRPlus: false);
+    _save.run.summons++;
     _incMission('daily_summon_15', 1, daily: true);
     _incMission('weekly_summon_120', 1, daily: false);
     _emit(loaded: true);
@@ -2119,6 +2169,7 @@ class GameNotifier extends Notifier<GameState> {
       final isLast = i == 9;
       results.add(_doOnePull(guaranteedRPlus: isLast));
     }
+    _save.run.summons += results.length;
     _incMission('daily_summon_15', results.length, daily: true);
     _incMission('weekly_summon_120', results.length, daily: false);
     _emit(loaded: true);
@@ -2129,6 +2180,7 @@ class GameNotifier extends Notifier<GameState> {
   void equipSword(String id) {
     if ((_save.ownedSwords[id] ?? 0) <= 0) return;
     _save.equippedSwordId = id;
+    _save.run.changedEquippedSword = true;
     _emit(loaded: true);
     unawaited(_persist());
   }
@@ -2417,6 +2469,9 @@ class GameNotifier extends Notifier<GameState> {
 
     _save.gold -= actualTotal;
     _save.stats.totalGoldSpent += actualTotal;
+    _save.run.goldSpent += actualTotal;
+    _save.run.stockTrades++;
+    _save.run.stockBuys++;
     // Update average cost (weighted average).
     final priorBasis = st.avgCost * st.shares;
     final newShares = st.shares + actualShares;
@@ -2459,6 +2514,10 @@ class GameNotifier extends Notifier<GameState> {
     _save.market.totalTradesCount++;
     _save.market.totalFeesPaid += fee;
     _save.market.totalRealizedProfit += realized;
+    _save.run.stockTrades++;
+    _save.run.stockSells++;
+    _save.run.stockProfitRealized += realized;
+    _save.run.goldEarned += net;
     _emit(loaded: true);
     unawaited(_persist());
     return (sharesSold: actual, netProceeds: net, realizedProfit: realized);
@@ -2475,6 +2534,8 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += amount;
     _save.stats.lifetimeGold += amount;
     _save.market.totalDividendsClaimed += amount;
+    _save.run.stockDividendsClaimed += amount;
+    _save.run.goldEarned += amount;
     _emit(loaded: true);
     unawaited(_persist());
     return amount;
@@ -2493,6 +2554,8 @@ class GameNotifier extends Notifier<GameState> {
     _save.totalGoldEarned += total;
     _save.stats.lifetimeGold += total;
     _save.market.totalDividendsClaimed += total;
+    _save.run.stockDividendsClaimed += total;
+    _save.run.goldEarned += total;
     _emit(loaded: true);
     unawaited(_persist());
     return total;
