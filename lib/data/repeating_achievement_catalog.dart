@@ -22,12 +22,20 @@ double _powInt(double base, int exp) {
 double Function(int) _linear(int base, int step) =>
     (s) => (base + (s - 1) * step).toDouble();
 
+/// Repeat-track reward global nerf (70% of previous payout).
+const _repeatRewardScale = 0.7;
+
 /// Reward curve: small base + slow growth (capped to keep economy sane).
-int Function(int) _reward({required int base, double growth = 1.4, int cap = 200}) =>
+int Function(int) _reward({
+  required int base,
+  double growth = 1.4,
+  int cap = 200,
+}) =>
     (s) {
-      final v = base * _powInt(growth, s - 1);
-      final r = v.round();
-      return r > cap ? cap : (r < 1 ? 1 : r);
+      final raw = base * _powInt(growth, s - 1);
+      final clamped = raw > cap ? cap.toDouble() : raw;
+      final scaled = (clamped * _repeatRewardScale).round();
+      return scaled < 1 ? 1 : scaled;
     };
 
 const _trackTap = Color(0xFFFF7043);
