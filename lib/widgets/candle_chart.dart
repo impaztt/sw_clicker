@@ -44,6 +44,7 @@ class _CandleChartPainter extends CustomPainter {
   static const Color _gridColor = Color(0x1F000000);
   static const Color _avgLineColor = Color(0xFFEC407A);
   static const Color _intrinsicLineColor = Color(0x66607D8B);
+  static const int _visibleCandleSlots = 42;
 
   final List<Candle> candles;
   final Candle? forming;
@@ -59,14 +60,17 @@ class _CandleChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final all = <Candle>[
+    final allCandles = <Candle>[
       ...candles,
       if (forming != null) forming!,
     ];
-    if (all.isEmpty) {
+    if (allCandles.isEmpty) {
       _drawEmpty(canvas, size);
       return;
     }
+    final visible = allCandles.length > _visibleCandleSlots
+        ? allCandles.sublist(allCandles.length - _visibleCandleSlots)
+        : allCandles;
 
     // Reserve space at the bottom for the volume histogram.
     final priceTop = 4.0;
@@ -74,33 +78,16 @@ class _CandleChartPainter extends CustomPainter {
     final volumeTop = size.height * 0.78;
     final volumeBottom = size.height - 14;
 
-    // Compute price range with a little padding for visual breathing room.
-    var pMin = double.infinity;
-    var pMax = -double.infinity;
-    for (final c in all) {
-      if (c.low < pMin) pMin = c.low;
-      if (c.high > pMax) pMax = c.high;
-    }
-    if (avgCost != null && avgCost! > 0) {
-      if (avgCost! < pMin) pMin = avgCost!;
-      if (avgCost! > pMax) pMax = avgCost!;
-    }
-    if (intrinsicPrice != null && intrinsicPrice! > 0) {
-      if (intrinsicPrice! < pMin) pMin = intrinsicPrice!;
-      if (intrinsicPrice! > pMax) pMax = intrinsicPrice!;
-    }
-    if (pMin == pMax) {
-      pMin = pMin * 0.99;
-      pMax = pMax * 1.01;
-    }
-    final pad = (pMax - pMin) * 0.05;
-    pMin -= pad;
-    pMax += pad;
+    // Auto-zoom to the visible candles only. Reference lines are drawn when
+    // they are inside this viewport, but they no longer squash the candles.
+    final range = _priceViewport(visible);
+    final pMin = range.$1;
+    final pMax = range.$2;
     final priceSpan = pMax - pMin;
 
     // Volume range.
     var vMax = 0.0;
-    for (final c in all) {
+    for (final c in visible) {
       if (c.volume > vMax) vMax = c.volume;
     }
     if (vMax <= 0) vMax = 1;
@@ -112,11 +99,10 @@ class _CandleChartPainter extends CustomPainter {
     final plotWidth = plotRight - plotLeft;
     if (plotWidth <= 0) return;
 
-    // Use a fixed slot count so partial-fill data still left-aligns nicely.
-    const targetSlots = 60;
-    final slotCount = targetSlots;
+    // Fewer visible slots keeps 30-second candles readable on phones.
+    const slotCount = _visibleCandleSlots;
     final slotWidth = plotWidth / slotCount;
-    final candleWidth = (slotWidth * 0.7).clamp(1.0, 12.0);
+    final candleWidth = (slotWidth * 0.76).clamp(2.0, 14.0);
 
     // Grid + price labels (5 horizontal lines).
     final gridPaint = Paint()
@@ -152,7 +138,7 @@ class _CandleChartPainter extends CustomPainter {
 
     // Reference lines (intrinsic, then avg) — drawn before candles so they
     // sit underneath the wicks visually.
-    if (intrinsicPrice != null && intrinsicPrice! > 0) {
+    if (_insideViewport(intrinsicPrice, pMin, pMax)) {
       _drawDashedLine(
         canvas,
         Offset(plotLeft, yForPrice(intrinsicPrice!)),
@@ -162,7 +148,7 @@ class _CandleChartPainter extends CustomPainter {
         gap: 4,
       );
     }
-    if (avgCost != null && avgCost! > 0) {
+    if (_insideViewport(avgCost, pMin, pMax)) {
       _drawDashedLine(
         canvas,
         Offset(plotLeft, yForPrice(avgCost!)),
@@ -185,9 +171,9 @@ class _CandleChartPainter extends CustomPainter {
     }
 
     // Candles — right-aligned: latest is the rightmost slot.
-    final startSlot = slotCount - all.length;
-    for (var i = 0; i < all.length; i++) {
-      final c = all[i];
+    final startSlot = slotCount - visible.length;
+    for (var i = 0; i < visible.length; i++) {
+      final c = visible[i];
       final slot = startSlot + i;
       final cx = plotLeft + slot * slotWidth + slotWidth / 2;
       final isUp = c.close >= c.open;
@@ -208,7 +194,7 @@ class _CandleChartPainter extends CustomPainter {
         cx - candleWidth / 2,
         bodyTop,
         cx + candleWidth / 2,
-        bodyBottom < bodyTop + 1 ? bodyTop + 1 : bodyBottom,
+        bodyBottom < bodyTop + 2 ? bodyTop + 2 : bodyBottom,
       );
       final bodyPaint = Paint()..color = color;
       // Up candles in Korean charts are typically drawn as filled boxes.
@@ -229,6 +215,17 @@ class _CandleChartPainter extends CustomPainter {
         volPaint,
       );
     }
+
+    final latest = visible.last.close;
+    _drawCurrentPriceMarker(
+      canvas,
+      y: yForPrice(latest),
+      plotLeft: plotLeft,
+      plotRight: plotRight,
+      labelGap: labelGap,
+      label: _fmt(latest),
+      color: visible.last.close >= visible.last.open ? _upColor : _downColor,
+    );
 
     // Bottom and right axis lines.
     final axisPaint = Paint()
@@ -304,6 +301,78 @@ class _CandleChartPainter extends CustomPainter {
       d = endD;
       on = !on;
     }
+  }
+
+  (double, double) _priceViewport(List<Candle> visible) {
+    var pMin = double.infinity;
+    var pMax = -double.infinity;
+    for (final c in visible) {
+      if (c.low < pMin) pMin = c.low;
+      if (c.high > pMax) pMax = c.high;
+    }
+
+    final last = visible.last.close <= 0 ? 1.0 : visible.last.close;
+    if (!pMin.isFinite || !pMax.isFinite || pMin <= 0 || pMax <= 0) {
+      pMin = last * 0.9925;
+      pMax = last * 1.0075;
+    }
+
+    var span = pMax - pMin;
+    final minSpan = last * 0.012;
+    if (span < minSpan) {
+      final center = (pMin + pMax) * 0.5;
+      pMin = center - minSpan * 0.5;
+      pMax = center + minSpan * 0.5;
+      span = pMax - pMin;
+    }
+
+    final pad = (span * 0.12).clamp(last * 0.002, last * 0.05).toDouble();
+    pMin = (pMin - pad).clamp(last * 0.001, double.infinity).toDouble();
+    pMax += pad;
+    if (pMax <= pMin) pMax = pMin + last * 0.01;
+    return (pMin, pMax);
+  }
+
+  bool _insideViewport(double? value, double pMin, double pMax) {
+    if (value == null || value <= 0) return false;
+    return value >= pMin && value <= pMax;
+  }
+
+  void _drawCurrentPriceMarker(
+    Canvas canvas, {
+    required double y,
+    required double plotLeft,
+    required double plotRight,
+    required double labelGap,
+    required String label,
+    required Color color,
+  }) {
+    final linePaint = Paint()
+      ..color = color.withValues(alpha: 0.34)
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(plotLeft, y), Offset(plotRight, y), linePaint);
+
+    final labelRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(plotRight + 3, y - 8, labelGap - 6, 16),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(
+      labelRect,
+      Paint()..color = color.withValues(alpha: 0.13),
+    );
+    final tp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textAlign: TextAlign.right,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: labelGap - 10);
+    tp.paint(canvas, Offset(plotRight + labelGap - tp.width - 6, y - 6));
   }
 
   String _fmt(double v) {

@@ -2419,13 +2419,15 @@ class GameNotifier extends Notifier<GameState> {
     // many ticks before being pulled back. Event probability and shock
     // magnitudes are slightly elevated to make the bounded range
     // (-90% to +1750%) feel reachable in long horizons.
+    const volatilityBoost = 1.45;
     const driftPerSec = 0.0003;
-    const eventProbPerSec = 0.001;
+    const eventProbPerSec = 0.0015;
 
     for (final state in m.regions.values) {
       if (!state.unlocked) continue;
       final def = regionDefById(state.regionId);
-      final sigmaPerTick = def.volatilityPerMinute * tickFactor;
+      final sigmaPerTick =
+          def.volatilityPerMinute * volatilityBoost * tickFactor;
 
       for (var i = 0; i < ticksElapsed; i++) {
         // Mean-reverting drift toward intrinsic price (scaled to tick).
@@ -2437,7 +2439,7 @@ class GameNotifier extends Notifier<GameState> {
         if (_random.nextDouble() <
             eventProbPerSec * stockPriceTickSeconds) {
           const shocks = [
-            -0.20, -0.12, -0.06, 0.06, 0.12, 0.20, 0.30,
+            -0.18, -0.11, -0.055, 0.055, 0.11, 0.18, 0.26,
           ];
           event = shocks[_random.nextInt(shocks.length)] * state.currentPrice;
         }
