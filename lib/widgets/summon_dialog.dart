@@ -258,37 +258,22 @@ class _MultiRevealState extends State<_MultiReveal> {
 
   @override
   Widget build(BuildContext context) {
-    final shouldScroll = widget.results.length > 25;
-    final grid = GridView.count(
-      crossAxisCount: 5,
-      shrinkWrap: !shouldScroll,
-      physics: shouldScroll
-          ? const BouncingScrollPhysics()
-          : const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 0.8,
-      children: [
-        for (final r in widget.results) _MultiCell(result: r),
-      ],
-    );
     return AnimatedBuilder(
       animation: widget.revealFade,
       builder: (_, __) {
-        final content = shouldScroll
-            ? ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(context).height * 0.5,
-                ),
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  child: grid,
-                ),
-              )
-            : grid;
         return Opacity(
           opacity: widget.revealFade.value,
-          child: content,
+          child: GridView.count(
+            crossAxisCount: 5,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.8,
+            children: [
+              for (final r in widget.results) _MultiCell(result: r),
+            ],
+          ),
         );
       },
     );
