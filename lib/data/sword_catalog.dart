@@ -25,6 +25,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFF8D6E63),
       auraColor: Color(0xFF795548),
       auraIntensity: 0.15,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -41,6 +42,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFA1887F),
       auraColor: Color(0xFFD7CCC8),
       auraIntensity: 0.15,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -57,6 +59,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFCD853F),
       auraColor: Color(0xFFCD853F),
       auraIntensity: 0.2,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -73,6 +76,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: _pommelSilver,
       auraColor: Color(0xFFB0BEC5),
       auraIntensity: 0.2,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -89,6 +93,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: _pommelSilver,
       auraColor: Color(0xFFCFD8DC),
       auraIntensity: 0.2,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -105,6 +110,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: _pommelSilver,
       auraColor: Color(0xFFECEFF1),
       auraIntensity: 0.22,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -121,6 +127,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFF8D6E63),
       auraColor: Color(0xFF8BC34A),
       auraIntensity: 0.2,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -137,6 +144,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: _pommelSilver,
       auraColor: Color(0xFF81D4FA),
       auraIntensity: 0.2,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -153,6 +161,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFFFB74D),
       auraColor: Color(0xFFFFB74D),
       auraIntensity: 0.2,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -169,6 +178,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: _pommelSilver,
       auraColor: Color(0xFFC5E1A5),
       auraIntensity: 0.2,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -185,6 +195,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFF8BC34A),
       auraColor: Color(0xFFAED581),
       auraIntensity: 0.25,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -201,6 +212,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFA1887F),
       auraColor: Color(0xFFDCE775),
       auraIntensity: 0.18,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -217,6 +229,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFFFCC80),
       auraColor: Color(0xFFFFCC80),
       auraIntensity: 0.2,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -233,6 +246,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFF78909C),
       auraColor: Color(0xFFB0BEC5),
       auraIntensity: 0.22,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -250,6 +264,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF4A148C),
       auraIntensity: 0.25,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.falchion,
     ),
   ),
 
@@ -270,6 +285,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF64B5F6),
       auraIntensity: 0.3,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -287,6 +303,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFBF360C),
       auraColor: Color(0xFFFF7043),
       auraIntensity: 0.28,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -305,6 +322,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFF59D),
       auraIntensity: 0.35,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -322,6 +340,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFF689F38),
       auraColor: Color(0xFFAED581),
       auraIntensity: 0.28,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -339,6 +358,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: _guardGold,
       auraColor: Color(0xFFFFB74D),
       auraIntensity: 0.3,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -356,6 +376,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFD84315),
       auraColor: Color(0xFFBF360C),
       auraIntensity: 0.3,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -374,6 +395,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF2196F3),
       auraIntensity: 0.35,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -392,6 +414,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFE1F5FE),
       auraIntensity: 0.32,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -409,6 +432,7 @@ const swordCatalog = <SwordDef>[
       pommelColor: Color(0xFFD32F2F),
       auraColor: Color(0xFFE53935),
       auraIntensity: 0.35,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -427,6 +451,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF29B6F6),
       auraIntensity: 0.35,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.longsword,
     ),
   ),
   SwordDef(
@@ -445,6 +470,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFC107),
       auraIntensity: 0.4,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -463,6 +489,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF00BCD4),
       auraIntensity: 0.38,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -481,6 +508,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFEC407A),
       auraIntensity: 0.4,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -499,6 +527,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF039BE5),
       auraIntensity: 0.4,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -517,6 +546,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFF8A65),
       auraIntensity: 0.42,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -535,6 +565,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF4CAF50),
       auraIntensity: 0.42,
       sparkle: SparkleStyle.dim,
+      shape: SwordShape.katana,
     ),
   ),
 
@@ -555,6 +586,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFF5722),
       auraIntensity: 0.5,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -573,6 +605,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF03A9F4),
       auraIntensity: 0.5,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -591,6 +624,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFEB3B),
       auraIntensity: 0.55,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -609,6 +643,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF7E57C2),
       auraIntensity: 0.5,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -627,6 +662,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFBBDEFB),
       auraIntensity: 0.55,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -645,6 +681,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFB300),
       auraIntensity: 0.6,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -663,6 +700,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFF5722),
       auraIntensity: 0.55,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -681,6 +719,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF9C27B0),
       auraIntensity: 0.58,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -699,6 +738,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF607D8B),
       auraIntensity: 0.6,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -717,6 +757,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF7CB342),
       auraIntensity: 0.58,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.dagger,
     ),
   ),
   SwordDef(
@@ -735,6 +776,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF26C6DA),
       auraIntensity: 0.6,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -753,6 +795,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF8E24AA),
       auraIntensity: 0.62,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -771,6 +814,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFE64A19),
       auraIntensity: 0.65,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.falchion,
     ),
   ),
 
@@ -791,6 +835,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFC107),
       auraIntensity: 0.75,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -809,6 +854,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFF6F00),
       auraIntensity: 0.8,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -827,6 +873,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFF59D),
       auraIntensity: 0.85,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -845,6 +892,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFB71C1C),
       auraIntensity: 0.85,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -863,6 +911,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF2196F3),
       auraIntensity: 0.88,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -881,6 +930,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFF5722),
       auraIntensity: 0.92,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -899,6 +949,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF00ACC1),
       auraIntensity: 0.92,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.dagger,
     ),
   ),
 
@@ -919,6 +970,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFEB3B),
       auraIntensity: 0.95,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -937,6 +989,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF00BFA5),
       auraIntensity: 0.95,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -955,6 +1008,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFE53935),
       auraIntensity: 0.98,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -973,6 +1027,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF26A69A),
       auraIntensity: 0.98,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -991,6 +1046,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF8E24AA),
       auraIntensity: 1.0,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
 
@@ -1011,6 +1067,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF7C4DFF),
       auraIntensity: 1.0,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
   SwordDef(
@@ -1029,6 +1086,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFFEB3B),
       auraIntensity: 1.0,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -1047,6 +1105,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF66BB6A),
       auraIntensity: 1.0,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -1065,6 +1124,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF6A1B9A),
       auraIntensity: 1.0,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -1083,6 +1143,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF7C4DFF),
       auraIntensity: 1.0,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
 
@@ -1104,6 +1165,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFEC407A),
       auraIntensity: 0.6,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -1123,6 +1185,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF00BCD4),
       auraIntensity: 0.6,
       sparkle: SparkleStyle.bright,
+      shape: SwordShape.katana,
     ),
   ),
   SwordDef(
@@ -1142,6 +1205,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFFF7043),
       auraIntensity: 0.85,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.falchion,
     ),
   ),
   SwordDef(
@@ -1161,6 +1225,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFF03A9F4),
       auraIntensity: 0.88,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.rapier,
     ),
   ),
   SwordDef(
@@ -1180,6 +1245,7 @@ const swordCatalog = <SwordDef>[
       auraColor: Color(0xFFE53935),
       auraIntensity: 0.95,
       sparkle: SparkleStyle.orbiting,
+      shape: SwordShape.claymore,
     ),
   ),
 ];

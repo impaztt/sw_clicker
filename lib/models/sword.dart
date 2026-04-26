@@ -106,6 +106,22 @@ extension SwordFormationRoleInfo on SwordFormationRole {
 
 enum SparkleStyle { none, dim, bright, orbiting }
 
+/// Distinct silhouette categories used by the sword painter. Default is
+/// [SwordShape.longsword] so existing catalog entries that don't specify a
+/// shape keep rendering identically to before this enum existed.
+enum SwordShape { dagger, longsword, claymore, katana, rapier, falchion }
+
+extension SwordShapeInfo on SwordShape {
+  String get korLabel => switch (this) {
+        SwordShape.dagger => '단검',
+        SwordShape.longsword => '장검',
+        SwordShape.claymore => '대검',
+        SwordShape.katana => '도',
+        SwordShape.rapier => '세검',
+        SwordShape.falchion => '곡도',
+      };
+}
+
 class SwordVisual {
   final Color bladeColor;
   final Color bladeAccent;
@@ -115,6 +131,7 @@ class SwordVisual {
   final Color auraColor;
   final double auraIntensity;
   final SparkleStyle sparkle;
+  final SwordShape shape;
 
   const SwordVisual({
     required this.bladeColor,
@@ -125,6 +142,7 @@ class SwordVisual {
     required this.auraColor,
     this.auraIntensity = 0.3,
     this.sparkle = SparkleStyle.none,
+    this.shape = SwordShape.longsword,
   });
 }
 
