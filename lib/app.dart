@@ -30,12 +30,15 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      ref.read(gameProvider.notifier).persist();
+      // Awaiting here doesn't block Flutter's lifecycle dispatch, but it does
+      // schedule the local-write continuation immediately so SharedPreferences
+      // gets a chance to flush before a force-kill.
+      await ref.read(gameProvider.notifier).persist();
     }
   }
 
