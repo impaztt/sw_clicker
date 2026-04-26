@@ -116,15 +116,15 @@ class SettingsScreen extends ConsumerWidget {
           authStatus.when(
             data: (status) => _AccountCard(
               status: status,
-              onRegister: () => _openAuthDialog(
+              onGoogle: () => _startSocialLogin(
                 context,
                 ref,
-                initialMode: _AuthMode.register,
+                SocialSignInProvider.google,
               ),
-              onLogin: () => _openAuthDialog(
+              onApple: () => _startSocialLogin(
                 context,
                 ref,
-                initialMode: _AuthMode.login,
+                SocialSignInProvider.apple,
               ),
               onLogout: () => _confirmLogout(context, ref),
             ),
@@ -135,15 +135,15 @@ class SettingsScreen extends ConsumerWidget {
                 email: null,
                 isAnonymous: true,
               ),
-              onRegister: () => _openAuthDialog(
+              onGoogle: () => _startSocialLogin(
                 context,
                 ref,
-                initialMode: _AuthMode.register,
+                SocialSignInProvider.google,
               ),
-              onLogin: () => _openAuthDialog(
+              onApple: () => _startSocialLogin(
                 context,
                 ref,
-                initialMode: _AuthMode.login,
+                SocialSignInProvider.apple,
               ),
               onLogout: () => _confirmLogout(context, ref),
             ),
@@ -252,16 +252,16 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _openAuthDialog(
+  Future<void> _startSocialLogin(
     BuildContext context,
-    WidgetRef ref, {
-    required _AuthMode initialMode,
-  }) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _AuthDialog(initialMode: initialMode),
-    );
+    WidgetRef ref,
+    SocialSignInProvider provider,
+  ) async {
+    await ref.read(gameProvider.notifier).persist();
+    final result =
+        await ref.read(authServiceProvider).signInWithSocial(provider);
+    if (!context.mounted) return;
+    _toast(context, result.message);
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
@@ -728,14 +728,14 @@ class _ScaleChip extends StatelessWidget {
 
 class _AccountCard extends StatelessWidget {
   final AuthStatus status;
-  final VoidCallback onRegister;
-  final VoidCallback onLogin;
+  final VoidCallback onGoogle;
+  final VoidCallback onApple;
   final VoidCallback onLogout;
 
   const _AccountCard({
     required this.status,
-    required this.onRegister,
-    required this.onLogin,
+    required this.onGoogle,
+    required this.onApple,
     required this.onLogout,
   });
 
@@ -743,8 +743,9 @@ class _AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final linked = status.isLinkedAccount;
     final title = linked ? (status.email ?? '로그인 계정') : '게스트 플레이 중';
-    final subtitle =
-        linked ? '클라우드 저장이 이 계정에 연결됩니다' : '계정을 만들면 현재 진행도를 이메일 계정에 연결합니다';
+    final subtitle = linked
+        ? '클라우드 저장이 이 계정에 연결됩니다'
+        : '로그인 없이도 저장됩니다. 계정 연결 시 기기 변경 후에도 이어갈 수 있어요';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -823,25 +824,38 @@ class _AccountCard extends StatelessWidget {
               ),
             )
           else
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: onRegister,
-                    icon: const Icon(Icons.person_add, size: 16),
-                    label: const Text('계정 만들기'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.coral,
-                      foregroundColor: Colors.white,
-                    ),
+                FilledButton.icon(
+                  onPressed: onGoogle,
+                  icon: const Icon(Icons.g_mobiledata, size: 24),
+                  label: const Text('Google로 계속하기'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    minimumSize: const Size.fromHeight(46),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onLogin,
-                    icon: const Icon(Icons.login, size: 16),
-                    label: const Text('로그인'),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: onApple,
+                  icon: const Icon(Icons.apple, size: 20),
+                  label: const Text('Apple로 계속하기'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(46),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '비로그인 상태에서도 현재 기기와 게스트 클라우드에 진행도가 자동 저장됩니다.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.52),
                   ),
                 ),
               ],
@@ -865,153 +879,6 @@ class _AccountLoadingCard extends StatelessWidget {
       ),
       child: const Center(child: CircularProgressIndicator()),
     );
-  }
-}
-
-enum _AuthMode { login, register }
-
-class _AuthDialog extends ConsumerStatefulWidget {
-  final _AuthMode initialMode;
-
-  const _AuthDialog({required this.initialMode});
-
-  @override
-  ConsumerState<_AuthDialog> createState() => _AuthDialogState();
-}
-
-class _AuthDialogState extends ConsumerState<_AuthDialog> {
-  late _AuthMode _mode = widget.initialMode;
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  bool _busy = false;
-  bool _obscure = true;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isRegister = _mode == _AuthMode.register;
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      title: Text(isRegister ? '계정 만들기' : '로그인'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isRegister
-                  ? '현재 게스트 진행도를 이메일 계정에 연결합니다.'
-                  : '클라우드 저장이 있으면 해당 계정 데이터를 불러옵니다.',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.black.withValues(alpha: 0.62),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: '이메일',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _password,
-              obscureText: _obscure,
-              decoration: InputDecoration(
-                labelText: '비밀번호',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                  icon:
-                      Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                ),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => setState(() {
-                        _mode =
-                            isRegister ? _AuthMode.login : _AuthMode.register;
-                      }),
-              child: Text(isRegister ? '이미 계정이 있어요' : '새 계정 만들기'),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.pop(context),
-          child: const Text('닫기'),
-        ),
-        FilledButton(
-          onPressed: _busy ? null : _submit,
-          child: _busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(isRegister ? '계정 만들기' : '로그인'),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _submit() async {
-    setState(() => _busy = true);
-    final service = ref.read(authServiceProvider);
-    final game = ref.read(gameProvider.notifier);
-    final isRegister = _mode == _AuthMode.register;
-    final AuthActionResult result;
-    try {
-      if (isRegister) {
-        result = await service.registerGuestAccount(
-          email: _email.text,
-          password: _password.text,
-        );
-        if (result.ok) await game.persist();
-      } else {
-        result = await service.signIn(
-          email: _email.text,
-          password: _password.text,
-        );
-        if (result.ok) {
-          final loadedCloud = await game.loadCloudSaveForCurrentAccount();
-          if (!mounted) return;
-          _toast(
-            context,
-            loadedCloud ? '로그인 후 클라우드 저장을 불러왔어요' : result.message,
-          );
-          Navigator.pop(context);
-          return;
-        }
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      _toast(context, '계정 처리 중 오류가 발생했어요');
-      return;
-    }
-
-    if (!mounted) return;
-    setState(() => _busy = false);
-    _toast(context, result.message);
-    if (result.ok) Navigator.pop(context);
   }
 }
 

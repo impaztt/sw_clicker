@@ -35,6 +35,16 @@ class SyncService {
       return localSave;
     }
 
+    final pendingAccountLogin = await local.consumePendingAccountLogin();
+    if (pendingAccountLogin) {
+      if (cloudSave != null) {
+        await local.saveRaw(cloudSave);
+        return cloudSave;
+      }
+      if (localSave != null) unawaited(_safeUpsert(localSave));
+      return localSave;
+    }
+
     if (localSave == null && cloudSave == null) return null;
     if (localSave == null) return cloudSave;
     if (cloudSave == null) {

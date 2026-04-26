@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'save_service.dart';
+
 class AuthStatus {
   final String? userId;
   final String? email;
@@ -34,8 +36,24 @@ class AuthActionResult {
   const AuthActionResult({required this.ok, required this.message});
 }
 
+enum SocialSignInProvider {
+  google,
+  apple;
+
+  OAuthProvider get oauthProvider => switch (this) {
+        SocialSignInProvider.google => OAuthProvider.google,
+        SocialSignInProvider.apple => OAuthProvider.apple,
+      };
+
+  String get label => switch (this) {
+        SocialSignInProvider.google => 'Google',
+        SocialSignInProvider.apple => 'Apple',
+      };
+}
+
 class AuthService {
   SupabaseClient get _client => Supabase.instance.client;
+  final _saveService = SaveService();
 
   AuthStatus get currentStatus => AuthStatus.fromUser(_client.auth.currentUser);
 
@@ -46,65 +64,27 @@ class AuthService {
     }
   }
 
-  Future<AuthActionResult> registerGuestAccount({
-    required String email,
-    required String password,
-  }) async {
-    final normalizedEmail = email.trim();
-    final validation = _validateCredentials(normalizedEmail, password);
-    if (validation != null) return validation;
-
+  Future<AuthActionResult> signInWithSocial(
+    SocialSignInProvider provider,
+  ) async {
     try {
-      var user = _client.auth.currentUser;
-      if (user == null) {
-        final res = await _client.auth.signInAnonymously();
-        user = res.user;
-      }
-
-      if (user != null && !user.isAnonymous) {
-        return const AuthActionResult(
-          ok: false,
-          message: '이미 계정으로 로그인되어 있어요',
-        );
-      }
-
-      await _client.auth.updateUser(
-        UserAttributes(email: normalizedEmail, password: password),
+      await _saveService.markPendingAccountLogin();
+      final launched = await _client.auth.signInWithOAuth(
+        provider.oauthProvider,
       );
-      return const AuthActionResult(
-        ok: true,
-        message: '계정 연결을 요청했어요. 확인 메일이 오면 인증해 주세요',
+      if (!launched) await _saveService.clearPendingAccountLogin();
+      return AuthActionResult(
+        ok: launched,
+        message: launched
+            ? '${provider.label} 로그인 화면으로 이동합니다'
+            : '${provider.label} 로그인 창을 열지 못했어요',
       );
     } on AuthException catch (e) {
       return AuthActionResult(ok: false, message: _authErrorMessage(e));
     } catch (_) {
-      return const AuthActionResult(
+      return AuthActionResult(
         ok: false,
-        message: '계정 생성 중 오류가 발생했어요',
-      );
-    }
-  }
-
-  Future<AuthActionResult> signIn({
-    required String email,
-    required String password,
-  }) async {
-    final normalizedEmail = email.trim();
-    final validation = _validateCredentials(normalizedEmail, password);
-    if (validation != null) return validation;
-
-    try {
-      await _client.auth.signInWithPassword(
-        email: normalizedEmail,
-        password: password,
-      );
-      return const AuthActionResult(ok: true, message: '로그인됐어요');
-    } on AuthException catch (e) {
-      return AuthActionResult(ok: false, message: _authErrorMessage(e));
-    } catch (_) {
-      return const AuthActionResult(
-        ok: false,
-        message: '로그인 중 오류가 발생했어요',
+        message: '${provider.label} 로그인 중 오류가 발생했어요',
       );
     }
   }
@@ -125,22 +105,6 @@ class AuthService {
         message: '로그아웃 중 오류가 발생했어요',
       );
     }
-  }
-
-  AuthActionResult? _validateCredentials(String email, String password) {
-    if (email.isEmpty || !email.contains('@')) {
-      return const AuthActionResult(
-        ok: false,
-        message: '이메일을 정확히 입력해 주세요',
-      );
-    }
-    if (password.length < 6) {
-      return const AuthActionResult(
-        ok: false,
-        message: '비밀번호는 6자 이상이어야 해요',
-      );
-    }
-    return null;
   }
 
   String _authErrorMessage(AuthException e) {

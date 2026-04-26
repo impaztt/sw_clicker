@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/auth_provider.dart';
 import '../providers/game_provider.dart';
 import '../widgets/daily_bonus_dialog.dart';
 import '../widgets/offline_reward_dialog.dart';
@@ -72,13 +73,26 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
+    ref.listen(authStatusProvider, (previous, next) {
+      final before = previous?.valueOrNull;
+      final after = next.valueOrNull;
+      if (after == null || !after.isLinkedAccount) return;
+      if (before?.userId == after.userId && before?.isLinkedAccount == true) {
+        return;
+      }
+      if (!ref.read(gameProvider).loaded) return;
+      Future.microtask(() async {
+        await ref.read(gameProvider.notifier).loadCloudSaveForCurrentAccount();
+      });
+    });
     if (game.loaded && !_bootDialogsShown) {
       _bootDialogsShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _runBootDialogs());
     }
 
     final visible = _allDestinations
-        .where((d) => d.featureId == null || game.isFeatureUnlocked(d.featureId!))
+        .where(
+            (d) => d.featureId == null || game.isFeatureUnlocked(d.featureId!))
         .toList();
     // Map current page index back to a slot in the visible list. If the
     // destination just got hidden (shouldn't happen — unlocks are sticky),

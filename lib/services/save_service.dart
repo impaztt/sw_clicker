@@ -4,6 +4,7 @@ import '../models/save_data.dart';
 
 class SaveService {
   static const _key = 'sw_clicker_save_v1';
+  static const _pendingAccountLoginKey = 'sw_pending_account_login_v1';
 
   Future<SaveData?> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,5 +35,23 @@ class SaveService {
   Future<void> wipe() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
+    await prefs.remove(_pendingAccountLoginKey);
+  }
+
+  Future<void> markPendingAccountLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_pendingAccountLoginKey, true);
+  }
+
+  Future<bool> consumePendingAccountLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getBool(_pendingAccountLoginKey) ?? false;
+    if (pending) await prefs.remove(_pendingAccountLoginKey);
+    return pending;
+  }
+
+  Future<void> clearPendingAccountLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingAccountLoginKey);
   }
 }
