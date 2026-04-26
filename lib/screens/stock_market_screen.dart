@@ -294,8 +294,7 @@ class _MarketSummary extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.7),
                 width: 1.4,
               ),
-              disabledForegroundColor:
-                  Colors.white.withValues(alpha: 0.4),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -395,20 +394,19 @@ class _RegionListTile extends ConsumerWidget {
     final ownership = st.shares / def.totalShares;
     final districtBonus = notifier.regionSwordDistrictBonusFraction(def.id);
     final effectiveYield = notifier.regionEffectiveHourlyYield(def.id);
-    final regionOwned =
-        ownedSwordCountForRegion(def.id, game.ownedSwords);
+    final regionOwned = ownedSwordCountForRegion(def.id, game.ownedSwords);
     final regionTotal = totalSwordCountForRegion(def.id);
     final lastClose = st.recentCandles.isEmpty
         ? (st.formingCandle?.open ?? st.currentPrice)
         : st.recentCandles.last.close;
-    final pctChange = lastClose == 0
-        ? 0.0
-        : (st.currentPrice - lastClose) / lastClose * 100;
+    final pctChange =
+        lastClose == 0 ? 0.0 : (st.currentPrice - lastClose) / lastClose * 100;
     final up = pctChange >= 0;
-    final priceColor =
-        up ? const Color(0xFFD32F2F) : const Color(0xFF1976D2);
-    final unrealized = st.shares > 0
-        ? (st.currentPrice - st.avgCost) * st.shares
+    final priceColor = up ? const Color(0xFFD32F2F) : const Color(0xFF1976D2);
+    final unrealized =
+        st.shares > 0 ? (st.currentPrice - st.avgCost) * st.shares : 0.0;
+    final unrealizedPct = (st.shares > 0 && st.avgCost > 0)
+        ? (st.currentPrice - st.avgCost) / st.avgCost * 100
         : 0.0;
 
     return Material(
@@ -517,8 +515,7 @@ class _RegionListTile extends ConsumerWidget {
                     Expanded(
                       child: _MiniStat(
                         label: '보유',
-                        value:
-                            '${(ownership * 100).toStringAsFixed(2)}%',
+                        value: '${(ownership * 100).toStringAsFixed(2)}%',
                       ),
                     ),
                     Expanded(
@@ -530,8 +527,7 @@ class _RegionListTile extends ConsumerWidget {
                     Expanded(
                       child: _MiniStat(
                         label: '평가손익',
-                        value: (unrealized >= 0 ? '+' : '') +
-                            NumberFormatter.format(unrealized.abs()),
+                        value: _profitLabel(unrealized, unrealizedPct),
                         valueColor: unrealized >= 0
                             ? const Color(0xFFD32F2F)
                             : const Color(0xFF1976D2),
@@ -542,8 +538,8 @@ class _RegionListTile extends ConsumerWidget {
                 if (st.pendingDividend > 0) ...[
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.coral.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
@@ -642,6 +638,13 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
+String _profitLabel(double amount, double pct) {
+  final amountSign = amount >= 0 ? '+' : '-';
+  final pctSign = pct >= 0 ? '+' : '-';
+  return '$amountSign${NumberFormatter.format(amount.abs())} '
+      '($pctSign${pct.abs().toStringAsFixed(2)}%)';
+}
+
 class _LockedTile extends StatelessWidget {
   final _RegionRow row;
   final StockMarketState market;
@@ -671,13 +674,14 @@ class _LockedTile extends StatelessWidget {
         final prevState = market.regions[prev.id];
         final prevOwn =
             prevState == null ? 0.0 : prevState.shares / prev.totalShares;
-        final needPct = (regionUnlockOwnershipThreshold * 100).toStringAsFixed(0);
+        final needPct =
+            (regionUnlockOwnershipThreshold * 100).toStringAsFixed(0);
         blockingMessage =
             '${prev.name} $needPct% 보유 시 해금 (현재 ${(prevOwn * 100).toStringAsFixed(2)}%)';
       }
     } else {
-      final progress = (lifetimeGold / stockMarketLifetimeGoldTrigger)
-          .clamp(0.0, 1.0);
+      final progress =
+          (lifetimeGold / stockMarketLifetimeGoldTrigger).clamp(0.0, 1.0);
       blockingMessage =
           '누적 골드 ${NumberFormatter.format(stockMarketLifetimeGoldTrigger)} 달성 시 해금 '
           '(현재 ${NumberFormatter.format(lifetimeGold)} · ${(progress * 100).toStringAsFixed(2)}%)';
@@ -748,23 +752,19 @@ class RegionDetailScreen extends ConsumerWidget {
     final lastClose = st.recentCandles.isEmpty
         ? (st.formingCandle?.open ?? st.currentPrice)
         : st.recentCandles.last.close;
-    final pctChange = lastClose == 0
-        ? 0.0
-        : (st.currentPrice - lastClose) / lastClose * 100;
+    final pctChange =
+        lastClose == 0 ? 0.0 : (st.currentPrice - lastClose) / lastClose * 100;
     final up = pctChange >= 0;
-    final priceColor =
-        up ? const Color(0xFFD32F2F) : const Color(0xFF1976D2);
-    final unrealized = st.shares > 0
-        ? (st.currentPrice - st.avgCost) * st.shares
-        : 0.0;
+    final priceColor = up ? const Color(0xFFD32F2F) : const Color(0xFF1976D2);
+    final unrealized =
+        st.shares > 0 ? (st.currentPrice - st.avgCost) * st.shares : 0.0;
     final unrealizedPct = (st.shares > 0 && st.avgCost > 0)
         ? (st.currentPrice - st.avgCost) / st.avgCost * 100
         : 0.0;
     final hourlyEst = notifier.regionHourlyDividendEstimate(regionId);
     final districtBonus = notifier.regionSwordDistrictBonusFraction(regionId);
     final effectiveYield = notifier.regionEffectiveHourlyYield(regionId);
-    final regionOwned =
-        ownedSwordCountForRegion(regionId, game.ownedSwords);
+    final regionOwned = ownedSwordCountForRegion(regionId, game.ownedSwords);
     final regionTotal = totalSwordCountForRegion(regionId);
 
     return Scaffold(
@@ -1158,16 +1158,15 @@ class _HoldingPanel extends StatelessWidget {
               Expanded(
                 child: _MiniStat(
                   label: '평단가',
-                  value: shares > 0
-                      ? NumberFormatter.formatPrecise(avgCost)
-                      : '-',
+                  value:
+                      shares > 0 ? NumberFormatter.formatPrecise(avgCost) : '-',
                 ),
               ),
               Expanded(
                 child: _MiniStat(
                   label: '평가손익',
                   value: shares > 0
-                      ? '${unrealized >= 0 ? '+' : ''}${NumberFormatter.format(unrealized.abs())} (${unrealizedPct >= 0 ? '+' : ''}${unrealizedPct.toStringAsFixed(2)}%)'
+                      ? _profitLabel(unrealized, unrealizedPct)
                       : '-',
                   valueColor: shares > 0
                       ? (unrealized >= 0
@@ -1247,8 +1246,7 @@ class _BuyDialogState extends ConsumerState<_BuyDialog> {
             const Divider(height: 16),
             _kv('총 차감', NumberFormatter.format(total), bold: true),
             const SizedBox(height: 4),
-            _kv('매수 후 보유율',
-                '${(newOwn * 100).toStringAsFixed(3)}%'),
+            _kv('매수 후 보유율', '${(newOwn * 100).toStringAsFixed(3)}%'),
           ],
         ),
       ),
@@ -1261,8 +1259,7 @@ class _BuyDialogState extends ConsumerState<_BuyDialog> {
           onPressed: (cap == 0 || _qty <= 0)
               ? null
               : () {
-                  final bought =
-                      notifier.buyShares(widget.regionId, _qty);
+                  final bought = notifier.buyShares(widget.regionId, _qty);
                   if (bought > 0) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1356,8 +1353,7 @@ class _SellDialogState extends ConsumerState<_SellDialog> {
           onPressed: (cap == 0 || _qty <= 0)
               ? null
               : () {
-                  final r =
-                      notifier.sellShares(widget.regionId, _qty);
+                  final r = notifier.sellShares(widget.regionId, _qty);
                   if (r.sharesSold > 0) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
