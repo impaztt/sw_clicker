@@ -2186,7 +2186,6 @@ class GameNotifier extends Notifier<GameState> {
     _save.prestigeCoins += coins;
     _save.prestigeCount += 1;
     _incMission('weekly_prestige_5', 1, daily: false);
-    _save.essence += coins * 3;
     _save.gold = 0;
     _save.totalGoldEarned = 0;
     _save.producerLevels.clear();

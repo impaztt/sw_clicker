@@ -3152,10 +3152,6 @@ class _EssenceSources extends StatelessWidget {
             text: '동료 Lv 25 / 50 / 100 / 200 달성 시',
           ),
           const _SourceRow(
-            icon: Icons.auto_awesome,
-            text: '환생 시 (획득 코인 × 3)',
-          ),
-          const _SourceRow(
             icon: Icons.calendar_month,
             text: '일일 출석 보너스 (5~60 정수)',
           ),
