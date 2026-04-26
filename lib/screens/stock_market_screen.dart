@@ -62,6 +62,9 @@ class StockMarketView extends ConsumerWidget {
                     );
                   }
                 },
+          onSellAll: totalHoldings <= 0
+              ? null
+              : () => _confirmAndSellAll(context, notifier, totalHoldings),
         ),
         const SizedBox(height: 12),
         if (owned.isNotEmpty) ...[
@@ -94,6 +97,52 @@ class _RegionRow {
   _RegionRow({required this.def, required this.state});
 }
 
+Future<void> _confirmAndSellAll(
+  BuildContext context,
+  GameNotifier notifier,
+  double totalHoldings,
+) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('전체 매도'),
+      content: Text(
+        '보유한 모든 지역의 주식을 현재가로 매도합니다.\n'
+        '예상 평가액: ${NumberFormatter.format(totalHoldings)}골드\n'
+        '매도 시 2% 수수료가 차감됩니다.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF1976D2),
+          ),
+          child: const Text('매도'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final r = notifier.sellAllShares();
+  if (r.regionsSold == 0) return;
+  if (!context.mounted) return;
+  final realizedSign = r.realizedProfit >= 0 ? '+' : '-';
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        '${r.regionsSold}개 지역 ${NumberFormatter.formatInt(r.sharesSold)}주 매도 · 순 ${NumberFormatter.format(r.netProceeds)}골드 ($realizedSign${NumberFormatter.format(r.realizedProfit.abs())})',
+      ),
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
+
 enum _Status { owned, tradable }
 
 class _MarketSummary extends StatelessWidget {
@@ -103,6 +152,7 @@ class _MarketSummary extends StatelessWidget {
   final double fees;
   final double dividendsClaimed;
   final VoidCallback? onClaimAll;
+  final VoidCallback? onSellAll;
   const _MarketSummary({
     required this.totalHoldings,
     required this.totalPending,
@@ -110,6 +160,7 @@ class _MarketSummary extends StatelessWidget {
     required this.fees,
     required this.dividendsClaimed,
     required this.onClaimAll,
+    required this.onSellAll,
   });
 
   @override
@@ -221,6 +272,25 @@ class _MarketSummary extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: onSellAll,
+            icon: const Icon(Icons.sell, size: 16, color: Colors.white),
+            label: const Text(
+              '전체 매도',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(40),
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.7),
+                width: 1.4,
+              ),
+              disabledForegroundColor:
+                  Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ],

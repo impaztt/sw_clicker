@@ -1885,6 +1885,40 @@ class GameNotifier extends Notifier<GameState> {
     return true;
   }
 
+  /// Claim every completed-but-unclaimed mission across both daily and
+  /// weekly tracks. Returns aggregate reward totals (count, essence, coins).
+  ({int count, int essence, int coins}) claimAllMissions() {
+    _rotateMissionWindowsIfNeeded();
+    var count = 0;
+    var essence = 0;
+    var coins = 0;
+    void sweep({required bool daily}) {
+      final defs = daily ? _dailyMissionById : _weeklyMissionById;
+      final progress =
+          daily ? _save.dailyMissionProgress : _save.weeklyMissionProgress;
+      final claimed =
+          daily ? _save.dailyMissionClaimed : _save.weeklyMissionClaimed;
+      for (final entry in defs.entries) {
+        final id = entry.key;
+        final def = entry.value;
+        if (claimed.contains(id)) continue;
+        if ((progress[id] ?? 0) < def.target) continue;
+        claimed.add(id);
+        essence += def.rewardEssence;
+        coins += def.rewardPrestigeCoins;
+        count++;
+      }
+    }
+    sweep(daily: true);
+    sweep(daily: false);
+    if (count == 0) return (count: 0, essence: 0, coins: 0);
+    _save.essence += essence;
+    _save.prestigeCoins += coins;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return (count: count, essence: essence, coins: coins);
+  }
+
   // ============ Boosters + ads ============
 
   /// Attempt to buy [offer] with essence. Returns true on success.
@@ -2542,6 +2576,65 @@ class GameNotifier extends Notifier<GameState> {
     _emit(loaded: true);
     unawaited(_persist());
     return (sharesSold: actual, netProceeds: net, realizedProfit: realized);
+  }
+
+  /// Sell every held share across all regions at the current market price.
+  /// Each region counted as one trade for stats consistency. Returns
+  /// aggregate (regions touched, total shares, net proceeds, realized
+  /// profit).
+  ({
+    int regionsSold,
+    int sharesSold,
+    double netProceeds,
+    double realizedProfit
+  }) sellAllShares() {
+    var regionsSold = 0;
+    var sharesSold = 0;
+    var netTotal = 0.0;
+    var realizedTotal = 0.0;
+    for (final st in _save.market.regions.values) {
+      if (st.shares <= 0) continue;
+      final price = st.currentPrice;
+      final shares = st.shares;
+      final gross = shares * price;
+      final fee = gross * stockTradeFee;
+      final net = gross - fee;
+      final realized = (price - st.avgCost) * shares - fee;
+
+      _save.gold += net;
+      st.shares = 0;
+      st.avgCost = 0;
+      st.lastAccrualAt = null;
+
+      _save.market.totalTradesCount++;
+      _save.market.totalFeesPaid += fee;
+      _save.market.totalRealizedProfit += realized;
+      _save.run.stockTrades++;
+      _save.run.stockSells++;
+      _save.run.stockProfitRealized += realized;
+      _save.run.goldEarned += net;
+
+      regionsSold++;
+      sharesSold += shares;
+      netTotal += net;
+      realizedTotal += realized;
+    }
+    if (regionsSold == 0) {
+      return (
+        regionsSold: 0,
+        sharesSold: 0,
+        netProceeds: 0,
+        realizedProfit: 0,
+      );
+    }
+    _emit(loaded: true);
+    unawaited(_persist());
+    return (
+      regionsSold: regionsSold,
+      sharesSold: sharesSold,
+      netProceeds: netTotal,
+      realizedProfit: realizedTotal,
+    );
   }
 
   /// Claim pending dividend on a single region. Returns the amount paid out.

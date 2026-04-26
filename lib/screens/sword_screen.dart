@@ -912,11 +912,19 @@ class _StatRow extends StatelessWidget {
   }
 }
 
-class _MissionHubView extends ConsumerWidget {
+class _MissionHubView extends ConsumerStatefulWidget {
   const _MissionHubView();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MissionHubView> createState() => _MissionHubViewState();
+}
+
+class _MissionHubViewState extends ConsumerState<_MissionHubView> {
+  bool _dailyExpanded = true;
+  bool _weeklyExpanded = true;
+
+  @override
+  Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
     final notifier = ref.read(gameProvider.notifier);
     final daily = game.dailyMissions;
@@ -939,12 +947,31 @@ class _MissionHubView extends ConsumerWidget {
             weeklyDone: weeklyDone,
             weeklyTotal: weekly.length,
             claimable: claimable,
+            onClaimAll: claimable == 0
+                ? null
+                : () {
+                    final r = notifier.claimAllMissions();
+                    if (r.count > 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '미션 ${r.count}개 일괄 수령 · 정수 +${r.essence} · 코인 +${r.coins}',
+                          ),
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
           ),
           const SizedBox(height: 12),
           _MissionSection(
             title: '오늘의 미션',
             accent: const Color(0xFF00897B),
             missions: daily,
+            expanded: _dailyExpanded,
+            onToggle: () =>
+                setState(() => _dailyExpanded = !_dailyExpanded),
             onClaim: (id) => notifier.claimMission(id, daily: true),
           ),
           const SizedBox(height: 10),
@@ -952,6 +979,9 @@ class _MissionHubView extends ConsumerWidget {
             title: '주간 미션',
             accent: const Color(0xFF7E57C2),
             missions: weekly,
+            expanded: _weeklyExpanded,
+            onToggle: () =>
+                setState(() => _weeklyExpanded = !_weeklyExpanded),
             onClaim: (id) => notifier.claimMission(id, daily: false),
           ),
         ],
@@ -966,12 +996,14 @@ class _MissionProgressCard extends StatelessWidget {
   final int weeklyDone;
   final int weeklyTotal;
   final int claimable;
+  final VoidCallback? onClaimAll;
   const _MissionProgressCard({
     required this.dailyDone,
     required this.dailyTotal,
     required this.weeklyDone,
     required this.weeklyTotal,
     required this.claimable,
+    required this.onClaimAll,
   });
 
   @override
@@ -1007,14 +1039,38 @@ class _MissionProgressCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            claimable > 0 ? '수령 가능 보상 $claimable개' : '현재 수령 가능한 보상이 없습니다',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  claimable > 0
+                      ? '수령 가능 보상 $claimable개'
+                      : '현재 수령 가능한 보상이 없습니다',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: onClaimAll,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.deepCoral,
+                  minimumSize: const Size(96, 36),
+                  disabledBackgroundColor:
+                      Colors.white.withValues(alpha: 0.25),
+                  disabledForegroundColor:
+                      Colors.white.withValues(alpha: 0.7),
+                ),
+                child: const Text(
+                  '전체 수령',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1026,16 +1082,23 @@ class _MissionSection extends StatelessWidget {
   final String title;
   final Color accent;
   final List<MissionView> missions;
+  final bool expanded;
+  final VoidCallback onToggle;
   final bool Function(String id) onClaim;
   const _MissionSection({
     required this.title,
     required this.accent,
     required this.missions,
+    required this.expanded,
+    required this.onToggle,
     required this.onClaim,
   });
 
   @override
   Widget build(BuildContext context) {
+    final done = missions.where((m) => m.done).length;
+    final claimable =
+        missions.where((m) => m.done && !m.claimed).length;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1052,21 +1115,71 @@ class _MissionSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: accent,
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$done / ${missions.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: accent.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  if (claimable > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.coral,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '수령 $claimable',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  AnimatedRotation(
+                    turns: expanded ? 0 : -0.25,
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(
+                      Icons.expand_more,
+                      color: accent,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          for (final m in missions)
-            _MissionTaskTile(
-              mission: m,
-              accent: accent,
-              onClaim: () => onClaim(m.id),
-            ),
+          if (expanded) ...[
+            const SizedBox(height: 6),
+            for (final m in missions)
+              _MissionTaskTile(
+                mission: m,
+                accent: accent,
+                onClaim: () => onClaim(m.id),
+              ),
+          ],
         ],
       ),
     );
