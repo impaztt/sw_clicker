@@ -118,7 +118,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const OnboardingDialog(),
+        builder: (_) => OnboardingDialog(game: game),
       );
       notifier.setTutorialSeen(true);
     }

@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/number_format.dart';
 import '../core/theme.dart';
 import '../data/achievement_catalog.dart';
+import '../data/feature_unlocks.dart';
 import '../providers/game_provider.dart';
+import '../widgets/feature_unlock_guide.dart';
+import '../widgets/onboarding_dialog.dart';
 import 'achievement_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -24,7 +27,7 @@ class SettingsScreen extends ConsumerWidget {
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 16),
-          _SectionTitle(title: '통계'),
+          const _SectionTitle(title: '통계'),
           const SizedBox(height: 8),
           _StatGrid(
             items: [
@@ -49,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
               _StatItem(
                 icon: Icons.monetization_on,
                 color: AppColors.deepCoral,
-                label: '평생 골드',
+                label: '누적 골드',
                 value: NumberFormatter.format(game.lifetimeGold),
               ),
               _StatItem(
@@ -68,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          _SectionTitle(title: '업적'),
+          const _SectionTitle(title: '업적'),
           const SizedBox(height: 8),
           _AchievementLink(
             unlocked: game.unlockedAchievements.length,
@@ -78,11 +81,38 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _SectionTitle(title: '설정'),
+          const _SectionTitle(title: '해금 가이드'),
+          const SizedBox(height: 8),
+          _UnlockGuideHeader(
+            game: game,
+            onOpenRoadmap: () => showFeatureUnlockRoadmapSheet(
+              context,
+              game: game,
+              title: '설정 - 해금 가이드',
+            ),
+            onReplayTutorial: () => showDialog<void>(
+              context: context,
+              builder: (_) => OnboardingDialog(
+                game: game,
+                replayMode: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FeatureUnlockRoadmapList(
+            game: game,
+            onTap: (def) => showFeatureUnlockDetailSheet(
+              context,
+              def: def,
+              game: game,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SectionTitle(title: '설정'),
           const SizedBox(height: 8),
           _ToggleRow(
             icon: Icons.vibration,
-            label: '햅틱 (터치 진동)',
+            label: '진동 (터치 피드백)',
             value: game.haptic,
             onChanged: (v) => ref.read(gameProvider.notifier).setHaptic(v),
           ),
@@ -122,7 +152,7 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (v) => ref.read(gameProvider.notifier).setTextScale(v),
           ),
           const SizedBox(height: 24),
-          _SectionTitle(title: '데이터'),
+          const _SectionTitle(title: '데이터'),
           const SizedBox(height: 8),
           if (game.timeGuardTriggered)
             Container(
@@ -136,7 +166,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               child: const Text(
                 '기기 시간 조작이 감지되어 오프라인 보상이 제한되었습니다.\n'
-                '시간 자동 설정을 사용해 주세요.',
+                '시간 자동 설정 사용을 권장합니다.',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -160,8 +190,8 @@ class SettingsScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('정말 초기화할까요?'),
         content: const Text(
-          '모든 진행도, 골드, 동료 레벨, 환생 코인, 통계가 삭제돼요.\n'
-          '이 작업은 되돌릴 수 없어요.',
+          '모든 진행도, 골드, 강화 레벨, 환생 코인, 통계가 삭제됩니다.\n'
+          '이 작업은 되돌릴 수 없습니다.',
         ),
         actions: [
           TextButton(
@@ -180,16 +210,16 @@ class SettingsScreen extends ConsumerWidget {
       await ref.read(gameProvider.notifier).resetAll();
     }
   }
+}
 
-  String _fmtDuration(int seconds) {
-    final d = Duration(seconds: seconds);
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) return '${h}h ${m}m';
-    if (m > 0) return '${m}m ${s}s';
-    return '${s}s';
-  }
+String _fmtDuration(int seconds) {
+  final d = Duration(seconds: seconds);
+  final h = d.inHours;
+  final m = d.inMinutes % 60;
+  final s = d.inSeconds % 60;
+  if (h > 0) return '${h}h ${m}m';
+  if (m > 0) return '${m}m ${s}s';
+  return '${s}s';
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -287,6 +317,100 @@ class _StatItem extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnlockGuideHeader extends StatelessWidget {
+  final GameState game;
+  final VoidCallback onOpenRoadmap;
+  final VoidCallback onReplayTutorial;
+
+  const _UnlockGuideHeader({
+    required this.game,
+    required this.onOpenRoadmap,
+    required this.onReplayTutorial,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final unlocked = unlockedFeatureCount(game);
+    final total = featureUnlockCatalog.length;
+    final next = nextRecommendedLockedFeature(game);
+    final nextProgress = next?.progress(game);
+    final ratio = featureUnlockCompletionRatio(game);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.map_outlined, color: AppColors.deepCoral),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$unlocked / $total 기능 해금',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            next == null
+                ? '모든 기능이 해금되었습니다.'
+                : '다음 추천 목표: ${next.label} (${nextProgress?.percentText ?? '0%'})',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.black.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: ratio.clamp(0.0, 1.0).toDouble(),
+              minHeight: 7,
+              backgroundColor: Colors.black12,
+              valueColor: const AlwaysStoppedAnimation(AppColors.coral),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onOpenRoadmap,
+                icon: const Icon(Icons.visibility),
+                label: const Text('전체 기준 보기'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onReplayTutorial,
+                icon: const Icon(Icons.school),
+                label: const Text('튜토리얼 다시 보기'),
+              ),
+            ],
           ),
         ],
       ),
@@ -395,7 +519,7 @@ class _AchievementLink extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$unlocked / $total 해제',
+                      '$unlocked / $total 해금',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.black.withValues(alpha: 0.6),
@@ -530,7 +654,7 @@ class _DangerButton extends StatelessWidget {
       onPressed: onPressed,
       icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
       label: const Text(
-        '저장 초기화',
+        '데이터 초기화',
         style: TextStyle(
           color: Colors.redAccent,
           fontWeight: FontWeight.w800,

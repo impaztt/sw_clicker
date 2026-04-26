@@ -13,6 +13,7 @@ import '../services/audio_service.dart';
 import '../widgets/booster_shop_dialog.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/floating_number.dart';
+import '../widgets/feature_unlock_guide.dart';
 import '../widgets/golden_slime.dart';
 import '../widgets/gold_display.dart';
 import '../widgets/sword_widget.dart';
@@ -107,11 +108,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  void _openUnlockRoadmap() {
+    final game = ref.read(gameProvider);
+    showFeatureUnlockRoadmapSheet(
+      context,
+      game: game,
+      title: '홈 - 기능 로드맵',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
     final notifier = ref.read(gameProvider.notifier);
     final slimeActive = _slimes.isNotEmpty;
+    final lockedFeatures = lockedFeatureDefs(game);
+    final nextLocked = nextRecommendedLockedFeature(game);
 
     return SafeArea(
       child: Stack(
@@ -153,6 +165,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 }),
               ),
               const Spacer(),
+              if (lockedFeatures.isNotEmpty && nextLocked != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _LockedFeaturePeekCard(
+                    lockedCount: lockedFeatures.length,
+                    totalCount: featureUnlockCatalog.length,
+                    def: nextLocked,
+                    progress: nextLocked.progress(game),
+                    onTap: _openUnlockRoadmap,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _BattleStatusPanel(
@@ -214,6 +239,105 @@ class _ShopFab extends StatelessWidget {
           width: 52,
           height: 52,
           child: Icon(Icons.bolt, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _LockedFeaturePeekCard extends StatelessWidget {
+  final int lockedCount;
+  final int totalCount;
+  final FeatureUnlockDef def;
+  final FeatureUnlockProgress progress;
+  final VoidCallback onTap;
+
+  const _LockedFeaturePeekCard({
+    required this.lockedCount,
+    required this.totalCount,
+    required this.def,
+    required this.progress,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(color: Colors.black12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: def.color.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(def.icon, size: 16, color: def.color),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '잠김 기능 $lockedCount개 남음',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.black45),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '다음 추천: ${def.label} · ${progress.progressText} (${progress.percentText})',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black.withValues(alpha: 0.62),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress.ratio,
+                  minHeight: 6,
+                  backgroundColor: Colors.black12,
+                  valueColor: AlwaysStoppedAnimation(def.color),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '탭하면 해금 기준과 달성 팁을 모두 볼 수 있습니다. ($totalCount개 기능)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
