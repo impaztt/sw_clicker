@@ -45,24 +45,12 @@ extension SwordTierInfo on SwordTier {
   /// idea: collecting feels rewarding even before you equip, but equipping
   /// is still meaningfully better thanks to the big base multipliers.
   double get ownedBonusBase => switch (this) {
-        // Baseline is doubled versus previous tuning.
-        SwordTier.n => 0.010,
-        SwordTier.r => 0.024,
-        SwordTier.sr => 0.050,
-        SwordTier.ssr => 0.100,
-        SwordTier.lr => 0.200,
-        SwordTier.ur => 0.360,
-      };
-
-  /// Per-level scaling for the passive collection bonus.
-  /// Higher tiers scale a bit harder so rare pickups feel more impactful.
-  double get ownedBonusLevelStep => switch (this) {
-        SwordTier.n => 0.10,
-        SwordTier.r => 0.11,
-        SwordTier.sr => 0.12,
-        SwordTier.ssr => 0.13,
-        SwordTier.lr => 0.14,
-        SwordTier.ur => 0.15,
+        SwordTier.n => 0.005,
+        SwordTier.r => 0.012,
+        SwordTier.sr => 0.025,
+        SwordTier.ssr => 0.05,
+        SwordTier.lr => 0.10,
+        SwordTier.ur => 0.18,
       };
 }
 
@@ -124,9 +112,8 @@ class SwordDef {
 
   /// Passive collection bonus contributed while this sword is owned (even
   /// when not equipped). Returns a fraction (e.g. 0.05 = +5%). Scales the
-  /// tier base by a tier-specific level curve, so high-rarity upgrades feel
-  /// meaningfully stronger in the collection system.
+  /// tier base by the same (1 + (L-1) * 0.1) curve as equip multipliers,
+  /// so leveling up an owned sword raises its passive value too.
   double ownedBonusAt(int level) =>
-      tier.ownedBonusBase *
-      (1 + (level.clamp(1, maxLevel) - 1) * tier.ownedBonusLevelStep);
+      tier.ownedBonusBase * (1 + (level.clamp(1, maxLevel) - 1) * 0.1);
 }

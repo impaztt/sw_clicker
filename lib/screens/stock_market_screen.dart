@@ -84,11 +84,7 @@ class StockMarketView extends ConsumerWidget {
         if (locked.isNotEmpty) ...[
           const _SectionLabel(label: '잠긴 종목', accent: Colors.black38),
           for (final r in locked)
-            _LockedTile(
-              row: r,
-              market: market,
-              lifetimeGold: game.lifetimeGold,
-            ),
+            _LockedTile(row: r, market: market),
         ],
       ],
     );
@@ -627,12 +623,7 @@ class _MiniStat extends StatelessWidget {
 class _LockedTile extends StatelessWidget {
   final _RegionRow row;
   final StockMarketState market;
-  final double lifetimeGold;
-  const _LockedTile({
-    required this.row,
-    required this.market,
-    required this.lifetimeGold,
-  });
+  const _LockedTile({required this.row, required this.market});
 
   @override
   Widget build(BuildContext context) {
@@ -653,16 +644,9 @@ class _LockedTile extends StatelessWidget {
         final prevState = market.regions[prev.id];
         final prevOwn =
             prevState == null ? 0.0 : prevState.shares / prev.totalShares;
-        final needPct = (regionUnlockOwnershipThreshold * 100).toStringAsFixed(0);
         blockingMessage =
-            '${prev.name} $needPct% 보유 시 해금 (현재 ${(prevOwn * 100).toStringAsFixed(2)}%)';
+            '${prev.name} 20% 보유 시 해금 (현재 ${(prevOwn * 100).toStringAsFixed(2)}%)';
       }
-    } else {
-      final progress = (lifetimeGold / stockMarketLifetimeGoldTrigger)
-          .clamp(0.0, 1.0);
-      blockingMessage =
-          '누적 골드 ${NumberFormatter.format(stockMarketLifetimeGoldTrigger)} 달성 시 해금 '
-          '(현재 ${NumberFormatter.format(lifetimeGold)} · ${(progress * 100).toStringAsFixed(2)}%)';
     }
 
     return Container(

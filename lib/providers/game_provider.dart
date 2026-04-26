@@ -34,63 +34,6 @@ const summonCostHundred = 4500;
 /// After this many consecutive non-SR+ pulls, the next pull is guaranteed SR+.
 const pityThreshold = 80;
 
-/// Summon-rate progression: every [summonRateLevelStepSummons] pulls, SR+
-/// rates are nudged up a little (up to [summonRateMaxLevel]).
-const summonRateLevelStepSummons = 100;
-const summonRateMaxLevel = 40;
-const summonRateMinN = 35.0;
-const summonRateMinR = 15.0;
-const summonRateDrainFromNRatio = 0.70;
-
-const _summonRateBoostPerLevel = <SwordTier, double>{
-  SwordTier.sr: 0.20,
-  SwordTier.ssr: 0.11,
-  SwordTier.lr: 0.06,
-  SwordTier.ur: 0.03,
-};
-
-int summonRateLevelFor(int totalSummons) {
-  if (totalSummons <= 0) return 0;
-  return min(totalSummons ~/ summonRateLevelStepSummons, summonRateMaxLevel);
-}
-
-int summonsToNextRateLevel(int totalSummons) {
-  final level = summonRateLevelFor(totalSummons);
-  if (level >= summonRateMaxLevel) return 0;
-  final nextTarget = (level + 1) * summonRateLevelStepSummons;
-  return max(0, nextTarget - totalSummons);
-}
-
-Map<SwordTier, double> summonRatesForTotalSummons(int totalSummons) {
-  final level = summonRateLevelFor(totalSummons);
-  final rates = <SwordTier, double>{
-    for (final tier in SwordTier.values) tier: tier.rate,
-  };
-  if (level <= 0) return rates;
-
-  double boostedTotal = 0;
-  for (final entry in _summonRateBoostPerLevel.entries) {
-    final gain = entry.value * level;
-    boostedTotal += gain;
-    rates[entry.key] = (rates[entry.key] ?? 0) + gain;
-  }
-
-  rates[SwordTier.n] = max(
-    summonRateMinN,
-    (rates[SwordTier.n] ?? 0) - boostedTotal * summonRateDrainFromNRatio,
-  );
-  rates[SwordTier.r] = max(
-    summonRateMinR,
-    (rates[SwordTier.r] ?? 0) - boostedTotal * (1 - summonRateDrainFromNRatio),
-  );
-
-  final total = rates.values.fold<double>(0, (a, b) => a + b);
-  if ((total - 100).abs() > 0.0001) {
-    rates[SwordTier.r] = (rates[SwordTier.r] ?? 0) + (100 - total);
-  }
-  return rates;
-}
-
 /// Idle earnings config.
 const offlineMaxHours = 12;
 const offlineMaxSeconds = offlineMaxHours * 3600;
@@ -2193,13 +2136,12 @@ class GameNotifier extends Notifier<GameState> {
     final pool = forceSrPlus
         ? const [SwordTier.sr, SwordTier.ssr, SwordTier.lr, SwordTier.ur]
         : SwordTier.values;
-    final rates = summonRatesForTotalSummons(_save.stats.totalSummons);
     final totalWeight =
-        pool.map((t) => rates[t] ?? 0).fold<double>(0, (a, b) => a + b);
+        pool.map((t) => t.rate).fold<double>(0, (a, b) => a + b);
     final roll = _random.nextDouble() * totalWeight;
     double cum = 0;
     for (final t in pool) {
-      cum += rates[t] ?? 0;
+      cum += t.rate;
       if (roll < cum) return t;
     }
     return pool.last;

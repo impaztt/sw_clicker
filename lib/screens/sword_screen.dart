@@ -1897,9 +1897,6 @@ class _SummonView extends ConsumerWidget {
     final game = ref.watch(gameProvider);
     final notifier = ref.read(gameProvider.notifier);
     final pityRemaining = pityThreshold - game.summonsSinceHighRare;
-    final summonRateLevel = summonRateLevelFor(game.totalSummons);
-    final summonRateToNext = summonsToNextRateLevel(game.totalSummons);
-    final summonRates = summonRatesForTotalSummons(game.totalSummons);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1954,25 +1951,6 @@ class _SummonView extends ConsumerWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '소환 레벨 Lv$summonRateLevel / $summonRateMaxLevel',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  summonRateLevel >= summonRateMaxLevel
-                      ? '누적 소환 ${game.totalSummons}회 · 확률 보정 최대치 도달'
-                      : '누적 소환 ${game.totalSummons}회 · 다음 레벨까지 $summonRateToNext회',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ],
             ),
           ),
@@ -2016,11 +1994,7 @@ class _SummonView extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 20),
-          _RateTable(
-            rates: summonRates,
-            rateLevel: summonRateLevel,
-            toNextLevel: summonRateToNext,
-          ),
+          const _RateTable(),
           const SizedBox(height: 20),
           _EssenceSources(),
         ],
@@ -2099,29 +2073,10 @@ class _SummonButton extends StatelessWidget {
 }
 
 class _RateTable extends StatelessWidget {
-  final Map<SwordTier, double> rates;
-  final int rateLevel;
-  final int toNextLevel;
-
-  const _RateTable({
-    required this.rates,
-    required this.rateLevel,
-    required this.toNextLevel,
-  });
-
-  String _rateText(SwordTier tier) {
-    final rate = rates[tier] ?? tier.rate;
-    final delta = rate - tier.rate;
-    if (delta.abs() > 0.0001) {
-      final sign = delta >= 0 ? '+' : '';
-      return '${rate.toStringAsFixed(2)}% ($sign${delta.toStringAsFixed(2)})';
-    }
-    return '${rate.toStringAsFixed(2)}%';
-  }
+  const _RateTable();
 
   @override
   Widget build(BuildContext context) {
-    final isMaxLevel = rateLevel >= summonRateMaxLevel;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -2144,17 +2099,6 @@ class _RateTable extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: Colors.black.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            isMaxLevel
-                ? '소환 레벨 Lv$rateLevel (최대)'
-                : '소환 레벨 Lv$rateLevel · 다음 레벨까지 $toNextLevel회',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.black.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 8),
@@ -2187,7 +2131,7 @@ class _RateTable extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    _rateText(tier),
+                    '${tier.rate.toStringAsFixed(0)}%',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
