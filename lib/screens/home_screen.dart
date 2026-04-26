@@ -11,6 +11,7 @@ import '../models/booster.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../widgets/booster_shop_dialog.dart';
+import '../widgets/gold_exchange_dialog.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/floating_number.dart';
 import '../widgets/feature_unlock_guide.dart';
@@ -105,6 +106,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showDialog<void>(
       context: context,
       builder: (_) => const BoosterShopDialog(),
+    );
+  }
+
+  void _openGoldExchange() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => const GoldExchangeDialog(),
     );
   }
 
@@ -209,6 +217,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               bottom: 16,
               child: _ShopFab(onTap: _openBoosterShop),
             ),
+          if (game.isFeatureUnlocked(FeatureUnlocks.goldExchange))
+            Positioned(
+              right: 16,
+              bottom: game.isFeatureUnlocked(FeatureUnlocks.boosterShop)
+                  ? 76
+                  : 16,
+              child: _ExchangeFab(onTap: _openGoldExchange),
+            ),
         ],
       ),
     );
@@ -238,6 +254,30 @@ class _ShopFab extends StatelessWidget {
           width: 52,
           height: 52,
           child: Icon(Icons.bolt, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExchangeFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ExchangeFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFFB300),
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 52,
+          height: 52,
+          child: Icon(Icons.currency_exchange,
+              color: Colors.white, size: 26),
         ),
       ),
     );

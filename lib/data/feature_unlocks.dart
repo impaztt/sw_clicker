@@ -15,6 +15,7 @@ class FeatureUnlocks {
   static const prestigeTab = 'prestige_tab';
   static const swordSetsView = 'sword_sets_view';
   static const stockMarket = 'stock_market';
+  static const goldExchange = 'gold_exchange';
 }
 
 enum FeatureUnlockProgressKind {
@@ -269,6 +270,29 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
       current: s.lifetimeGold,
       target: stockMarketLifetimeGoldTrigger,
       kind: FeatureUnlockProgressKind.gold,
+    ),
+  ),
+  FeatureUnlockDef(
+    id: FeatureUnlocks.goldExchange,
+    label: '골드 환금소',
+    description: '정수를 골드로 즉시 환전할 수 있어요. 환전한 골드는 환생 코인에 직접 들어가지 않습니다.',
+    icon: Icons.currency_exchange,
+    color: const Color(0xFFFFB300),
+    // Either first prestige clears it (most likely path) OR a player who
+    // hasn't prestiged yet but has crawled past 100M gold can also see it.
+    trigger: (s) => s.prestigeCount >= 1 || s.lifetimeGold >= 1e8,
+    roadmapOrder: 8,
+    unlockConditionText: '환생 1회 또는 누적 골드 100M 이상',
+    benefitSummary: '정수를 시간 단축에 사용해 페이스 조절',
+    stageHint: '중후반',
+    tips: const [
+      '8시간 환금 슬롯이 정수 효율이 가장 좋아요. 자기 전 한 번 사용해 보세요.',
+      '환전한 골드를 강화/주식에 쓰면 그때부터 환생 코인 계산에 정상 반영됩니다.',
+    ],
+    progress: (s) => FeatureUnlockProgress(
+      current: s.prestigeCount >= 1 ? 1 : (s.lifetimeGold / 1e8).clamp(0.0, 1.0),
+      target: 1,
+      kind: FeatureUnlockProgressKind.count,
     ),
   ),
 ];

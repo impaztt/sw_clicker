@@ -5,7 +5,7 @@ import 'stock_market.dart';
 import 'sword.dart';
 
 class SaveData {
-  static const currentVersion = 16;
+  static const currentVersion = 17;
 
   int version;
   double gold;
@@ -71,6 +71,21 @@ class SaveData {
   DateTime? monthlyPassLastClaimAt;
   bool starterPackagePurchased;
 
+  // Gold-exchange shop (v17): how much of the player's currentGold came from
+  // the essence-for-gold exchange and hasn't been spent yet. While this is
+  // > 0, that portion of currentGold is excluded from the prestige-coin
+  // wealthScore so paying for the exchange can't directly buy prestige
+  // coins. Decrements down to 0 as the player spends gold on producers,
+  // upgrades, or share purchases.
+  double purchasedGoldUnconverted;
+  // Daily-rotating exchange counter, keyed on _dayKey().
+  int goldExchangeDayKey;
+  int goldExchangeDailyCount;
+  // Per-prestige-run exchange counter; resets in prestige().
+  int goldExchangePrestigeCount;
+  // Last day-key the 8-hour pack was used (it has its own once-per-day cap).
+  int goldExchangeEightHourDayKey;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -110,6 +125,11 @@ class SaveData {
     this.monthlyPassExpiresAt,
     this.monthlyPassLastClaimAt,
     this.starterPackagePurchased = false,
+    this.purchasedGoldUnconverted = 0,
+    this.goldExchangeDayKey = 0,
+    this.goldExchangeDailyCount = 0,
+    this.goldExchangePrestigeCount = 0,
+    this.goldExchangeEightHourDayKey = 0,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -171,6 +191,11 @@ class SaveData {
         'monthlyPassExpiresAt': monthlyPassExpiresAt?.toIso8601String(),
         'monthlyPassLastClaimAt': monthlyPassLastClaimAt?.toIso8601String(),
         'starterPackagePurchased': starterPackagePurchased,
+        'purchasedGoldUnconverted': purchasedGoldUnconverted,
+        'goldExchangeDayKey': goldExchangeDayKey,
+        'goldExchangeDailyCount': goldExchangeDailyCount,
+        'goldExchangePrestigeCount': goldExchangePrestigeCount,
+        'goldExchangeEightHourDayKey': goldExchangeEightHourDayKey,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -252,6 +277,14 @@ class SaveData {
             DateTime.tryParse(json['monthlyPassLastClaimAt'] as String? ?? ''),
         starterPackagePurchased:
             json['starterPackagePurchased'] as bool? ?? false,
+        purchasedGoldUnconverted:
+            (json['purchasedGoldUnconverted'] as num?)?.toDouble() ?? 0,
+        goldExchangeDayKey: json['goldExchangeDayKey'] as int? ?? 0,
+        goldExchangeDailyCount: json['goldExchangeDailyCount'] as int? ?? 0,
+        goldExchangePrestigeCount:
+            json['goldExchangePrestigeCount'] as int? ?? 0,
+        goldExchangeEightHourDayKey:
+            json['goldExchangeEightHourDayKey'] as int? ?? 0,
       );
 
   static List<String?> _normalizeFormationSwordIds(List<String?>? source) {

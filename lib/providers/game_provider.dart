@@ -126,6 +126,7 @@ int dailyRewardFor(int streak) {
 int _calcPrestigeCoinsFromProgress({
   required double totalGoldEarned,
   required double currentGold,
+  required double purchasedGoldUnconverted,
   required Map<String, int> producerLevels,
   required Map<String, int> tapUpgradeLevels,
   required int prestigeCount,
@@ -140,8 +141,14 @@ int _calcPrestigeCoinsFromProgress({
     tapUpgradeSum += lv;
   }
 
+  // Exclude any portion of currentGold that came from the essence-for-gold
+  // exchange. Until the player actually spends it on producers/upgrades,
+  // purchased gold contributes nothing to the prestige coin payout.
+  final effectiveCurrentGold =
+      (currentGold - purchasedGoldUnconverted).clamp(0.0, double.infinity);
   final wealthScore = sqrt(
-    ((totalGoldEarned + currentGold * 2).clamp(0.0, double.infinity)) / 1e7,
+    ((totalGoldEarned + effectiveCurrentGold * 2).clamp(0.0, double.infinity)) /
+        1e7,
   );
   final progressionScore = producerLevelSum / 30 + tapUpgradeSum / 20;
   final runDepthScore = min(10.0, prestigeCount * 0.1);
@@ -296,6 +303,163 @@ const comboSurgeBonus = 2.0; // tap reward × this while surging
 const slashBurstWorthSeconds = 300;
 const essenceGatherAmount = 30;
 const ascensionCoreBonusPerLevel = 0.015;
+
+// =========================================================================
+// Gold-exchange shop (정수 → 골드 환전소)
+//
+// Two product lines:
+//   • dpsTime  — pays out (currentDps × seconds × dpsTimeYieldFactor) gold.
+//                Auto-scales with player power, so a single offer stays
+//                relevant across the whole game.
+//   • fixed    — pays out a constant gold amount. Useful in early runs
+//                before DPS is meaningful, becomes obsolete late-game.
+//
+// The earned gold is added to currentGold AND tracked separately in
+// `purchasedGoldUnconverted` so it is excluded from the prestige-coin
+// wealthScore until the player actually spends it on producers/upgrades.
+// `totalGoldEarned` is intentionally NOT bumped — purchased gold must
+// never directly print prestige coins.
+// =========================================================================
+
+enum GoldExchangeKind { dpsTime, fixed }
+
+class GoldExchangeOffer {
+  final String id;
+  final String title;
+  final String subtitle;
+  final int essenceCost;
+  final GoldExchangeKind kind;
+  // For dpsTime: the simulated offline duration in seconds.
+  final int dpsSeconds;
+  // For fixed: the flat gold amount granted.
+  final double fixedGold;
+  // Caps the number of times this specific offer can be used per UTC day.
+  // 0 = no per-offer cap (still subject to global daily and run caps).
+  final int dailyCap;
+
+  const GoldExchangeOffer({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.essenceCost,
+    required this.kind,
+    this.dpsSeconds = 0,
+    this.fixedGold = 0,
+    this.dailyCap = 0,
+  });
+}
+
+/// Slight haircut on dpsTime offers vs. true offline-equivalent so that
+/// "instant time" never feels strictly better than just playing.
+const dpsTimeYieldFactor = 0.85;
+
+/// Floor for dpsTime offers right after prestige (when DPS = 0). We pay out
+/// `floor * essenceCost` so a freshly-prestiged player still gets a small
+/// nudge instead of zero gold.
+const dpsTimeFloorPerEssence = 10000.0; // 10K gold per essence
+
+/// Daily cap for the entire exchange shop, independent of which offers were
+/// used. Resets at UTC day rollover via the existing _dayKey() helper.
+const goldExchangeDailyLimit = 5;
+
+/// Hard cap for one prestige run. Resets in prestige().
+const goldExchangePrestigeLimit = 15;
+
+const goldExchangeOffers = <GoldExchangeOffer>[
+  // DPS-time line.
+  GoldExchangeOffer(
+    id: 'dps_5m',
+    title: '5분 환금',
+    subtitle: '현재 DPS 기준 5분치 골드',
+    essenceCost: 12,
+    kind: GoldExchangeKind.dpsTime,
+    dpsSeconds: 300,
+  ),
+  GoldExchangeOffer(
+    id: 'dps_30m',
+    title: '30분 환금',
+    subtitle: '현재 DPS 기준 30분치 골드',
+    essenceCost: 50,
+    kind: GoldExchangeKind.dpsTime,
+    dpsSeconds: 1800,
+  ),
+  GoldExchangeOffer(
+    id: 'dps_2h',
+    title: '2시간 환금',
+    subtitle: '현재 DPS 기준 2시간치 골드',
+    essenceCost: 180,
+    kind: GoldExchangeKind.dpsTime,
+    dpsSeconds: 7200,
+  ),
+  GoldExchangeOffer(
+    id: 'dps_8h',
+    title: '8시간 환금',
+    subtitle: '현재 DPS 기준 8시간치 골드 · 하루 1회',
+    essenceCost: 600,
+    kind: GoldExchangeKind.dpsTime,
+    dpsSeconds: 28800,
+    dailyCap: 1,
+  ),
+  // Fixed-amount line. Becomes invisible once the player has cleared a
+  // few prestiges (see GameNotifier.goldExchangeFixedHidden).
+  GoldExchangeOffer(
+    id: 'fixed_1m',
+    title: '긴급 자금 1M',
+    subtitle: '고정 100만 골드',
+    essenceCost: 5,
+    kind: GoldExchangeKind.fixed,
+    fixedGold: 1e6,
+  ),
+  GoldExchangeOffer(
+    id: 'fixed_50m',
+    title: '긴급 자금 50M',
+    subtitle: '고정 5천만 골드',
+    essenceCost: 20,
+    kind: GoldExchangeKind.fixed,
+    fixedGold: 5e7,
+  ),
+  GoldExchangeOffer(
+    id: 'fixed_500m',
+    title: '긴급 자금 500M',
+    subtitle: '고정 5억 골드',
+    essenceCost: 80,
+    kind: GoldExchangeKind.fixed,
+    fixedGold: 5e8,
+  ),
+  GoldExchangeOffer(
+    id: 'fixed_3b',
+    title: '긴급 자금 3B',
+    subtitle: '고정 30억 골드',
+    essenceCost: 300,
+    kind: GoldExchangeKind.fixed,
+    fixedGold: 3e9,
+  ),
+];
+
+/// Hide the fixed line once the player has prestiged this many times — by
+/// then their DPS is large enough that fixed packs are noise.
+const goldExchangeFixedHideAfterPrestiges = 3;
+
+/// Result of attempting a gold-exchange purchase. Communicates the precise
+/// reason on failure so the UI can show a useful toast.
+enum GoldExchangeFailureReason {
+  none,
+  notEnoughEssence,
+  dailyCapReached,
+  prestigeCapReached,
+  perOfferCapReached,
+}
+
+class GoldExchangeResult {
+  final bool ok;
+  final double goldGranted;
+  final GoldExchangeFailureReason reason;
+  const GoldExchangeResult({
+    required this.ok,
+    required this.goldGranted,
+    required this.reason,
+  });
+}
 
 /// Stream of newly unlocked achievements (for toast UI).
 final achievementUnlockProvider = StreamProvider<AchievementDef>(
@@ -648,6 +812,10 @@ class GameState {
   final StockMarketState market;
   final Map<String, int> repeatingAchievementStages;
   final RunStats run;
+  final double purchasedGoldUnconverted;
+  final int goldExchangeDailyUsed;
+  final int goldExchangePrestigeUsed;
+  final bool goldExchangeEightHourUsedToday;
   final bool loaded;
 
   const GameState({
@@ -702,6 +870,10 @@ class GameState {
     required this.market,
     required this.repeatingAchievementStages,
     required this.run,
+    this.purchasedGoldUnconverted = 0,
+    this.goldExchangeDailyUsed = 0,
+    this.goldExchangePrestigeUsed = 0,
+    this.goldExchangeEightHourUsedToday = false,
     this.loaded = false,
   });
 
@@ -781,6 +953,7 @@ class GameState {
   int get prestigeCoinsAvailable => _calcPrestigeCoinsFromProgress(
         totalGoldEarned: totalGoldEarned,
         currentGold: gold,
+        purchasedGoldUnconverted: purchasedGoldUnconverted,
         producerLevels: producerLevels,
         tapUpgradeLevels: tapUpgradeLevels,
         prestigeCount: prestigeCount,
@@ -1074,6 +1247,15 @@ class GameNotifier extends Notifier<GameState> {
   void _sanitizeLoadedSave() {
     _save.gold = _finiteClamp(_save.gold, 0, 1e120);
     _save.totalGoldEarned = _finiteClamp(_save.totalGoldEarned, 0, 1e120);
+    _save.purchasedGoldUnconverted = _finiteClamp(
+      _save.purchasedGoldUnconverted,
+      0,
+      _save.gold,
+    );
+    _save.goldExchangeDailyCount =
+        _intClamp(_save.goldExchangeDailyCount, 0, goldExchangeDailyLimit);
+    _save.goldExchangePrestigeCount =
+        _intClamp(_save.goldExchangePrestigeCount, 0, goldExchangePrestigeLimit);
     _save.prestigeCoins = _intClamp(_save.prestigeCoins, 0, 2147483647);
     _save.prestigeCount = _intClamp(_save.prestigeCount, 0, 1000000);
     _save.ascensionCoreLevel = _intClamp(_save.ascensionCoreLevel, 0, 1000000);
@@ -1332,6 +1514,11 @@ class GameNotifier extends Notifier<GameState> {
       repeatingAchievementStages:
           Map.unmodifiable(_save.repeatingAchievementStages),
       run: _save.run,
+      purchasedGoldUnconverted: _save.purchasedGoldUnconverted,
+      goldExchangeDailyUsed: _currentGoldExchangeDailyUsed(),
+      goldExchangePrestigeUsed: _save.goldExchangePrestigeCount,
+      goldExchangeEightHourUsedToday:
+          _save.goldExchangeEightHourDayKey == _dayKey(DateTime.now()),
       loaded: loaded,
     );
     if (loaded) {
@@ -1339,6 +1526,13 @@ class GameNotifier extends Notifier<GameState> {
       _advanceRepeatingAchievements();
       if (_featureUnlocksReady) _evaluateFeatureUnlocks();
     }
+  }
+
+  /// Daily exchange usage normalized to "today" — if the saved dayKey is
+  /// stale, the counter is implicitly 0.
+  int _currentGoldExchangeDailyUsed() {
+    if (_save.goldExchangeDayKey != _dayKey(DateTime.now())) return 0;
+    return _save.goldExchangeDailyCount;
   }
 
   bool _autoTapActive() {
@@ -2112,6 +2306,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.gold < cost) return 0;
     final newLv = oldLv + n;
     _save.gold -= cost;
+    _decayPurchasedGoldUnconverted(cost);
     _save.stats.totalGoldSpent += cost;
     _save.run.goldSpent += cost;
     _save.run.producerLevelsBought += n;
@@ -2134,6 +2329,7 @@ class GameNotifier extends Notifier<GameState> {
     final cost = def.costForNext(lv, n);
     if (_save.gold < cost) return 0;
     _save.gold -= cost;
+    _decayPurchasedGoldUnconverted(cost);
     _save.stats.totalGoldSpent += cost;
     _save.run.goldSpent += cost;
     _save.run.tapUpgradesBought += n;
@@ -2180,6 +2376,113 @@ class GameNotifier extends Notifier<GameState> {
     return true;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Gold-exchange shop helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Drain `amount` from the "this gold came from the exchange" tracker.
+  /// Once the tracker hits zero, prestige-coin math sees the player's full
+  /// currentGold again. Call this at every gold-spend site.
+  void _decayPurchasedGoldUnconverted(double amount) {
+    if (amount <= 0 || _save.purchasedGoldUnconverted <= 0) return;
+    if (amount >= _save.purchasedGoldUnconverted) {
+      _save.purchasedGoldUnconverted = 0;
+    } else {
+      _save.purchasedGoldUnconverted -= amount;
+    }
+  }
+
+  /// Sync `goldExchangeDayKey` / `goldExchangeDailyCount` to today.
+  void _rotateGoldExchangeDayIfNeeded(DateTime now) {
+    final today = _dayKey(now);
+    if (_save.goldExchangeDayKey != today) {
+      _save.goldExchangeDayKey = today;
+      _save.goldExchangeDailyCount = 0;
+    }
+  }
+
+  /// Compute (but don't apply) the gold an [offer] would currently yield.
+  /// Returns 0 if the offer is unknown. Useful for the UI to show a live
+  /// preview underneath each tile.
+  double previewGoldExchangeYield(GoldExchangeOffer offer) {
+    switch (offer.kind) {
+      case GoldExchangeKind.dpsTime:
+        final raw = _calcDps() * offer.dpsSeconds * dpsTimeYieldFactor;
+        final floor = dpsTimeFloorPerEssence * offer.essenceCost;
+        return raw < floor ? floor : raw;
+      case GoldExchangeKind.fixed:
+        return offer.fixedGold;
+    }
+  }
+
+  /// True if the fixed-amount line should be hidden because the player's
+  /// progression has outgrown it.
+  bool get goldExchangeFixedHidden =>
+      _save.prestigeCount >= goldExchangeFixedHideAfterPrestiges;
+
+  /// Attempt to spend essence on a gold-exchange offer.
+  GoldExchangeResult buyGoldExchange(String offerId) {
+    final offer = goldExchangeOffers.firstWhere(
+      (o) => o.id == offerId,
+      orElse: () => throw ArgumentError('Unknown exchange offer: $offerId'),
+    );
+    final now = DateTime.now();
+    _rotateGoldExchangeDayIfNeeded(now);
+
+    if (_save.essence < offer.essenceCost) {
+      return const GoldExchangeResult(
+        ok: false,
+        goldGranted: 0,
+        reason: GoldExchangeFailureReason.notEnoughEssence,
+      );
+    }
+    if (_save.goldExchangeDailyCount >= goldExchangeDailyLimit) {
+      return const GoldExchangeResult(
+        ok: false,
+        goldGranted: 0,
+        reason: GoldExchangeFailureReason.dailyCapReached,
+      );
+    }
+    if (_save.goldExchangePrestigeCount >= goldExchangePrestigeLimit) {
+      return const GoldExchangeResult(
+        ok: false,
+        goldGranted: 0,
+        reason: GoldExchangeFailureReason.prestigeCapReached,
+      );
+    }
+    if (offer.dailyCap > 0) {
+      // Only the 8h pack uses this today, but the model is generic.
+      if (offer.id == 'dps_8h' &&
+          _save.goldExchangeEightHourDayKey == _dayKey(now)) {
+        return const GoldExchangeResult(
+          ok: false,
+          goldGranted: 0,
+          reason: GoldExchangeFailureReason.perOfferCapReached,
+        );
+      }
+    }
+
+    final goldGranted = previewGoldExchangeYield(offer);
+    _save.essence -= offer.essenceCost;
+    _save.gold += goldGranted;
+    // Critical: do NOT touch totalGoldEarned. The whole point of this
+    // tracker is to keep purchased gold out of prestige-coin math until
+    // the player actually spends it on producers/upgrades.
+    _save.purchasedGoldUnconverted += goldGranted;
+    _save.goldExchangeDailyCount++;
+    _save.goldExchangePrestigeCount++;
+    if (offer.id == 'dps_8h') {
+      _save.goldExchangeEightHourDayKey = _dayKey(now);
+    }
+    _emit(loaded: true);
+    unawaited(_persist());
+    return GoldExchangeResult(
+      ok: true,
+      goldGranted: goldGranted,
+      reason: GoldExchangeFailureReason.none,
+    );
+  }
+
   bool prestige() {
     final coins = state.prestigeCoinsAvailable;
     if (coins <= 0) return false;
@@ -2188,6 +2491,8 @@ class GameNotifier extends Notifier<GameState> {
     _incMission('weekly_prestige_5', 1, daily: false);
     _save.gold = 0;
     _save.totalGoldEarned = 0;
+    _save.purchasedGoldUnconverted = 0;
+    _save.goldExchangePrestigeCount = 0;
     _save.producerLevels.clear();
     _save.tapUpgradeLevels.clear();
     _combo = 0;
@@ -3214,6 +3519,7 @@ class GameNotifier extends Notifier<GameState> {
     final actualTotal = actualGross + actualFee;
 
     _save.gold -= actualTotal;
+    _decayPurchasedGoldUnconverted(actualTotal);
     _save.stats.totalGoldSpent += actualTotal;
     _save.run.goldSpent += actualTotal;
     _save.run.stockTrades++;
