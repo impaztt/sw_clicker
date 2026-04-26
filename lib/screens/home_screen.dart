@@ -167,19 +167,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const Spacer(),
               if (lockedFeatures.isNotEmpty && nextLocked != null) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: _LockedFeaturePeekCard(
                     lockedCount: lockedFeatures.length,
-                    totalCount: featureUnlockCatalog.length,
                     def: nextLocked,
                     progress: nextLocked.progress(game),
                     onTap: _openUnlockRoadmap,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
               ],
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: _BattleStatusPanel(
                   combo: game.combo,
                   tapPower: game.tapPower,
@@ -247,14 +246,12 @@ class _ShopFab extends StatelessWidget {
 
 class _LockedFeaturePeekCard extends StatelessWidget {
   final int lockedCount;
-  final int totalCount;
   final FeatureUnlockDef def;
   final FeatureUnlockProgress progress;
   final VoidCallback onTap;
 
   const _LockedFeaturePeekCard({
     required this.lockedCount,
-    required this.totalCount,
     required this.def,
     required this.progress,
     required this.onTap,
@@ -264,14 +261,14 @@ class _LockedFeaturePeekCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -287,20 +284,20 @@ class _LockedFeaturePeekCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    width: 28,
-                    height: 28,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
                       color: def.color.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(7),
                     ),
-                    child: Icon(def.icon, size: 16, color: def.color),
+                    child: Icon(def.icon, size: 14, color: def.color),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '잠김 기능 $lockedCount개 남음',
+                      '잠김 기능 $lockedCount개',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -308,32 +305,25 @@ class _LockedFeaturePeekCard extends StatelessWidget {
                   const Icon(Icons.chevron_right, color: Colors.black45),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 '다음 추천: ${def.label} · ${progress.progressText} (${progress.percentText})',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Colors.black.withValues(alpha: 0.62),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
                   value: progress.ratio,
-                  minHeight: 6,
+                  minHeight: 5,
                   backgroundColor: Colors.black12,
                   valueColor: AlwaysStoppedAnimation(def.color),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '탭하면 해금 기준과 달성 팁을 모두 볼 수 있습니다. ($totalCount개 기능)',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black.withValues(alpha: 0.55),
                 ),
               ),
             ],
@@ -387,14 +377,14 @@ class _BattleStatusPanel extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -409,7 +399,7 @@ class _BattleStatusPanel extends StatelessWidget {
                     const Color(0xFFFFF3EA).withValues(alpha: 0.98),
                   ],
           ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.08)
@@ -419,57 +409,43 @@ class _BattleStatusPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: AppColors.coral.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(8),
+              Row(
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AppColors.coral.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Icon(
+                      Icons.dashboard_customize,
+                      size: 14,
+                      color: AppColors.deepCoral,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.dashboard_customize,
-                    size: 16,
-                    color: AppColors.deepCoral,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '전투 대시보드',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: theme.colorScheme.onSurface,
-                        ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '전투 대시보드',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.onSurface,
                       ),
-                      Text(
-                        '핵심 수치 요약',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.55),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.mint.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(999),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.mint.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
                   ),
                   child: const Text(
                     'LIVE',
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 8,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF00695C),
                     ),
@@ -477,7 +453,7 @@ class _BattleStatusPanel extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -501,7 +477,7 @@ class _BattleStatusPanel extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -527,15 +503,15 @@ class _BattleStatusPanel extends StatelessWidget {
               ],
             ),
             if (combo > 1 || activeBoosters.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.04)
                       : Colors.black.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,7 +519,7 @@ class _BattleStatusPanel extends StatelessWidget {
                     Text(
                       '활성 효과',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w900,
                         color:
                             theme.colorScheme.onSurface.withValues(alpha: 0.62),
@@ -554,13 +530,13 @@ class _BattleStatusPanel extends StatelessWidget {
                       Row(
                         children: [
                           const Icon(Icons.local_fire_department,
-                              color: AppColors.deepCoral, size: 16),
+                              color: AppColors.deepCoral, size: 15),
                           const SizedBox(width: 5),
                           Expanded(
                             child: Text(
                               '콤보 x$combo',
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -568,7 +544,7 @@ class _BattleStatusPanel extends StatelessWidget {
                           Text(
                             '+${comboPct.toStringAsFixed(0)}%',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w900,
                               color: AppColors.deepCoral,
                             ),
@@ -580,7 +556,7 @@ class _BattleStatusPanel extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: (combo / comboMax).clamp(0.0, 1.0),
-                          minHeight: 5,
+                          minHeight: 4,
                           backgroundColor: Colors.black
                               .withValues(alpha: isDark ? 0.28 : 0.12),
                           valueColor:
@@ -593,13 +569,13 @@ class _BattleStatusPanel extends StatelessWidget {
                       Row(
                         children: [
                           const Icon(Icons.bolt,
-                              color: AppColors.deepCoral, size: 16),
+                              color: AppColors.deepCoral, size: 15),
                           const SizedBox(width: 5),
                           Expanded(
                             child: Text(
                               '부스터 ${activeBoosters.length}개 · 최고 x${strongestBoost.toStringAsFixed(strongestBoost % 1 == 0 ? 0 : 1)}',
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -607,7 +583,7 @@ class _BattleStatusPanel extends StatelessWidget {
                           Text(
                             _fmtDuration(minRemaining),
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w900,
                               color: theme.colorScheme.primary,
                             ),
@@ -616,8 +592,8 @@ class _BattleStatusPanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
+                        spacing: 4,
+                        runSpacing: 4,
                         children: [
                           for (final b in activeBoosters.take(3))
                             _BoosterBadge(
@@ -628,7 +604,7 @@ class _BattleStatusPanel extends StatelessWidget {
                           if (activeBoosters.length > 3)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                  horizontal: 7, vertical: 3),
                               decoration: BoxDecoration(
                                 color: Colors.black
                                     .withValues(alpha: isDark ? 0.24 : 0.08),
@@ -637,7 +613,7 @@ class _BattleStatusPanel extends StatelessWidget {
                               child: Text(
                                 '+${activeBoosters.length - 3}',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w900,
                                   color: theme.colorScheme.onSurface
                                       .withValues(alpha: 0.7),
@@ -691,10 +667,10 @@ class _BattleMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: color.withValues(alpha: 0.26),
         ),
@@ -704,23 +680,23 @@ class _BattleMetricCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: color),
+              Icon(icon, size: 13, color: color),
               const SizedBox(width: 4),
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.w800,
                   color: color.withValues(alpha: 0.9),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w900,
               color: color,
             ),
@@ -729,7 +705,7 @@ class _BattleMetricCard extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 8,
               fontWeight: FontWeight.w700,
               color: color.withValues(alpha: 0.72),
             ),
@@ -757,7 +733,7 @@ class _BoosterBadge extends StatelessWidget {
     final s = totalSec % 60;
     final timeText = '$m:${s.toString().padLeft(2, '0')}';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.deepCoral.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(999),
@@ -766,7 +742,7 @@ class _BoosterBadge extends StatelessWidget {
       child: Text(
         '$label x${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)} · $timeText',
         style: const TextStyle(
-          fontSize: 10,
+          fontSize: 9,
           fontWeight: FontWeight.w800,
           color: AppColors.deepCoral,
         ),

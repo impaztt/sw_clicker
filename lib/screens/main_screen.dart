@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/feature_unlocks.dart';
 import '../providers/game_provider.dart';
 import '../widgets/daily_bonus_dialog.dart';
 import '../widgets/offline_reward_dialog.dart';
@@ -61,7 +60,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       icon: Icons.auto_awesome_outlined,
       selectedIcon: Icons.auto_awesome,
       label: '환생',
-      featureId: FeatureUnlocks.prestigeTab,
     ),
     _NavDestSpec(
       pageIndex: _navSettings,

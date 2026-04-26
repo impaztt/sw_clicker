@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/number_format.dart';
 import '../core/theme.dart';
+import '../data/producer_catalog.dart';
 import '../data/prestige_upgrade_catalog.dart';
+import '../models/producer.dart';
 import '../models/prestige_upgrade.dart';
 import '../providers/game_provider.dart';
 
@@ -200,6 +202,12 @@ class _PrestigeShop extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final game = ref.watch(gameProvider);
     final notifier = ref.read(gameProvider.notifier);
+    var maxTranscendentLevel = 0;
+    for (final def in producerCatalog) {
+      if (def.category != ProducerCategory.transcendent) continue;
+      final lv = game.producerLevels[def.id] ?? 0;
+      if (lv > maxTranscendentLevel) maxTranscendentLevel = lv;
+    }
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       children: [
@@ -217,6 +225,8 @@ class _PrestigeShop extends ConsumerWidget {
           currentMult: game.ascensionCoreMultiplier,
           nextCost: game.ascensionCoreNextCost,
           coins: game.prestigeCoins,
+          prestigeCount: game.prestigeCount,
+          maxTranscendentLevel: maxTranscendentLevel,
           onBuy: notifier.buyAscensionCore,
         ),
         const SizedBox(height: 10),
@@ -240,6 +250,8 @@ class _AscensionCoreCard extends StatelessWidget {
   final double currentMult;
   final int nextCost;
   final int coins;
+  final int prestigeCount;
+  final int maxTranscendentLevel;
   final bool Function() onBuy;
   const _AscensionCoreCard({
     required this.level,
@@ -247,77 +259,189 @@ class _AscensionCoreCard extends StatelessWidget {
     required this.currentMult,
     required this.nextCost,
     required this.coins,
+    required this.prestigeCount,
+    required this.maxTranscendentLevel,
     required this.onBuy,
   });
 
   @override
   Widget build(BuildContext context) {
     final canBuy = unlocked && coins >= nextCost;
+    final prestigeRemaining = (5 - prestigeCount).clamp(0, 5);
+    final transcendentRemaining = (25 - maxTranscendentLevel).clamp(0, 25);
     final pct = ((currentMult - 1) * 100).toStringAsFixed(1);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F8FF),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF90CAF9), width: 1.2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
+        onTap: unlocked
+            ? null
+            : () => _showLockedHint(
+                  context,
+                  prestigeRemaining: prestigeRemaining,
+                  transcendentRemaining: transcendentRemaining,
+                ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F8FF),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF90CAF9), width: 1.2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.auto_graph, color: Color(0xFF1565C0)),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '초월 코어 연구 (중후반 루프)',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+              const Row(
+                children: [
+                  Icon(Icons.auto_graph, color: Color(0xFF1565C0)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '초월 코어 연구 (중후반 루프)',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                unlocked
+                    ? 'Lv $level · 전체 수익 영구 +$pct%'
+                    : '해금 조건: 환생 5회 + 초월 유닛 중 하나 Lv 25',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black.withValues(alpha: 0.72),
+                ),
+              ),
+              if (!unlocked) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _UnlockRequirementChip(
+                      label: '환생',
+                      value: '$prestigeCount / 5',
+                      done: prestigeRemaining == 0,
+                    ),
+                    _UnlockRequirementChip(
+                      label: '초월 최고',
+                      value: 'Lv $maxTranscendentLevel / 25',
+                      done: transcendentRemaining == 0,
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: unlocked
+                      ? (canBuy
+                          ? () {
+                              final ok = onBuy();
+                              if (!ok && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('조건 미달 또는 코인이 부족합니다'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('환생 코인이 부족합니다'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            })
+                      : () => _showLockedHint(
+                            context,
+                            prestigeRemaining: prestigeRemaining,
+                            transcendentRemaining: transcendentRemaining,
+                          ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor:
+                        canBuy ? const Color(0xFF1976D2) : Colors.grey.shade300,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(
+                    unlocked
+                        ? '연구 업그레이드 (${NumberFormatter.format(nextCost.toDouble())} 코인)'
+                        : '아직 잠겨 있음',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            unlocked
-                ? 'Lv $level · 전체 수익 영구 +$pct%'
-                : '해금 조건: 환생 5회 + 초월 유닛 중 하나 Lv 25',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Colors.black.withValues(alpha: 0.72),
-            ),
+        ),
+      ),
+    );
+  }
+
+  void _showLockedHint(
+    BuildContext context, {
+    required int prestigeRemaining,
+    required int transcendentRemaining,
+  }) {
+    final remain = <String>[];
+    if (prestigeRemaining > 0) remain.add('환생 ${prestigeRemaining}회');
+    if (transcendentRemaining > 0) remain.add('초월 ${transcendentRemaining}레벨');
+    final remainText = remain.isEmpty ? '곧 해금됩니다.' : '남은 조건: ${remain.join(' · ')}';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '초월 코어는 환생 5회 + 초월 유닛 Lv 25에서 해금됩니다.\n'
+            '현재 진행: 환생 $prestigeCount/5 · 초월 최고 Lv $maxTranscendentLevel/25\n'
+            '$remainText',
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: canBuy
-                  ? () {
-                      final ok = onBuy();
-                      if (!ok && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('조건 미달 또는 코인이 부족합니다'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    }
-                  : null,
-              style: FilledButton.styleFrom(
-                backgroundColor:
-                    canBuy ? const Color(0xFF1976D2) : Colors.grey.shade300,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                unlocked
-                    ? '연구 업그레이드 (${NumberFormatter.format(nextCost.toDouble())} 코인)'
-                    : '아직 잠겨 있음',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ),
-        ],
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+}
+
+class _UnlockRequirementChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool done;
+  const _UnlockRequirementChip({
+    required this.label,
+    required this.value,
+    required this.done,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = done
+        ? AppColors.mint.withValues(alpha: 0.24)
+        : Colors.black.withValues(alpha: 0.05);
+    final fg = done ? const Color(0xFF00695C) : Colors.black.withValues(alpha: 0.72);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: done
+              ? AppColors.mint.withValues(alpha: 0.5)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Text(
+        '$label $value',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: fg,
+        ),
       ),
     );
   }
