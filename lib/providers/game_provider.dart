@@ -3113,10 +3113,21 @@ class GameNotifier extends Notifier<GameState> {
     return DateTime.fromMillisecondsSinceEpoch(bucket * 1000, isUtc: false);
   }
 
-  /// Unlock the next region in the chain when ownership of the previous one
-  /// crosses [regionUnlockOwnershipThreshold].
+  /// Unlock the first region once the per-run gold gate is crossed, then
+  /// cascade chain unlocks: when ownership of a region passes
+  /// [regionUnlockOwnershipThreshold] the next region opens up.
+  ///
+  /// Runs on every stock-sim tick (~1s) so post-prestige players see the
+  /// market re-open as soon as they re-earn the 1B threshold, instead of
+  /// having to relaunch the app for `_bootstrapStockMarket` to notice.
   void _checkRegionUnlocks() {
     final m = _save.market;
+    final first = m.regions[regionCatalog.first.id];
+    if (first != null &&
+        !first.unlocked &&
+        _save.totalGoldEarned >= stockMarketLifetimeGoldTrigger) {
+      first.unlocked = true;
+    }
     for (final def in regionCatalog) {
       final state = m.regions[def.id];
       if (state == null || !state.unlocked) continue;
