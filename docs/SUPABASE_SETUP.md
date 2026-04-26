@@ -42,6 +42,20 @@ create policy "own row update" on public."SW_saves"
               with check (auth.uid() = user_id);
 ```
 
+## Save safety hardening (recommended)
+
+Once the base table above exists, run [`sql/save_safety.sql`](sql/save_safety.sql)
+in the SQL Editor. It adds:
+
+- **Stale-write rejection** on `SW_saves` — an `UPDATE` whose `last_saved_at`
+  is older than the existing row is rejected with `P0001 stale_save`.
+- **Rolling snapshot history** in a new `SW_save_backups` table — the row
+  state being replaced is archived (max 1/hour/user, last 24 retained per
+  user). RLS is read-own only; clients cannot insert/delete, so the history
+  is tamper-resistant.
+
+The file is idempotent — safe to re-run.
+
 ## Dashboard settings
 
 - **Authentication → Providers → Anonymous Sign-ins**: must be **Enabled**.
