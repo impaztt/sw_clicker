@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
 import '../data/prestige_upgrade_catalog.dart';
+import '../data/repeating_achievement_catalog.dart';
 import '../data/producer_catalog.dart';
 import '../data/region_catalog.dart';
 import '../data/sword_catalog.dart';
@@ -476,6 +477,7 @@ class GameState {
   final List<MissionView> weeklyMissions;
   final Set<String> unlockedFeatures;
   final StockMarketState market;
+  final Map<String, int> repeatingAchievementStages;
   final bool loaded;
 
   const GameState({
@@ -528,6 +530,7 @@ class GameState {
     required this.weeklyMissions,
     required this.unlockedFeatures,
     required this.market,
+    required this.repeatingAchievementStages,
     this.loaded = false,
   });
 
@@ -581,6 +584,7 @@ class GameState {
         weeklyMissions: const [],
         unlockedFeatures: const {},
         market: StockMarketState(),
+        repeatingAchievementStages: const {},
         loaded: false,
       );
 
@@ -1099,10 +1103,13 @@ class GameNotifier extends Notifier<GameState> {
       weeklyMissions: _buildMissionViews(daily: false),
       unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
       market: _save.market,
+      repeatingAchievementStages:
+          Map.unmodifiable(_save.repeatingAchievementStages),
       loaded: loaded,
     );
     if (loaded) {
       _checkAchievements();
+      _advanceRepeatingAchievements();
       if (_featureUnlocksReady) _evaluateFeatureUnlocks();
     }
   }
@@ -1252,9 +1259,91 @@ class GameNotifier extends Notifier<GameState> {
         weeklyMissions: state.weeklyMissions,
         unlockedFeatures: state.unlockedFeatures,
         market: state.market,
+        repeatingAchievementStages: state.repeatingAchievementStages,
         loaded: true,
       );
     }
+  }
+
+  /// Walk every repeating-achievement track. If the player's metric has
+  /// passed the next stage's target, advance the cleared-stage counter and
+  /// pay out the stage reward. A single tick may clear multiple stages
+  /// (e.g. on cold-start with a veteran save), so loop until caught up.
+  void _advanceRepeatingAchievements() {
+    final ctx = state.achContext();
+    var anyChanged = false;
+    var totalEssenceGranted = 0;
+    for (final def in repeatingAchievementCatalog) {
+      var cleared = _save.repeatingAchievementStages[def.id] ?? 0;
+      final value = def.current(ctx);
+      // Cap iterations defensively to avoid runaway loops.
+      var safety = 256;
+      while (safety-- > 0 && value >= def.targetForStage(cleared + 1)) {
+        cleared++;
+        totalEssenceGranted += def.rewardForStage(cleared);
+      }
+      if (cleared != (_save.repeatingAchievementStages[def.id] ?? 0)) {
+        _save.repeatingAchievementStages[def.id] = cleared;
+        anyChanged = true;
+      }
+    }
+    if (!anyChanged) return;
+    if (totalEssenceGranted > 0) _save.essence += totalEssenceGranted;
+    // Re-emit so the UI sees the new cleared-stage map and essence.
+    state = GameState(
+      gold: state.gold,
+      totalGoldEarned: state.totalGoldEarned,
+      tapPower: state.tapPower,
+      dps: state.dps,
+      prestigeCoins: state.prestigeCoins,
+      prestigeCount: state.prestigeCount,
+      ascensionCoreLevel: state.ascensionCoreLevel,
+      producerLevels: state.producerLevels,
+      tapUpgradeLevels: state.tapUpgradeLevels,
+      prestigeUpgradeLevels: state.prestigeUpgradeLevels,
+      totalTaps: state.totalTaps,
+      playTimeSeconds: state.playTimeSeconds,
+      maxDpsEver: state.maxDpsEver,
+      lifetimeGold: state.lifetimeGold,
+      totalSummons: state.totalSummons,
+      totalTapUpgradesBought: state.totalTapUpgradesBought,
+      totalGoldSpent: state.totalGoldSpent,
+      haptic: state.haptic,
+      sound: state.sound,
+      darkMode: state.darkMode,
+      highContrast: state.highContrast,
+      textScale: state.textScale,
+      reduceTapHaptics: state.reduceTapHaptics,
+      essence: _save.essence,
+      ownedSwords: state.ownedSwords,
+      equippedSwordId: state.equippedSwordId,
+      summonsSinceHighRare: state.summonsSinceHighRare,
+      unlockedAchievements: state.unlockedAchievements,
+      combo: state.combo,
+      totalCrits: state.totalCrits,
+      maxCombo: state.maxCombo,
+      comboBurstCount: state.comboBurstCount,
+      dailyStreak: state.dailyStreak,
+      maxDailyStreak: state.maxDailyStreak,
+      lastDailyClaimAt: state.lastDailyClaimAt,
+      activeBoosters: state.activeBoosters,
+      tapsUntilSlime: state.tapsUntilSlime,
+      autoTapping: state.autoTapping,
+      tutorialSeen: state.tutorialSeen,
+      skillReadyAt: state.skillReadyAt,
+      completedSetIds: state.completedSetIds,
+      slimesDefeated: state.slimesDefeated,
+      skillsUsed: state.skillsUsed,
+      boostersPurchased: state.boostersPurchased,
+      timeGuardTriggered: state.timeGuardTriggered,
+      dailyMissions: state.dailyMissions,
+      weeklyMissions: state.weeklyMissions,
+      unlockedFeatures: state.unlockedFeatures,
+      market: state.market,
+      repeatingAchievementStages:
+          Map.unmodifiable(_save.repeatingAchievementStages),
+      loaded: true,
+    );
   }
 
   /// Evaluate all feature unlock triggers against current state. New unlocks
@@ -1322,6 +1411,7 @@ class GameNotifier extends Notifier<GameState> {
       weeklyMissions: state.weeklyMissions,
       unlockedFeatures: Set.unmodifiable(_save.unlockedFeatures),
       market: state.market,
+      repeatingAchievementStages: state.repeatingAchievementStages,
       loaded: true,
     );
   }

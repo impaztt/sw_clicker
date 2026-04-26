@@ -3,7 +3,7 @@ import 'game_stats.dart';
 import 'stock_market.dart';
 
 class SaveData {
-  static const currentVersion = 12;
+  static const currentVersion = 13;
 
   int version;
   double gold;
@@ -56,6 +56,9 @@ class SaveData {
   // Regional stock market (v12)
   StockMarketState market;
 
+  // Repeating-achievement progress (v13). Map id -> cleared stage count.
+  Map<String, int> repeatingAchievementStages;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -88,6 +91,7 @@ class SaveData {
     Set<String>? weeklyMissionClaimed,
     Set<String>? unlockedFeatures,
     StockMarketState? market,
+    Map<String, int>? repeatingAchievementStages,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -103,7 +107,9 @@ class SaveData {
         weeklyMissionProgress = weeklyMissionProgress ?? <String, int>{},
         weeklyMissionClaimed = weeklyMissionClaimed ?? <String>{},
         unlockedFeatures = unlockedFeatures ?? <String>{},
-        market = market ?? StockMarketState();
+        market = market ?? StockMarketState(),
+        repeatingAchievementStages =
+            repeatingAchievementStages ?? <String, int>{};
 
   Map<String, dynamic> toJson() => {
         'version': version,
@@ -138,6 +144,7 @@ class SaveData {
         'weeklyMissionClaimed': weeklyMissionClaimed.toList(),
         'unlockedFeatures': unlockedFeatures.toList(),
         'market': market.toJson(),
+        'repeatingAchievementStages': repeatingAchievementStages,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -204,5 +211,7 @@ class SaveData {
             ? StockMarketState()
             : StockMarketState.fromJson(
                 Map<String, dynamic>.from(json['market'] as Map)),
+        repeatingAchievementStages: Map<String, int>.from(
+            json['repeatingAchievementStages'] as Map? ?? const {}),
       );
 }

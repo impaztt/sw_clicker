@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
+import '../data/repeating_achievement_catalog.dart';
 import '../data/sword_catalog.dart';
 import '../data/sword_sets.dart';
 import '../models/achievement.dart';
+import '../models/repeating_achievement.dart';
 import '../models/sword.dart';
 import '../providers/game_provider.dart';
 import '../widgets/summon_dialog.dart';
@@ -1167,18 +1169,33 @@ class _AchievementHubView extends ConsumerStatefulWidget {
       _AchievementHubViewState();
 }
 
+enum _AchKind { milestones, repeating }
+
 class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
   AchievementCategory? _filter;
+  _AchKind _kind = _AchKind.milestones;
 
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
     final achCtx = game.achContext();
-    final total = achievementCatalog.length;
-    final unlockedCount = game.unlockedAchievements.length;
-    final filtered = _filter == null
+    final milestoneTotal = achievementCatalog.length;
+    final milestoneUnlocked = game.unlockedAchievements.length;
+
+    // Repeating-achievement aggregate stats (clears across all tracks).
+    var totalClears = 0;
+    for (final def in repeatingAchievementCatalog) {
+      totalClears += game.repeatingAchievementStages[def.id] ?? 0;
+    }
+
+    final filteredMilestones = _filter == null
         ? achievementCatalog
         : achievementCatalog.where((a) => a.category == _filter).toList();
+    final filteredRepeats = _filter == null
+        ? repeatingAchievementCatalog
+        : repeatingAchievementCatalog
+            .where((r) => r.category == _filter)
+            .toList();
 
     return Column(
       children: [
@@ -1201,27 +1218,69 @@ class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '업적 진행도',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black.withValues(alpha: 0.55),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '마일스톤 진행도',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black.withValues(alpha: 0.55),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$milestoneUnlocked / $milestoneTotal',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 36,
+                      color: Colors.black.withValues(alpha: 0.08),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '반복 도전 클리어',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black.withValues(alpha: 0.55),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$totalClears 단계',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '$unlockedCount / $total',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
-                    value: total == 0 ? 0 : unlockedCount / total,
+                    value: milestoneTotal == 0
+                        ? 0
+                        : milestoneUnlocked / milestoneTotal,
                     minHeight: 8,
                     backgroundColor: Colors.black12,
                     valueColor: const AlwaysStoppedAnimation(AppColors.coral),
@@ -1229,6 +1288,32 @@ class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
                 ),
               ],
             ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: _AchKindToggle(
+                  label: '마일스톤',
+                  count: milestoneTotal,
+                  selected: _kind == _AchKind.milestones,
+                  onTap: () =>
+                      setState(() => _kind = _AchKind.milestones),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _AchKindToggle(
+                  label: '반복 도전',
+                  count: repeatingAchievementCatalog.length,
+                  selected: _kind == _AchKind.repeating,
+                  onTap: () =>
+                      setState(() => _kind = _AchKind.repeating),
+                ),
+              ),
+            ],
           ),
         ),
         SizedBox(
@@ -1254,23 +1339,259 @@ class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 10),
-            itemCount: filtered.length,
-            itemBuilder: (context, i) {
-              final def = filtered[i];
-              final unlocked = game.isAchievementUnlocked(def.id);
-              final progress = def.progress(achCtx);
-              return _AchievementHubTile(
-                def: def,
-                unlocked: unlocked,
-                progress: progress,
-              );
-            },
-          ),
+          child: _kind == _AchKind.milestones
+              ? ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  itemCount: filteredMilestones.length,
+                  itemBuilder: (context, i) {
+                    final def = filteredMilestones[i];
+                    final unlocked = game.isAchievementUnlocked(def.id);
+                    final progress = def.progress(achCtx);
+                    return _AchievementHubTile(
+                      def: def,
+                      unlocked: unlocked,
+                      progress: progress,
+                    );
+                  },
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  itemCount: filteredRepeats.length,
+                  itemBuilder: (context, i) {
+                    final def = filteredRepeats[i];
+                    final cleared =
+                        game.repeatingAchievementStages[def.id] ?? 0;
+                    final progress =
+                        repeatingProgress(def, achCtx, cleared);
+                    return _RepeatingAchTile(progress: progress);
+                  },
+                ),
         ),
       ],
     );
+  }
+}
+
+class _AchKindToggle extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AchKindToggle({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.coral : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? AppColors.coral
+                  : AppColors.coral.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.deepCoral,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.8)
+                      : AppColors.deepCoral.withValues(alpha: 0.6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RepeatingAchTile extends StatelessWidget {
+  final RepeatingAchProgress progress;
+  const _RepeatingAchTile({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final def = progress.def;
+    final color = def.color;
+    final cleared = progress.clearedStages;
+    final stageLabel = _romanNumeral(progress.nextStage);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(def.icon, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${def.name} $stageLabel',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '클리어 $cleared',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: color,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '목표 ${_compact(progress.currentStageTarget)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black.withValues(alpha: 0.55),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress.ratio,
+                    minHeight: 5,
+                    backgroundColor: Colors.black12,
+                    valueColor: AlwaysStoppedAnimation(color),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      '${_compact(progress.currentValue)} / ${_compact(progress.currentStageTarget)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.diamond,
+                        size: 12, color: Color(0xFF7C4DFF)),
+                    const SizedBox(width: 2),
+                    Text(
+                      '+${progress.rewardOnNextClear}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7C4DFF),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _compact(double v) {
+    if (v >= 1e18) return '${(v / 1e18).toStringAsFixed(2)}Qi';
+    if (v >= 1e15) return '${(v / 1e15).toStringAsFixed(2)}aa';
+    if (v >= 1e12) return '${(v / 1e12).toStringAsFixed(2)}T';
+    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)}B';
+    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(2)}M';
+    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(2)}K';
+    return v.floor().toString();
+  }
+
+  static const _roman = <int, String>{
+    1000: 'M',
+    900: 'CM',
+    500: 'D',
+    400: 'CD',
+    100: 'C',
+    90: 'XC',
+    50: 'L',
+    40: 'XL',
+    10: 'X',
+    9: 'IX',
+    5: 'V',
+    4: 'IV',
+    1: 'I',
+  };
+
+  static String _romanNumeral(int n) {
+    if (n <= 0) return '';
+    if (n > 3999) return '$n';
+    var v = n;
+    final buf = StringBuffer();
+    for (final entry in _roman.entries) {
+      while (v >= entry.key) {
+        buf.write(entry.value);
+        v -= entry.key;
+      }
+    }
+    return buf.toString();
   }
 }
 
