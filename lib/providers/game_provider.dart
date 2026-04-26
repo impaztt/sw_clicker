@@ -27,8 +27,9 @@ import '../services/sync_service.dart';
 final buyMultiplierProvider = StateProvider<int>((_) => 1);
 
 /// Cost in 정수 per single summon.
-const summonCostSingle = 30;
-const summonCostTen = 270;
+const summonCostSingle = 50;
+const summonCostTen = 450;
+const summonCostHundred = 4500;
 
 /// After this many consecutive non-SR+ pulls, the next pull is guaranteed SR+.
 const pityThreshold = 80;
@@ -2202,6 +2203,22 @@ class GameNotifier extends Notifier<GameState> {
     for (int i = 0; i < 10; i++) {
       final isLast = i == 9;
       results.add(_doOnePull(guaranteedRPlus: isLast));
+    }
+    _save.run.summons += results.length;
+    _incMission('daily_summon_15', results.length, daily: true);
+    _incMission('weekly_summon_120', results.length, daily: false);
+    _emit(loaded: true);
+    unawaited(_persist());
+    return results;
+  }
+
+  List<SummonResult>? summonHundred() {
+    if (_save.essence < summonCostHundred) return null;
+    _save.essence -= summonCostHundred;
+    final results = <SummonResult>[];
+    for (int i = 0; i < 100; i++) {
+      final isLastOfTenBlock = i % 10 == 9;
+      results.add(_doOnePull(guaranteedRPlus: isLastOfTenBlock));
     }
     _save.run.summons += results.length;
     _incMission('daily_summon_15', results.length, daily: true);

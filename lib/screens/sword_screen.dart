@@ -1980,6 +1980,19 @@ class _SummonView extends ConsumerWidget {
               }
             },
           ),
+          const SizedBox(height: 10),
+          _SummonButton(
+            label: '100연 소환 (10회마다 R+ 확정)',
+            cost: summonCostHundred,
+            essence: game.essence,
+            primary: false,
+            onTap: () async {
+              final r = notifier.summonHundred();
+              if (r != null) {
+                await showSummonDialog(context, r);
+              }
+            },
+          ),
           const SizedBox(height: 20),
           const _RateTable(),
           const SizedBox(height: 20),
