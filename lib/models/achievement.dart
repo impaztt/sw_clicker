@@ -15,6 +15,11 @@ enum AchievementCategory {
   skill,
   daily,
   master,
+  // v13: introduced with milestone expansion + new content surfaces.
+  stocks,
+  swordSets,
+  collection,
+  economy,
 }
 
 extension AchievementCategoryInfo on AchievementCategory {
@@ -33,6 +38,10 @@ extension AchievementCategoryInfo on AchievementCategory {
         AchievementCategory.skill => '스킬',
         AchievementCategory.daily => '일일',
         AchievementCategory.master => '마스터',
+        AchievementCategory.stocks => '주식',
+        AchievementCategory.swordSets => '세트',
+        AchievementCategory.collection => '컬렉션',
+        AchievementCategory.economy => '경제',
       };
 
   IconData get icon => switch (this) {
@@ -50,6 +59,10 @@ extension AchievementCategoryInfo on AchievementCategory {
         AchievementCategory.skill => Icons.flash_on,
         AchievementCategory.daily => Icons.event_available,
         AchievementCategory.master => Icons.emoji_events,
+        AchievementCategory.stocks => Icons.show_chart,
+        AchievementCategory.swordSets => Icons.workspaces,
+        AchievementCategory.collection => Icons.collections_bookmark,
+        AchievementCategory.economy => Icons.savings,
       };
 
   Color get color => switch (this) {
@@ -67,6 +80,10 @@ extension AchievementCategoryInfo on AchievementCategory {
         AchievementCategory.skill => const Color(0xFF42A5F5),
         AchievementCategory.daily => const Color(0xFF66BB6A),
         AchievementCategory.master => const Color(0xFFD81B60),
+        AchievementCategory.stocks => const Color(0xFFD32F2F),
+        AchievementCategory.swordSets => const Color(0xFFEC407A),
+        AchievementCategory.collection => const Color(0xFF5E35B1),
+        AchievementCategory.economy => const Color(0xFF2E7D32),
       };
 }
 
@@ -115,6 +132,15 @@ class AchContext {
   final int boostersPurchased;
   final int maxDailyStreak;
   final int completedSetCount;
+  // v13 — surfaces introduced with milestone expansion.
+  final int unlockedRegionCount;
+  final int regionsAtMaxOwnership;
+  final int totalShareUnits;
+  final double totalDividendsClaimed;
+  final int totalStockTrades;
+  final double totalGoldSpent;
+  final int prestigeCoins;
+  final int essence;
 
   const AchContext({
     required this.totalTaps,
@@ -148,6 +174,14 @@ class AchContext {
     required this.boostersPurchased,
     required this.maxDailyStreak,
     required this.completedSetCount,
+    required this.unlockedRegionCount,
+    required this.regionsAtMaxOwnership,
+    required this.totalShareUnits,
+    required this.totalDividendsClaimed,
+    required this.totalStockTrades,
+    required this.totalGoldSpent,
+    required this.prestigeCoins,
+    required this.essence,
   });
 }
 

@@ -12,6 +12,10 @@ class GameStats {
   int skillsUsed;
   int boostersPurchased;
   int maxDailyStreak;
+  // v13 — lifetime gold spent (producers, tap upgrades, prestige coin
+  // purchases, summons via essence/coin shops, etc). Tracks player-driven
+  // outflow rather than passively-burnt currency.
+  double totalGoldSpent;
 
   GameStats({
     this.totalTaps = 0,
@@ -27,6 +31,7 @@ class GameStats {
     this.skillsUsed = 0,
     this.boostersPurchased = 0,
     this.maxDailyStreak = 0,
+    this.totalGoldSpent = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +48,7 @@ class GameStats {
         'skillsUsed': skillsUsed,
         'boostersPurchased': boostersPurchased,
         'maxDailyStreak': maxDailyStreak,
+        'totalGoldSpent': totalGoldSpent,
       };
 
   factory GameStats.fromJson(Map<String, dynamic> json) => GameStats(
@@ -59,6 +65,7 @@ class GameStats {
         skillsUsed: json['skillsUsed'] as int? ?? 0,
         boostersPurchased: json['boostersPurchased'] as int? ?? 0,
         maxDailyStreak: json['maxDailyStreak'] as int? ?? 0,
+        totalGoldSpent: (json['totalGoldSpent'] as num?)?.toDouble() ?? 0,
       );
 }
 

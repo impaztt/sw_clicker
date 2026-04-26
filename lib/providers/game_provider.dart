@@ -443,6 +443,7 @@ class GameState {
   final double lifetimeGold;
   final int totalSummons;
   final int totalTapUpgradesBought;
+  final double totalGoldSpent;
   final bool haptic;
   final bool sound;
   final bool darkMode;
@@ -494,6 +495,7 @@ class GameState {
     required this.lifetimeGold,
     required this.totalSummons,
     required this.totalTapUpgradesBought,
+    required this.totalGoldSpent,
     required this.haptic,
     required this.sound,
     required this.darkMode,
@@ -546,6 +548,7 @@ class GameState {
         lifetimeGold: 0,
         totalSummons: 0,
         totalTapUpgradesBought: 0,
+        totalGoldSpent: 0,
         haptic: true,
         sound: true,
         darkMode: false,
@@ -657,6 +660,23 @@ class GameState {
       if (entry.value > maxLv) maxLv = entry.value;
       if (entry.value >= SwordDef.maxLevel) maxedCount++;
     }
+    // Stock-market derived stats.
+    var unlockedRegions = 0;
+    var maxedRegions = 0;
+    var totalShares = 0;
+    for (final entry in market.regions.entries) {
+      final st = entry.value;
+      if (st.unlocked) unlockedRegions++;
+      totalShares += st.shares;
+      // A region is "maxed" once the player hits the 80% ownership cap.
+      try {
+        final def = regionDefById(entry.key);
+        final cap = (def.totalShares * regionMaxOwnershipFraction).floor();
+        if (st.shares >= cap && cap > 0) maxedRegions++;
+      } catch (_) {
+        // Unknown region id — ignore.
+      }
+    }
     return AchContext(
       totalTaps: totalTaps,
       lifetimeGold: lifetimeGold,
@@ -689,6 +709,14 @@ class GameState {
       boostersPurchased: boostersPurchased,
       maxDailyStreak: maxDailyStreak,
       completedSetCount: completedSetIds.length,
+      unlockedRegionCount: unlockedRegions,
+      regionsAtMaxOwnership: maxedRegions,
+      totalShareUnits: totalShares,
+      totalDividendsClaimed: market.totalDividendsClaimed,
+      totalStockTrades: market.totalTradesCount,
+      totalGoldSpent: totalGoldSpent,
+      prestigeCoins: prestigeCoins,
+      essence: essence,
     );
   }
 }
@@ -1036,6 +1064,7 @@ class GameNotifier extends Notifier<GameState> {
       lifetimeGold: _save.stats.lifetimeGold,
       totalSummons: _save.stats.totalSummons,
       totalTapUpgradesBought: _save.stats.totalTapUpgradesBought,
+      totalGoldSpent: _save.stats.totalGoldSpent,
       haptic: _save.settings.haptic,
       sound: _save.settings.sound,
       darkMode: _save.settings.darkMode,
@@ -1190,6 +1219,7 @@ class GameNotifier extends Notifier<GameState> {
         lifetimeGold: state.lifetimeGold,
         totalSummons: state.totalSummons,
         totalTapUpgradesBought: state.totalTapUpgradesBought,
+        totalGoldSpent: state.totalGoldSpent,
         haptic: state.haptic,
         sound: state.sound,
         darkMode: state.darkMode,
@@ -1259,6 +1289,7 @@ class GameNotifier extends Notifier<GameState> {
       lifetimeGold: state.lifetimeGold,
       totalSummons: state.totalSummons,
       totalTapUpgradesBought: state.totalTapUpgradesBought,
+      totalGoldSpent: state.totalGoldSpent,
       haptic: state.haptic,
       sound: state.sound,
       darkMode: state.darkMode,
@@ -1519,6 +1550,7 @@ class GameNotifier extends Notifier<GameState> {
     if (_save.gold < cost) return 0;
     final newLv = oldLv + n;
     _save.gold -= cost;
+    _save.stats.totalGoldSpent += cost;
     _save.producerLevels[id] = newLv;
     _incMission('daily_upgrade_30', n, daily: true);
     _incMission('weekly_upgrade_200', n, daily: false);
@@ -1538,6 +1570,7 @@ class GameNotifier extends Notifier<GameState> {
     final cost = def.costForNext(lv, n);
     if (_save.gold < cost) return 0;
     _save.gold -= cost;
+    _save.stats.totalGoldSpent += cost;
     _save.tapUpgradeLevels[id] = lv + n;
     _save.stats.totalTapUpgradesBought += n;
     _incMission('daily_upgrade_30', n, daily: true);
@@ -2293,6 +2326,7 @@ class GameNotifier extends Notifier<GameState> {
     final actualTotal = actualGross + actualFee;
 
     _save.gold -= actualTotal;
+    _save.stats.totalGoldSpent += actualTotal;
     // Update average cost (weighted average).
     final priorBasis = st.avgCost * st.shares;
     final newShares = st.shares + actualShares;
