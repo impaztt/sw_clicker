@@ -15,18 +15,18 @@ final Map<String, String> swordRegionAffinities = () {
     final regionIndex = (i * 7 + sword.tier.index * 3) % regionCatalog.length;
     map[sword.id] = regionCatalog[regionIndex].id;
   }
-  return Map.unmodifiable(map);
+  return Map<String, String>.unmodifiable(map);
 }();
 
 final Map<String, SwordFormationRole> swordFormationRoles = () {
-  final roles = SwordFormationRole.values;
+  const roles = SwordFormationRole.values;
   final map = <String, SwordFormationRole>{};
   for (var i = 0; i < swordCatalog.length; i++) {
     final sword = swordCatalog[i];
     final roleIndex = (i + sword.tier.index * 2) % roles.length;
     map[sword.id] = roles[roleIndex];
   }
-  return Map.unmodifiable(map);
+  return Map<String, SwordFormationRole>.unmodifiable(map);
 }();
 
 String swordRegionId(SwordDef sword) =>
