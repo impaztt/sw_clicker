@@ -2208,11 +2208,32 @@ class GameNotifier extends Notifier<GameState> {
           lastAccrualAt: null,
         );
       } else {
+        // Migration: pre-rebalance saves had totalShares=100B and
+        // initialPrice 1/10000 of the new value. If the stored price is
+        // dramatically below the new initialPrice, rescale shares ÷ 10000
+        // and avgCost × 10000 so the player's gold-equivalent stays close
+        // while moving onto the new units. Candles + intra-tick state are
+        // dropped because they're priced in old units.
+        const oldToNewShareRatio = 10000;
+        final looksLegacy = existing.currentPrice > 0 &&
+            existing.currentPrice < def.initialPrice * 0.01;
+        if (looksLegacy) {
+          existing.shares = (existing.shares / oldToNewShareRatio).floor();
+          existing.avgCost = existing.avgCost * oldToNewShareRatio;
+          existing.currentPrice = def.initialPrice;
+          existing.intrinsicPrice = def.initialPrice;
+          existing.recentCandles.clear();
+          existing.formingCandle = null;
+        }
         // Heal corrupt prices, e.g. legacy zeros.
         if (existing.currentPrice <= 0) existing.currentPrice = def.initialPrice;
         if (existing.intrinsicPrice <= 0) {
           existing.intrinsicPrice = def.initialPrice;
         }
+        // Cap accidentally-overshot ownership at the configured max so
+        // legacy data stays inside the 80% bound.
+        final cap = (def.totalShares * regionMaxOwnershipFraction).floor();
+        if (existing.shares > cap) existing.shares = cap;
       }
     }
     // First-region auto-unlock for veterans who already crossed the lifetime
@@ -2285,12 +2306,12 @@ class GameNotifier extends Notifier<GameState> {
     // Per-tick σ: convert per-minute volatility to per-tick.
     // σ_tick = σ_min × √(tickSec / 60).
     final tickFactor = sqrt(stockPriceTickSeconds / 60.0);
-    // Drift / event rates are originally per-second; scale linearly to tick.
-    const driftPerSec = 0.0005;
-    const eventProbPerSec = 0.0005;
-    // Compound intrinsic inflation across [stockPriceTickSeconds].
-    final intrinsicGrowthPerTick =
-        pow(1.0000003, stockPriceTickSeconds).toDouble();
+    // Mean-reversion is intentionally weak so trends can persist over
+    // many ticks before being pulled back. Event probability and shock
+    // magnitudes are slightly elevated to make the bounded range
+    // (-90% to +1750%) feel reachable in long horizons.
+    const driftPerSec = 0.0003;
+    const eventProbPerSec = 0.001;
 
     for (final state in m.regions.values) {
       if (!state.unlocked) continue;
@@ -2307,18 +2328,18 @@ class GameNotifier extends Notifier<GameState> {
         if (_random.nextDouble() <
             eventProbPerSec * stockPriceTickSeconds) {
           const shocks = [
-            -0.12, -0.08, -0.05, 0.05, 0.08, 0.12, 0.18,
+            -0.20, -0.12, -0.06, 0.06, 0.12, 0.20, 0.30,
           ];
           event = shocks[_random.nextInt(shocks.length)] * state.currentPrice;
         }
         var next = state.currentPrice + drift + noise + event;
-        // Clamp to [0.3x, 3x] of intrinsic price.
-        final lo = state.intrinsicPrice * 0.3;
-        final hi = state.intrinsicPrice * 3.0;
+        // Clamp to [0.10x, 18.5x] of intrinsic price — i.e. -90% to +1750%
+        // off the original market cap.
+        final lo = state.intrinsicPrice * stockPriceMinFractionOfIntrinsic;
+        final hi = state.intrinsicPrice * stockPriceMaxFractionOfIntrinsic;
         if (next < lo) next = lo;
         if (next > hi) next = hi;
         state.currentPrice = next;
-        state.intrinsicPrice *= intrinsicGrowthPerTick;
 
         // Update / start forming candle. Candle bucket is 30s, but ticks
         // arrive every [stockPriceTickSeconds]; so each bucket gets several

@@ -7,9 +7,9 @@ import 'package:flutter/material.dart';
 /// of the holding's market value paid out per hour into the region's
 /// pendingDividend).
 ///
-/// Market cap design: 경기도 = 100aa (1×10^17 골드, ≈ "현재 가격 × 1000배"의
-/// 의도). 그 위로 직전 지역의 4.5배씩 등비 증가 — 17번째(서울)까지
-/// 4.5^16 ≈ 282억 배 격차. 모든 지역 총주식수는 100B(1,000억주)로 통일.
+/// Market cap design: 경기도 = 100aa (1×10^17 골드). 위로 직전 지역의 4.5배씩
+/// 등비 증가 → 17번째(서울)까지 4.5^16 ≈ 282억 배 격차. 모든 지역 총주식수는
+/// 10M (1,000만주)으로 통일. 1주 가격 = 시가총액 / 10M.
 class RegionDef {
   final String id;
   final String name;
@@ -49,7 +49,7 @@ const stockTradeFee = 0.02; // 2%
 
 /// Wall-clock seconds between price ticks. Candles still bucket on
 /// [candleWindowSeconds]; multiple price ticks compose one candle.
-const stockPriceTickSeconds = 2.5;
+const stockPriceTickSeconds = 1.0;
 
 /// Candle window length in seconds.
 const candleWindowSeconds = 30;
@@ -60,20 +60,26 @@ const candleHistoryMax = 60;
 /// Dividend accrual interval.
 const dividendIntervalSeconds = 3600; // 1 hour
 
-// Cap & shares constants used in the catalog literals below.
-const _baseShares = 100000000000; // 100B = 1.0e11
-// 4.5^i × 1e17 = 시총 (i = unlockOrder - 1).
-// 1주 가격 = 시총 / 100B = 4.5^i × 1e6.
+/// Lower / upper bounds applied to current price relative to the
+/// region's intrinsic (= initial) market cap. Values picked to satisfy
+/// the design rule "최초 시총에서 -90%에서 +1750% 사이".
+const stockPriceMinFractionOfIntrinsic = 0.10; // -90%
+const stockPriceMaxFractionOfIntrinsic = 18.5; // +1750%
+
+// All regions share this share count after the v3 rebalance — keeps a
+// "1주 = 시총/10M" mental model and trims share-count visual noise.
+const _baseShares = 10000000; // 10M
+
 const regionCatalog = <RegionDef>[
   RegionDef(
     id: 'gyeonggi',
     name: '경기도',
     shortName: '경기',
     unlockOrder: 1,
-    baseMarketCap: 1.0e17, // 100aa
+    baseMarketCap: 1.0e17,
     totalShares: _baseShares,
-    initialPrice: 1.0e6,
-    volatilityPerMinute: 0.005,
+    initialPrice: 1.0e10,
+    volatilityPerMinute: 0.0075,
     hourlyYield: 0.08,
     accent: Color(0xFF42A5F5),
   ),
@@ -84,8 +90,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 2,
     baseMarketCap: 4.5e17,
     totalShares: _baseShares,
-    initialPrice: 4.5e6,
-    volatilityPerMinute: 0.006,
+    initialPrice: 4.5e10,
+    volatilityPerMinute: 0.009,
     hourlyYield: 0.08,
     accent: Color(0xFF26A69A),
   ),
@@ -96,8 +102,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 3,
     baseMarketCap: 2.025e18,
     totalShares: _baseShares,
-    initialPrice: 2.025e7,
-    volatilityPerMinute: 0.005,
+    initialPrice: 2.025e11,
+    volatilityPerMinute: 0.0075,
     hourlyYield: 0.09,
     accent: Color(0xFF66BB6A),
   ),
@@ -108,8 +114,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 4,
     baseMarketCap: 9.1125e18,
     totalShares: _baseShares,
-    initialPrice: 9.1125e7,
-    volatilityPerMinute: 0.005,
+    initialPrice: 9.1125e11,
+    volatilityPerMinute: 0.0075,
     hourlyYield: 0.09,
     accent: Color(0xFF9CCC65),
   ),
@@ -120,8 +126,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 5,
     baseMarketCap: 4.100625e19,
     totalShares: _baseShares,
-    initialPrice: 4.100625e8,
-    volatilityPerMinute: 0.004,
+    initialPrice: 4.100625e12,
+    volatilityPerMinute: 0.006,
     hourlyYield: 0.10,
     accent: Color(0xFF7E57C2),
   ),
@@ -132,8 +138,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 6,
     baseMarketCap: 1.84528125e20,
     totalShares: _baseShares,
-    initialPrice: 1.84528125e9,
-    volatilityPerMinute: 0.007,
+    initialPrice: 1.84528125e13,
+    volatilityPerMinute: 0.0105,
     hourlyYield: 0.10,
     accent: Color(0xFFFFA726),
   ),
@@ -144,8 +150,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 7,
     baseMarketCap: 8.303765625e20,
     totalShares: _baseShares,
-    initialPrice: 8.303765625e9,
-    volatilityPerMinute: 0.007,
+    initialPrice: 8.303765625e13,
+    volatilityPerMinute: 0.0105,
     hourlyYield: 0.10,
     accent: Color(0xFFFFB74D),
   ),
@@ -156,8 +162,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 8,
     baseMarketCap: 3.7366945312e21,
     totalShares: _baseShares,
-    initialPrice: 3.7366945312e10,
-    volatilityPerMinute: 0.006,
+    initialPrice: 3.7366945312e14,
+    volatilityPerMinute: 0.009,
     hourlyYield: 0.09,
     accent: Color(0xFFEF5350),
   ),
@@ -168,8 +174,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 9,
     baseMarketCap: 1.6815125391e22,
     totalShares: _baseShares,
-    initialPrice: 1.6815125391e11,
-    volatilityPerMinute: 0.006,
+    initialPrice: 1.6815125391e15,
+    volatilityPerMinute: 0.009,
     hourlyYield: 0.09,
     accent: Color(0xFFEC407A),
   ),
@@ -180,8 +186,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 10,
     baseMarketCap: 7.5668064258e22,
     totalShares: _baseShares,
-    initialPrice: 7.5668064258e11,
-    volatilityPerMinute: 0.007,
+    initialPrice: 7.5668064258e15,
+    volatilityPerMinute: 0.0105,
     hourlyYield: 0.10,
     accent: Color(0xFFAB47BC),
   ),
@@ -192,8 +198,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 11,
     baseMarketCap: 3.4050628916e23,
     totalShares: _baseShares,
-    initialPrice: 3.4050628916e12,
-    volatilityPerMinute: 0.008,
+    initialPrice: 3.4050628916e16,
+    volatilityPerMinute: 0.012,
     hourlyYield: 0.10,
     accent: Color(0xFF8D6E63),
   ),
@@ -204,8 +210,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 12,
     baseMarketCap: 1.5322783012e24,
     totalShares: _baseShares,
-    initialPrice: 1.5322783012e13,
-    volatilityPerMinute: 0.007,
+    initialPrice: 1.5322783012e17,
+    volatilityPerMinute: 0.0105,
     hourlyYield: 0.11,
     accent: Color(0xFF6D4C41),
   ),
@@ -216,8 +222,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 13,
     baseMarketCap: 6.8952523554e24,
     totalShares: _baseShares,
-    initialPrice: 6.8952523554e13,
-    volatilityPerMinute: 0.006,
+    initialPrice: 6.8952523554e17,
+    volatilityPerMinute: 0.009,
     hourlyYield: 0.10,
     accent: Color(0xFF5C6BC0),
   ),
@@ -228,8 +234,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 14,
     baseMarketCap: 3.1028635599e25,
     totalShares: _baseShares,
-    initialPrice: 3.1028635599e14,
-    volatilityPerMinute: 0.007,
+    initialPrice: 3.1028635599e18,
+    volatilityPerMinute: 0.0105,
     hourlyYield: 0.11,
     accent: Color(0xFF3949AB),
   ),
@@ -240,8 +246,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 15,
     baseMarketCap: 1.3962886020e26,
     totalShares: _baseShares,
-    initialPrice: 1.3962886020e15,
-    volatilityPerMinute: 0.008,
+    initialPrice: 1.3962886020e19,
+    volatilityPerMinute: 0.012,
     hourlyYield: 0.12,
     accent: Color(0xFF1E88E5),
   ),
@@ -252,8 +258,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 16,
     baseMarketCap: 6.2832987088e26,
     totalShares: _baseShares,
-    initialPrice: 6.2832987088e15,
-    volatilityPerMinute: 0.012,
+    initialPrice: 6.2832987088e19,
+    volatilityPerMinute: 0.018,
     hourlyYield: 0.14,
     accent: Color(0xFF00ACC1),
   ),
@@ -264,8 +270,8 @@ const regionCatalog = <RegionDef>[
     unlockOrder: 17,
     baseMarketCap: 2.8274844190e27,
     totalShares: _baseShares,
-    initialPrice: 2.8274844190e16,
-    volatilityPerMinute: 0.004,
+    initialPrice: 2.8274844190e20,
+    volatilityPerMinute: 0.006,
     hourlyYield: 0.08,
     accent: Color(0xFFD32F2F),
   ),
