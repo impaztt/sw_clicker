@@ -27,6 +27,8 @@ import '../services/sync_service.dart';
 /// Buy count: 1, 10, 100 or -1 for Max.
 final buyMultiplierProvider = StateProvider<int>((_) => 1);
 
+const stockMarketPriceCurveRebalanceVersion = 16;
+
 /// Cost in 정수 per single summon.
 const summonCostSingle = 50;
 const summonCostTen = 450;
@@ -974,8 +976,10 @@ class GameNotifier extends Notifier<GameState> {
   Future<void> _initialize() async {
     final loaded = await _syncService.loadResolved();
     final now = DateTime.now();
+    var loadedVersion = SaveData.currentVersion;
     if (loaded != null) {
       _save = loaded;
+      loadedVersion = _save.version;
       _sanitizeLoadedSave();
       _migrateLegacySoulsToOverallUpgrade();
       _rotateMissionWindowsIfNeeded(now: now, force: true);
@@ -1001,7 +1005,8 @@ class GameNotifier extends Notifier<GameState> {
     } else {
       _rotateMissionWindowsIfNeeded(now: now, force: true);
     }
-    _bootstrapStockMarket(now: now);
+    _bootstrapStockMarket(now: now, loadedVersion: loadedVersion);
+    _save.version = SaveData.currentVersion;
     _accrueOfflineDividends(now: now);
     _pendingDaily = _evaluateDailyEligibility();
     _emit(loaded: true);
@@ -2812,7 +2817,10 @@ class GameNotifier extends Notifier<GameState> {
   /// Ensure RegionState entries exist for every catalog region. The first
   /// region (gyeonggi) is unlocked automatically once the lifetime gold
   /// trigger has been hit; later regions wait for the ownership chain.
-  void _bootstrapStockMarket({required DateTime now}) {
+  void _bootstrapStockMarket({
+    required DateTime now,
+    required int loadedVersion,
+  }) {
     final m = _save.market;
     for (final def in regionCatalog) {
       final existing = m.regions[def.id];
@@ -2827,21 +2835,26 @@ class GameNotifier extends Notifier<GameState> {
         );
       } else {
         // Migration: pre-rebalance saves had totalShares=100B and
-        // initialPrice 1/10000 of the new value. If the stored price is
-        // dramatically below the new initialPrice, rescale shares ÷ 10000
+        // initialPrice 1/10000 of the old post-rebalance value. If the
+        // stored price is dramatically below that curve, rescale shares ÷ 10000
         // and avgCost × 10000 so the player's gold-equivalent stays close
         // while moving onto the new units. Candles + intra-tick state are
         // dropped because they're priced in old units.
         const oldToNewShareRatio = 10000;
+        final previousInitialPrice =
+            _previousStockCurveInitialPrice(def.unlockOrder);
         final looksLegacy = existing.currentPrice > 0 &&
-            existing.currentPrice < def.initialPrice * 0.01;
+            existing.currentPrice < previousInitialPrice * 0.01;
         if (looksLegacy) {
           existing.shares = (existing.shares / oldToNewShareRatio).floor();
           existing.avgCost = existing.avgCost * oldToNewShareRatio;
-          existing.currentPrice = def.initialPrice;
-          existing.intrinsicPrice = def.initialPrice;
+          existing.currentPrice = previousInitialPrice;
+          existing.intrinsicPrice = previousInitialPrice;
           existing.recentCandles.clear();
           existing.formingCandle = null;
+        }
+        if (loadedVersion < stockMarketPriceCurveRebalanceVersion) {
+          _rebaseStockPriceCurve(def, existing);
         }
         // Heal corrupt prices, e.g. legacy zeros.
         if (existing.currentPrice <= 0)
@@ -2865,6 +2878,50 @@ class GameNotifier extends Notifier<GameState> {
       first.unlocked = true;
     }
     _checkRegionUnlocks();
+  }
+
+  double _previousStockCurveInitialPrice(int unlockOrder) {
+    if (unlockOrder <= 1) return regionCatalog.first.initialPrice;
+    return regionCatalog.first.initialPrice * pow(4.5, unlockOrder - 1);
+  }
+
+  void _rebaseStockPriceCurve(RegionDef def, RegionState state) {
+    final previousPrice = _previousStockCurveInitialPrice(def.unlockOrder);
+    if (previousPrice <= 0) return;
+    final scale = def.initialPrice / previousPrice;
+    final intrinsic = regionIntrinsicPrice(def.id);
+    if ((scale - 1.0).abs() < 0.000001) {
+      state.intrinsicPrice = intrinsic;
+      return;
+    }
+
+    if (state.shares <= 0) {
+      state.avgCost = 0;
+      state.currentPrice = def.initialPrice;
+      state.recentCandles.clear();
+      state.formingCandle = null;
+    } else {
+      state.currentPrice *= scale;
+      state.avgCost =
+          state.avgCost > 0 ? state.avgCost * scale : def.initialPrice;
+      for (final candle in state.recentCandles) {
+        _scaleCandle(candle, scale);
+      }
+      final forming = state.formingCandle;
+      if (forming != null) _scaleCandle(forming, scale);
+    }
+
+    final lo = intrinsic * stockPriceMinFractionOfIntrinsic;
+    final hi = intrinsic * stockPriceMaxFractionOfIntrinsic;
+    state.currentPrice = state.currentPrice.clamp(lo, hi).toDouble();
+    state.intrinsicPrice = intrinsic;
+  }
+
+  void _scaleCandle(Candle candle, double scale) {
+    candle.open *= scale;
+    candle.high *= scale;
+    candle.low *= scale;
+    candle.close *= scale;
   }
 
   /// Pay missed dividends for the time the user was away. Capped to the same

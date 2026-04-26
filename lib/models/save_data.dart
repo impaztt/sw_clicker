@@ -5,7 +5,7 @@ import 'stock_market.dart';
 import 'sword.dart';
 
 class SaveData {
-  static const currentVersion = 15;
+  static const currentVersion = 16;
 
   int version;
   double gold;
@@ -174,7 +174,7 @@ class SaveData {
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
-        version: json['version'] as int? ?? currentVersion,
+        version: json['version'] as int? ?? 0,
         gold: (json['gold'] as num?)?.toDouble() ?? 0,
         totalGoldEarned: (json['totalGoldEarned'] as num?)?.toDouble() ?? 0,
         producerLevels:
