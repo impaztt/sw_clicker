@@ -7,6 +7,7 @@ import 'screens/main_screen.dart';
 import 'services/audio_service.dart';
 import 'widgets/achievement_toast.dart';
 import 'widgets/feature_unlock_toast.dart';
+import 'widgets/main_sword_event_host.dart';
 
 class SwClickerApp extends ConsumerStatefulWidget {
   const SwClickerApp({super.key});
@@ -63,7 +64,9 @@ class _SwClickerAppState extends ConsumerState<SwClickerApp>
           data: media.copyWith(textScaler: TextScaler.linear(textScale)),
           child: AchievementToastHost(
             child: FeatureUnlockToastHost(
-              child: child ?? const SizedBox.shrink(),
+              child: MainSwordEventHost(
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );

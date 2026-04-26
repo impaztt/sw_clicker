@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
+import '../data/main_sword_enhancement.dart';
+import '../data/main_sword_evolution.dart';
 import '../data/prestige_upgrade_catalog.dart';
 import '../data/repeating_achievement_catalog.dart';
 import '../data/producer_catalog.dart';
@@ -440,6 +442,85 @@ const goldExchangeOffers = <GoldExchangeOffer>[
 /// then their DPS is large enough that fixed packs are noise.
 const goldExchangeFixedHideAfterPrestiges = 3;
 
+// Main sword enhancement types ------------------------------------------------
+
+enum MainSwordEnhanceCurrency { gold, essence, hybrid }
+
+enum MainSwordEnhanceFailure {
+  none,
+  notEnoughGold,
+  notEnoughEssence,
+  alreadyMaxed,
+  rolledFailure,
+}
+
+class MainSwordEnhanceAttemptResult {
+  final bool ok; // false → couldn't even attempt (cost / cap reasons)
+  final bool success; // true → +1 stage applied
+  final int previousStage;
+  final int newStage;
+  final MainSwordEnhanceFailure reason;
+  final int penaltyApplied;
+  final double goldSpent;
+  final int essenceSpent;
+  final bool crossedTierUp;
+  final MainSwordMilestoneReward? milestoneReward;
+  const MainSwordEnhanceAttemptResult({
+    required this.ok,
+    required this.success,
+    required this.previousStage,
+    required this.newStage,
+    required this.reason,
+    this.penaltyApplied = 0,
+    this.goldSpent = 0,
+    this.essenceSpent = 0,
+    this.crossedTierUp = false,
+    this.milestoneReward,
+  });
+}
+
+enum MainSwordEventType { tierUp, milestone, namingPrompt }
+
+class MainSwordEvent {
+  final MainSwordEventType type;
+  final int? tierIndex;
+  final String? tierName;
+  final int? stage;
+  final MainSwordMilestoneReward? milestone;
+  const MainSwordEvent._({
+    required this.type,
+    this.tierIndex,
+    this.tierName,
+    this.stage,
+    this.milestone,
+  });
+
+  const MainSwordEvent.tierUp({
+    required int tierIndex,
+    required String tierName,
+    required int stage,
+  }) : this._(
+          type: MainSwordEventType.tierUp,
+          tierIndex: tierIndex,
+          tierName: tierName,
+          stage: stage,
+        );
+
+  MainSwordEvent.milestone(MainSwordMilestoneReward reward)
+      : this._(
+          type: MainSwordEventType.milestone,
+          milestone: reward,
+          stage: reward.stage,
+        );
+
+  const MainSwordEvent.namingPrompt()
+      : this._(type: MainSwordEventType.namingPrompt);
+}
+
+final mainSwordEventProvider = StreamProvider<MainSwordEvent>(
+  (ref) => ref.watch(gameProvider.notifier).mainSwordEventStream,
+);
+
 /// Result of attempting a gold-exchange purchase. Communicates the precise
 /// reason on failure so the UI can show a useful toast.
 enum GoldExchangeFailureReason {
@@ -816,6 +897,9 @@ class GameState {
   final int goldExchangeDailyUsed;
   final int goldExchangePrestigeUsed;
   final bool goldExchangeEightHourUsedToday;
+  final int mainSwordStage;
+  final String? mainSwordName;
+  final int mainSwordHighestStage;
   final bool loaded;
 
   const GameState({
@@ -874,6 +958,9 @@ class GameState {
     this.goldExchangeDailyUsed = 0,
     this.goldExchangePrestigeUsed = 0,
     this.goldExchangeEightHourUsedToday = false,
+    this.mainSwordStage = 0,
+    this.mainSwordName,
+    this.mainSwordHighestStage = 0,
     this.loaded = false,
   });
 
@@ -1144,6 +1231,7 @@ class GameNotifier extends Notifier<GameState> {
     _autoTapTimer?.cancel();
     _achievementUnlocks.close();
     _featureUnlocks.close();
+    _mainSwordEvents.close();
   }
 
   Future<void> _initialize() async {
@@ -1256,6 +1344,16 @@ class GameNotifier extends Notifier<GameState> {
         _intClamp(_save.goldExchangeDailyCount, 0, goldExchangeDailyLimit);
     _save.goldExchangePrestigeCount =
         _intClamp(_save.goldExchangePrestigeCount, 0, goldExchangePrestigeLimit);
+    _save.mainSwordStage =
+        _intClamp(_save.mainSwordStage, 0, mainSwordEnhanceMaxStage);
+    _save.mainSwordHighestStage = _intClamp(
+      _save.mainSwordHighestStage,
+      _save.mainSwordStage,
+      mainSwordEnhanceMaxStage,
+    );
+    _save.mainSwordTiersShown.removeWhere(
+      (i) => i < 0 || i >= mainSwordTiers.length,
+    );
     _save.prestigeCoins = _intClamp(_save.prestigeCoins, 0, 2147483647);
     _save.prestigeCount = _intClamp(_save.prestigeCount, 0, 1000000);
     _save.ascensionCoreLevel = _intClamp(_save.ascensionCoreLevel, 0, 1000000);
@@ -1519,6 +1617,9 @@ class GameNotifier extends Notifier<GameState> {
       goldExchangePrestigeUsed: _save.goldExchangePrestigeCount,
       goldExchangeEightHourUsedToday:
           _save.goldExchangeEightHourDayKey == _dayKey(DateTime.now()),
+      mainSwordStage: _save.mainSwordStage,
+      mainSwordName: _save.mainSwordName,
+      mainSwordHighestStage: _save.mainSwordHighestStage,
       loaded: loaded,
     );
     if (loaded) {
@@ -1888,6 +1989,8 @@ class GameNotifier extends Notifier<GameState> {
         total += swordById(id).ownedBonusAt(lv);
       } catch (_) {}
     });
+    // Permanent collection-bonus boosts unlocked via main sword milestones.
+    total += _save.mainSwordCollectionBonusFraction;
     return total;
   }
 
@@ -2018,7 +2121,8 @@ class GameNotifier extends Notifier<GameState> {
         _boosterTapMult() *
         _setTapBonus() *
         _collectionMult() *
-        _formationTapMult();
+        _formationTapMult() *
+        _mainSwordMult();
   }
 
   double _calcDps() {
@@ -2035,8 +2139,22 @@ class GameNotifier extends Notifier<GameState> {
         _boosterDpsMult() *
         _setDpsBonus() *
         _collectionMult() *
-        _formationDpsMult();
+        _formationDpsMult() *
+        _mainSwordMult();
   }
+
+  /// Multiplier from the home-tab main sword's enhancement stage. Applies
+  /// to BOTH tap and DPS so progression on the main sword scales evenly
+  /// with the rest of the build.
+  double _mainSwordMult() => mainSwordStageBonusMult(_save.mainSwordStage);
+
+  /// Public read so the UI can show "+X% from 메인검 +N단계".
+  double get mainSwordBonusFraction =>
+      _mainSwordMult() - 1.0 + _summonRateBonusFromMainSword();
+
+  /// Permanent +5% summon-rate bonus from clearing +50.
+  double _summonRateBonusFromMainSword() =>
+      _save.mainSwordHighestStage >= 50 ? 0.05 : 0.0;
 
   /// Public read for the home screen so it can show "수집 보너스 +X%".
   double get collectionBonusFraction => _collectionBonusTotal();
@@ -2480,6 +2598,187 @@ class GameNotifier extends Notifier<GameState> {
       ok: true,
       goldGranted: goldGranted,
       reason: GoldExchangeFailureReason.none,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Main sword enhancement
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Stream of milestone awards / tier evolutions / first-naming prompts.
+  final _mainSwordEvents =
+      StreamController<MainSwordEvent>.broadcast();
+  Stream<MainSwordEvent> get mainSwordEventStream => _mainSwordEvents.stream;
+
+  /// Set/replace the main sword's nickname. Empty/whitespace input is
+  /// rejected so the UI can default to a placeholder.
+  bool setMainSwordName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return false;
+    _save.mainSwordName = trimmed;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return true;
+  }
+
+  /// Attempt one main sword enhancement step.
+  ///
+  /// Stage transitions follow these rules:
+  ///   • Success → +1 stage (clamped at mainSwordEnhanceMaxStage).
+  ///   • Failure on essence path → no stage change.
+  ///   • Failure on gold path → −penalty unless [useProtection] is set.
+  ///   • Failure on hybrid → splits the difference: gold-track penalty
+  ///     applies, but protection is implied (so no stage loss) at the
+  ///     cost of full hybrid pricing.
+  MainSwordEnhanceAttemptResult attemptMainSwordEnhance({
+    required MainSwordEnhanceCurrency currency,
+    MainSwordBoostLevel boostLevel = MainSwordBoostLevel.none,
+    bool useProtection = false,
+  }) {
+    final currentStage = _save.mainSwordStage;
+    if (currentStage >= mainSwordEnhanceMaxStage) {
+      return const MainSwordEnhanceAttemptResult(
+        ok: false,
+        success: false,
+        previousStage: 0,
+        newStage: 0,
+        reason: MainSwordEnhanceFailure.alreadyMaxed,
+      );
+    }
+    final targetStage = currentStage + 1;
+    final cost = mainSwordEnhanceCost(targetStage);
+
+    // Compute final cost based on currency choice.
+    double goldCost = 0;
+    int essenceCost = 0;
+    double successRate;
+    final boost = boostLevel;
+    final protection = useProtection;
+
+    switch (currency) {
+      case MainSwordEnhanceCurrency.gold:
+        goldCost = cost.goldCost;
+        essenceCost = boost.essenceCost +
+            (protection ? mainSwordProtectionEssenceCost : 0);
+        successRate = (cost.goldSuccessBase + boost.successBonus).clamp(0.0, 1.0);
+      case MainSwordEnhanceCurrency.essence:
+        essenceCost = cost.essenceCost;
+        successRate = cost.essenceSuccessBase;
+      case MainSwordEnhanceCurrency.hybrid:
+        goldCost = cost.goldCost * mainSwordHybridGoldMultiplier;
+        essenceCost =
+            (cost.essenceCost * mainSwordHybridEssenceMultiplier).round();
+        successRate =
+            (cost.goldSuccessBase + mainSwordHybridSuccessBonus).clamp(0.0, 1.0);
+    }
+
+    if (_save.gold < goldCost) {
+      return MainSwordEnhanceAttemptResult(
+        ok: false,
+        success: false,
+        previousStage: currentStage,
+        newStage: currentStage,
+        reason: MainSwordEnhanceFailure.notEnoughGold,
+      );
+    }
+    if (_save.essence < essenceCost) {
+      return MainSwordEnhanceAttemptResult(
+        ok: false,
+        success: false,
+        previousStage: currentStage,
+        newStage: currentStage,
+        reason: MainSwordEnhanceFailure.notEnoughEssence,
+      );
+    }
+
+    if (goldCost > 0) {
+      _save.gold -= goldCost;
+      _decayPurchasedGoldUnconverted(goldCost);
+      _save.stats.totalGoldSpent += goldCost;
+      _save.run.goldSpent += goldCost;
+    }
+    if (essenceCost > 0) {
+      _save.essence -= essenceCost;
+    }
+
+    final roll = _random.nextDouble();
+    final success = roll < successRate;
+    final previousStage = currentStage;
+    final firstEverEnhance =
+        currentStage == 0 && _save.mainSwordHighestStage == 0;
+    int newStage = currentStage;
+    int penaltyApplied = 0;
+    if (success) {
+      newStage = currentStage + 1;
+    } else if (currency == MainSwordEnhanceCurrency.essence) {
+      // Essence-track failures never lose a stage.
+    } else if (currency == MainSwordEnhanceCurrency.hybrid) {
+      // Hybrid paid the full price, treat as protected.
+    } else if (!protection) {
+      penaltyApplied =
+          cost.penaltyOnFail.clamp(0, currentStage);
+      newStage = currentStage - penaltyApplied;
+    }
+    _save.mainSwordStage = newStage.clamp(0, mainSwordEnhanceMaxStage);
+    _save.mainSwordEnhanceAttempts++;
+
+    // Milestone + tier-up detection on the *new* stage.
+    final wasNewHigh =
+        _save.mainSwordStage > _save.mainSwordHighestStage;
+    if (wasNewHigh) {
+      _save.mainSwordHighestStage = _save.mainSwordStage;
+    }
+    final crossedTierUp =
+        success &&
+        mainSwordTierIndex(newStage) >
+            mainSwordTierIndex(previousStage);
+    if (crossedTierUp) {
+      final tierIdx = mainSwordTierIndex(newStage);
+      if (!_save.mainSwordTiersShown.contains(tierIdx)) {
+        _save.mainSwordTiersShown.add(tierIdx);
+        _mainSwordEvents.add(
+          MainSwordEvent.tierUp(
+            tierIndex: tierIdx,
+            tierName: mainSwordTiers[tierIdx].name,
+            stage: newStage,
+          ),
+        );
+      }
+    }
+    MainSwordMilestoneReward? milestone;
+    if (success && wasNewHigh) {
+      milestone = mainSwordMilestoneAt(newStage);
+      if (milestone != null) {
+        if (milestone.essence > 0) _save.essence += milestone.essence;
+        if (milestone.collectionBonusFraction != null) {
+          _save.mainSwordCollectionBonusFraction +=
+              milestone.collectionBonusFraction!;
+        }
+        _mainSwordEvents.add(MainSwordEvent.milestone(milestone));
+      }
+    }
+    if (firstEverEnhance &&
+        success &&
+        _save.mainSwordName == null) {
+      _mainSwordEvents.add(const MainSwordEvent.namingPrompt());
+    }
+
+    _emit(loaded: true);
+    unawaited(_persist());
+
+    return MainSwordEnhanceAttemptResult(
+      ok: true,
+      success: success,
+      previousStage: previousStage,
+      newStage: newStage,
+      reason: success
+          ? MainSwordEnhanceFailure.none
+          : MainSwordEnhanceFailure.rolledFailure,
+      penaltyApplied: penaltyApplied,
+      goldSpent: goldCost,
+      essenceSpent: essenceCost,
+      crossedTierUp: crossedTierUp,
+      milestoneReward: milestone,
     );
   }
 

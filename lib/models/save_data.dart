@@ -5,7 +5,7 @@ import 'stock_market.dart';
 import 'sword.dart';
 
 class SaveData {
-  static const currentVersion = 17;
+  static const currentVersion = 18;
 
   int version;
   double gold;
@@ -71,6 +71,19 @@ class SaveData {
   DateTime? monthlyPassLastClaimAt;
   bool starterPackagePurchased;
 
+  // Main sword (v18): the single sword anchored to the home tab. Separate
+  // from the collection — collection swords still grant passive/active
+  // bonuses, but the home tab visually represents this main sword and only
+  // its stage controls the home-tap visual evolution.
+  int mainSwordStage; // 0~50
+  String? mainSwordName; // null until first +1 enhance prompts the user
+  int mainSwordHighestStage; // for the permanent title (never decays)
+  Set<int> mainSwordTiersShown; // which evolution cutscenes have played
+  int mainSwordEnhanceAttempts; // analytics
+  // Sum of all milestone collectionBonusFraction grants. Applied as a
+  // fraction on top of the existing collection bonus.
+  double mainSwordCollectionBonusFraction;
+
   // Gold-exchange shop (v17): how much of the player's currentGold came from
   // the essence-for-gold exchange and hasn't been spent yet. While this is
   // > 0, that portion of currentGold is excluded from the prestige-coin
@@ -130,7 +143,14 @@ class SaveData {
     this.goldExchangeDailyCount = 0,
     this.goldExchangePrestigeCount = 0,
     this.goldExchangeEightHourDayKey = 0,
-  })  : producerLevels = producerLevels ?? {},
+    this.mainSwordStage = 0,
+    this.mainSwordName,
+    this.mainSwordHighestStage = 0,
+    Set<int>? mainSwordTiersShown,
+    this.mainSwordEnhanceAttempts = 0,
+    this.mainSwordCollectionBonusFraction = 0,
+  })  : mainSwordTiersShown = mainSwordTiersShown ?? <int>{},
+        producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
         lastSavedAt = lastSavedAt ?? DateTime.now(),
@@ -196,6 +216,12 @@ class SaveData {
         'goldExchangeDailyCount': goldExchangeDailyCount,
         'goldExchangePrestigeCount': goldExchangePrestigeCount,
         'goldExchangeEightHourDayKey': goldExchangeEightHourDayKey,
+        'mainSwordStage': mainSwordStage,
+        'mainSwordName': mainSwordName,
+        'mainSwordHighestStage': mainSwordHighestStage,
+        'mainSwordTiersShown': mainSwordTiersShown.toList(),
+        'mainSwordEnhanceAttempts': mainSwordEnhanceAttempts,
+        'mainSwordCollectionBonusFraction': mainSwordCollectionBonusFraction,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -285,6 +311,16 @@ class SaveData {
             json['goldExchangePrestigeCount'] as int? ?? 0,
         goldExchangeEightHourDayKey:
             json['goldExchangeEightHourDayKey'] as int? ?? 0,
+        mainSwordStage: json['mainSwordStage'] as int? ?? 0,
+        mainSwordName: json['mainSwordName'] as String?,
+        mainSwordHighestStage: json['mainSwordHighestStage'] as int? ?? 0,
+        mainSwordTiersShown: ((json['mainSwordTiersShown'] as List?) ?? const [])
+            .map((e) => e as int)
+            .toSet(),
+        mainSwordEnhanceAttempts:
+            json['mainSwordEnhanceAttempts'] as int? ?? 0,
+        mainSwordCollectionBonusFraction:
+            (json['mainSwordCollectionBonusFraction'] as num?)?.toDouble() ?? 0,
       );
 
   static List<String?> _normalizeFormationSwordIds(List<String?>? source) {

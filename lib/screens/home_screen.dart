@@ -12,12 +12,13 @@ import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../widgets/booster_shop_dialog.dart';
 import '../widgets/gold_exchange_dialog.dart';
+import '../widgets/main_sword_enhance_dialog.dart';
+import '../widgets/main_sword_widget.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/floating_number.dart';
 import '../widgets/feature_unlock_guide.dart';
 import '../widgets/golden_slime.dart';
 import '../widgets/gold_display.dart';
-import '../widgets/sword_widget.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -116,6 +117,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  void _openMainSwordEnhance() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => const MainSwordEnhanceDialog(),
+    );
+  }
+
+  double _enhanceFabBottom(GameState game) {
+    var bottom = 16.0;
+    if (game.isFeatureUnlocked(FeatureUnlocks.boosterShop)) bottom += 60;
+    if (game.isFeatureUnlocked(FeatureUnlocks.goldExchange)) bottom += 60;
+    return bottom;
+  }
+
   void _openUnlockRoadmap() {
     final game = ref.read(gameProvider);
     showFeatureUnlockRoadmapSheet(
@@ -161,16 +176,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               DpsDisplay(dps: game.dps),
               const Spacer(),
               Center(
-                child: Builder(builder: (_) {
-                  final equipped = game.equippedSword;
-                  if (equipped != null) {
-                    return SwordWidget(
-                      onTap: _handleTap,
-                      visual: equipped.visual,
-                    );
-                  }
-                  return SwordWidget(onTap: _handleTap);
-                }),
+                child: MainSwordWidget(
+                  onTap: _handleTap,
+                  stage: game.mainSwordStage,
+                ),
               ),
               const Spacer(),
               if (lockedFeatures.isNotEmpty && nextLocked != null) ...[
@@ -225,6 +234,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   : 16,
               child: _ExchangeFab(onTap: _openGoldExchange),
             ),
+          Positioned(
+            right: 16,
+            bottom: _enhanceFabBottom(game),
+            child: _EnhanceFab(
+              onTap: _openMainSwordEnhance,
+              stage: game.mainSwordStage,
+            ),
+          ),
         ],
       ),
     );
@@ -254,6 +271,55 @@ class _ShopFab extends StatelessWidget {
           width: 52,
           height: 52,
           child: Icon(Icons.bolt, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _EnhanceFab extends StatelessWidget {
+  final VoidCallback onTap;
+  final int stage;
+  const _EnhanceFab({required this.onTap, required this.stage});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF7C4DFF),
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(Icons.auto_fix_high, color: Colors.white, size: 26),
+              Positioned(
+                right: 4,
+                bottom: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '+$stage',
+                    style: const TextStyle(
+                      color: Color(0xFF7C4DFF),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
