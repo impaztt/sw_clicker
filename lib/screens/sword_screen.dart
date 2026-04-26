@@ -34,6 +34,7 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
         const _CodexTab(label: '세트', view: _SwordSetsView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.summonTab))
         const _CodexTab(label: '소환', view: _SummonView()),
+      const _CodexTab(label: '상점', view: _PremiumShopView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.missionsTab))
         const _CodexTab(label: '미션', view: _MissionHubView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
@@ -853,8 +854,7 @@ class _TierSection extends StatelessWidget {
                                     fontWeight: FontWeight.w800,
                                     color: ratio >= 1
                                         ? color
-                                        : Colors.black
-                                            .withValues(alpha: 0.65),
+                                        : Colors.black.withValues(alpha: 0.65),
                                   ),
                                 ),
                               ],
@@ -1477,8 +1477,7 @@ class _MissionHubViewState extends ConsumerState<_MissionHubView> {
             accent: const Color(0xFF00897B),
             missions: daily,
             expanded: _dailyExpanded,
-            onToggle: () =>
-                setState(() => _dailyExpanded = !_dailyExpanded),
+            onToggle: () => setState(() => _dailyExpanded = !_dailyExpanded),
             onClaim: (id) => notifier.claimMission(id, daily: true),
           ),
           const SizedBox(height: 10),
@@ -1487,8 +1486,7 @@ class _MissionHubViewState extends ConsumerState<_MissionHubView> {
             accent: const Color(0xFF7E57C2),
             missions: weekly,
             expanded: _weeklyExpanded,
-            onToggle: () =>
-                setState(() => _weeklyExpanded = !_weeklyExpanded),
+            onToggle: () => setState(() => _weeklyExpanded = !_weeklyExpanded),
             onClaim: (id) => notifier.claimMission(id, daily: false),
           ),
         ],
@@ -1551,9 +1549,7 @@ class _MissionProgressCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  claimable > 0
-                      ? '수령 가능 보상 $claimable개'
-                      : '현재 수령 가능한 보상이 없습니다',
+                  claimable > 0 ? '수령 가능 보상 $claimable개' : '현재 수령 가능한 보상이 없습니다',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 12,
@@ -1567,10 +1563,8 @@ class _MissionProgressCard extends StatelessWidget {
                   backgroundColor: Colors.white,
                   foregroundColor: AppColors.deepCoral,
                   minimumSize: const Size(96, 36),
-                  disabledBackgroundColor:
-                      Colors.white.withValues(alpha: 0.25),
-                  disabledForegroundColor:
-                      Colors.white.withValues(alpha: 0.7),
+                  disabledBackgroundColor: Colors.white.withValues(alpha: 0.25),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
                 ),
                 child: const Text(
                   '전체 수령',
@@ -1604,8 +1598,7 @@ class _MissionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final done = missions.where((m) => m.done).length;
-    final claimable =
-        missions.where((m) => m.done && !m.claimed).length;
+    final claimable = missions.where((m) => m.done && !m.claimed).length;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1919,8 +1912,7 @@ class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
                   label: '마일스톤',
                   count: milestoneTotal,
                   selected: _kind == _AchKind.milestones,
-                  onTap: () =>
-                      setState(() => _kind = _AchKind.milestones),
+                  onTap: () => setState(() => _kind = _AchKind.milestones),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1929,8 +1921,7 @@ class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
                   label: '반복 도전',
                   count: repeatingAchievementCatalog.length,
                   selected: _kind == _AchKind.repeating,
-                  onTap: () =>
-                      setState(() => _kind = _AchKind.repeating),
+                  onTap: () => setState(() => _kind = _AchKind.repeating),
                 ),
               ),
             ],
@@ -1981,8 +1972,7 @@ class _AchievementHubViewState extends ConsumerState<_AchievementHubView> {
                     final def = filteredRepeats[i];
                     final cleared =
                         game.repeatingAchievementStages[def.id] ?? 0;
-                    final progress =
-                        repeatingProgress(def, achCtx, cleared);
+                    final progress = repeatingProgress(def, achCtx, cleared);
                     return _RepeatingAchTile(progress: progress);
                   },
                 ),
@@ -2396,6 +2386,426 @@ class _AchievementHubTile extends StatelessWidget {
   }
 }
 
+class _PremiumShopView extends ConsumerWidget {
+  const _PremiumShopView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final game = ref.watch(gameProvider);
+    final notifier = ref.read(gameProvider.notifier);
+    final activePass = notifier.hasActiveMonthlyPass;
+    final passDays = notifier.monthlyPassDaysRemaining;
+    final claimableEssence = notifier.monthlyPassClaimableEssence;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF202A44),
+                  AppColors.deepCoral.withValues(alpha: 0.88),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '상점',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '정수 보급, 광고 제거, 초반 성장 패키지를 먼저 열어둔 1차 상점입니다.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.86),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _PremiumStatusChip(
+                      icon: Icons.diamond,
+                      label: '보유 정수 ${game.essence}',
+                    ),
+                    _PremiumStatusChip(
+                      icon: Icons.workspace_premium,
+                      label: activePass ? '월정액 D-$passDays' : '월정액 없음',
+                    ),
+                    _PremiumStatusChip(
+                      icon: Icons.block,
+                      label: notifier.adsRemoved ? '광고 제거 적용' : '광고 포함',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (activePass)
+            _MonthlyClaimPanel(
+              claimableEssence: claimableEssence,
+              daysRemaining: passDays,
+              onClaim: () {
+                final amount =
+                    ref.read(gameProvider.notifier).claimMonthlyPassEssence();
+                _toast(
+                  context,
+                  amount > 0 ? '정수 $amount개를 수령했어요' : '오늘 받을 정수가 없어요',
+                );
+              },
+            ),
+          if (activePass) const SizedBox(height: 14),
+          for (final product in premiumProducts) ...[
+            _PremiumProductCard(
+              product: product,
+              icon: _premiumProductIcon(product.id),
+              color: _premiumProductColor(product.id),
+              status: _premiumProductStatus(product.id, notifier),
+              buttonLabel: _premiumProductButtonLabel(product.id, notifier),
+              enabled: _premiumProductEnabled(product.id, notifier),
+              onPressed: () => _buyPremiumProduct(context, ref, product.id),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthlyClaimPanel extends StatelessWidget {
+  final int claimableEssence;
+  final int daysRemaining;
+  final VoidCallback onClaim;
+
+  const _MonthlyClaimPanel({
+    required this.claimableEssence,
+    required this.daysRemaining,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canClaim = claimableEssence > 0;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.teal.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.teal.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.teal.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.event_available, color: Colors.teal.shade700),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  canClaim ? '수령 가능 정수 $claimableEssence' : '오늘 수령 완료',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '월간 보급권 잔여 $daysRemaining일',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.58),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: canClaim ? onClaim : null,
+            icon: const Icon(Icons.diamond, size: 15),
+            label: const Text('수령'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.teal.shade600,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade600,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumProductCard extends StatelessWidget {
+  final PremiumProductDef product;
+  final IconData icon;
+  final Color color;
+  final String status;
+  final String buttonLabel;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _PremiumProductCard({
+    required this.product,
+    required this.icon,
+    required this.color,
+    required this.status,
+    required this.buttonLabel,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 23),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      product.subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withValues(alpha: 0.58),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    product.priceLabel,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _MiniTag(label: status, color: color, icon: Icons.verified),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (final benefit in product.benefits) ...[
+            Row(
+              children: [
+                Icon(Icons.check_circle, size: 14, color: color),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    benefit,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: enabled ? onPressed : null,
+              icon: Icon(enabled ? Icons.shopping_bag : Icons.check, size: 16),
+              label: Text(buttonLabel),
+              style: FilledButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                disabledForegroundColor: Colors.grey.shade600,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumStatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PremiumStatusChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _premiumProductIcon(String productId) {
+  return switch (productId) {
+    premiumAdRemovalProductId => Icons.block,
+    premiumMonthlyEssencePassProductId => Icons.calendar_month,
+    premiumStarterPackageProductId => Icons.inventory_2,
+    _ => Icons.storefront,
+  };
+}
+
+Color _premiumProductColor(String productId) {
+  return switch (productId) {
+    premiumAdRemovalProductId => const Color(0xFF455A64),
+    premiumMonthlyEssencePassProductId => Colors.teal.shade700,
+    premiumStarterPackageProductId => AppColors.deepCoral,
+    _ => AppColors.coral,
+  };
+}
+
+String _premiumProductStatus(String productId, GameNotifier notifier) {
+  return switch (productId) {
+    premiumAdRemovalProductId => notifier.adsRemoved ? '구매 완료' : '영구',
+    premiumMonthlyEssencePassProductId => notifier.hasActiveMonthlyPass
+        ? 'D-${notifier.monthlyPassDaysRemaining}'
+        : '30일',
+    premiumStarterPackageProductId =>
+      notifier.starterPackagePurchased ? '구매 완료' : '1회',
+    _ => '',
+  };
+}
+
+String _premiumProductButtonLabel(String productId, GameNotifier notifier) {
+  return switch (productId) {
+    premiumAdRemovalProductId => notifier.adsRemoved ? '적용 완료' : '테스트 구매',
+    premiumMonthlyEssencePassProductId =>
+      notifier.hasActiveMonthlyPass ? '30일 연장' : '테스트 구매',
+    premiumStarterPackageProductId =>
+      notifier.starterPackagePurchased ? '구매 완료' : '테스트 구매',
+    _ => '테스트 구매',
+  };
+}
+
+bool _premiumProductEnabled(String productId, GameNotifier notifier) {
+  return switch (productId) {
+    premiumAdRemovalProductId => !notifier.adsRemoved,
+    premiumMonthlyEssencePassProductId => true,
+    premiumStarterPackageProductId => !notifier.starterPackagePurchased,
+    _ => false,
+  };
+}
+
+Future<void> _buyPremiumProduct(
+  BuildContext context,
+  WidgetRef ref,
+  String productId,
+) async {
+  final result =
+      ref.read(gameProvider.notifier).purchasePremiumProduct(productId);
+  if (!context.mounted) return;
+  if (result.bonusSummon != null) {
+    await showSummonDialog(context, [result.bonusSummon!]);
+  }
+  if (!context.mounted) return;
+  _toast(context, result.message);
+}
+
+void _toast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
+
 class _SummonView extends ConsumerWidget {
   const _SummonView();
 
@@ -2798,8 +3208,7 @@ class _SwordSetsView extends ConsumerWidget {
     final inProgress = <SwordSet>[];
     final untouched = <SwordSet>[];
     for (final s in swordSets) {
-      final ownedCount =
-          s.swordIds.where((id) => game.ownsSword(id)).length;
+      final ownedCount = s.swordIds.where((id) => game.ownsSword(id)).length;
       if (ownedCount == s.swordIds.length) {
         completed.add(s);
       } else if (ownedCount > 0) {

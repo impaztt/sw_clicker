@@ -5,7 +5,7 @@ import 'stock_market.dart';
 import 'sword.dart';
 
 class SaveData {
-  static const currentVersion = 14;
+  static const currentVersion = 15;
 
   int version;
   double gold;
@@ -65,6 +65,12 @@ class SaveData {
   // Per-prestige run-scoped stats (v13). Reset on prestige().
   RunStats run;
 
+  // Premium shop state (v15)
+  bool adsRemoved;
+  DateTime? monthlyPassExpiresAt;
+  DateTime? monthlyPassLastClaimAt;
+  bool starterPackagePurchased;
+
   SaveData({
     this.version = currentVersion,
     this.gold = 0,
@@ -100,6 +106,10 @@ class SaveData {
     StockMarketState? market,
     Map<String, int>? repeatingAchievementStages,
     RunStats? run,
+    this.adsRemoved = false,
+    this.monthlyPassExpiresAt,
+    this.monthlyPassLastClaimAt,
+    this.starterPackagePurchased = false,
   })  : producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
         prestigeUpgradeLevels = prestigeUpgradeLevels ?? {},
@@ -157,6 +167,10 @@ class SaveData {
         'market': market.toJson(),
         'repeatingAchievementStages': repeatingAchievementStages,
         'run': run.toJson(),
+        'adsRemoved': adsRemoved,
+        'monthlyPassExpiresAt': monthlyPassExpiresAt?.toIso8601String(),
+        'monthlyPassLastClaimAt': monthlyPassLastClaimAt?.toIso8601String(),
+        'starterPackagePurchased': starterPackagePurchased,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -231,6 +245,13 @@ class SaveData {
         run: json['run'] == null
             ? RunStats()
             : RunStats.fromJson(Map<String, dynamic>.from(json['run'] as Map)),
+        adsRemoved: json['adsRemoved'] as bool? ?? false,
+        monthlyPassExpiresAt:
+            DateTime.tryParse(json['monthlyPassExpiresAt'] as String? ?? ''),
+        monthlyPassLastClaimAt:
+            DateTime.tryParse(json['monthlyPassLastClaimAt'] as String? ?? ''),
+        starterPackagePurchased:
+            json['starterPackagePurchased'] as bool? ?? false,
       );
 
   static List<String?> _normalizeFormationSwordIds(List<String?>? source) {

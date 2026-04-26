@@ -202,6 +202,69 @@ const boosterOffers = <BoosterOffer>[
   ),
 ];
 
+const premiumAdRemovalProductId = 'premium_ad_removal';
+const premiumMonthlyEssencePassProductId = 'premium_monthly_essence_pass';
+const premiumStarterPackageProductId = 'premium_starter_package';
+
+const monthlyEssencePassImmediateEssence = 300;
+const monthlyEssencePassDailyEssence = 120;
+const monthlyEssencePassDurationDays = 30;
+const monthlyEssencePassMissedClaimCapDays = 3;
+
+const starterPackageEssence = 1400;
+const starterPackageDpsBoostDurationSec = 1800;
+
+class PremiumProductDef {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String priceLabel;
+  final List<String> benefits;
+  const PremiumProductDef({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.priceLabel,
+    required this.benefits,
+  });
+}
+
+const premiumProducts = <PremiumProductDef>[
+  PremiumProductDef(
+    id: premiumAdRemovalProductId,
+    title: '광고 제거',
+    subtitle: '강제 광고 제거 + 광고 보상 즉시 수령',
+    priceLabel: '₩4,900',
+    benefits: [
+      '강제 광고 영구 제거',
+      '부스터 광고 보상 즉시 지급',
+      '계정 영구 적용',
+    ],
+  ),
+  PremiumProductDef(
+    id: premiumMonthlyEssencePassProductId,
+    title: '월간 정수 보급권',
+    subtitle: '30일 동안 매일 정수를 안정적으로 확보',
+    priceLabel: '₩5,900',
+    benefits: [
+      '구매 즉시 정수 300',
+      '30일 동안 매일 정수 120',
+      '미수령 보상 최대 3일 누적',
+    ],
+  ),
+  PremiumProductDef(
+    id: premiumStarterPackageProductId,
+    title: '초보자 패키지',
+    subtitle: '초반 소환과 성장 템포를 한 번에 보강',
+    priceLabel: '₩3,900',
+    benefits: [
+      '정수 1,400',
+      'SR+ 검 1자루 확정 지급',
+      '자동 수익 x2 30분',
+    ],
+  ),
+];
+
 /// Slime config — guaranteed spawn every N taps so the player can
 /// predict it. Counter persists in SaveData.tapsSinceSlime.
 const slimeSpawnEvery = 250;
@@ -446,6 +509,20 @@ class SummonResult {
     required this.levelAfter,
     required this.isDuplicate,
     required this.isMaxed,
+  });
+}
+
+class PremiumPurchaseResult {
+  final bool ok;
+  final String message;
+  final int essenceGranted;
+  final SummonResult? bonusSummon;
+
+  const PremiumPurchaseResult({
+    required this.ok,
+    required this.message,
+    this.essenceGranted = 0,
+    this.bonusSummon,
   });
 }
 
@@ -1777,8 +1854,8 @@ class GameNotifier extends Notifier<GameState> {
     owned.sort((a, b) {
       final tierCmp = b.tier.index.compareTo(a.tier.index);
       if (tierCmp != 0) return tierCmp;
-      final lvCmp =
-          (_save.ownedSwords[b.id] ?? 0).compareTo(_save.ownedSwords[a.id] ?? 0);
+      final lvCmp = (_save.ownedSwords[b.id] ?? 0)
+          .compareTo(_save.ownedSwords[a.id] ?? 0);
       if (lvCmp != 0) return lvCmp;
       return a.id.compareTo(b.id);
     });
@@ -2105,6 +2182,7 @@ class GameNotifier extends Notifier<GameState> {
       _save.essence += def.essenceReward;
       _achievementUnlocks.add(def);
     }
+
     if (!_save.run.usedAnySkill) unlock('ch_no_skill');
     if (!_save.run.usedAnyBooster) unlock('ch_no_booster');
     if (!_save.run.boughtAnyTapUpgrade) unlock('ch_no_tap_upgrade');
@@ -2255,6 +2333,7 @@ class GameNotifier extends Notifier<GameState> {
         count++;
       }
     }
+
     sweep(daily: true);
     sweep(daily: false);
     if (count == 0) return (count: 0, essence: 0, coins: 0);
@@ -2264,6 +2343,135 @@ class GameNotifier extends Notifier<GameState> {
     unawaited(_persist());
     return (count: count, essence: essence, coins: coins);
   }
+
+  // ============ Premium shop ============
+
+  bool get adsRemoved => _save.adsRemoved;
+
+  bool get starterPackagePurchased => _save.starterPackagePurchased;
+
+  DateTime? get monthlyPassExpiresAt => _save.monthlyPassExpiresAt;
+
+  bool get hasActiveMonthlyPass {
+    final expiresAt = _save.monthlyPassExpiresAt;
+    return expiresAt != null && expiresAt.isAfter(DateTime.now());
+  }
+
+  int get monthlyPassDaysRemaining {
+    final expiresAt = _save.monthlyPassExpiresAt;
+    if (expiresAt == null) return 0;
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining.isNegative) return 0;
+    return max(
+      1,
+      (remaining.inSeconds + Duration.secondsPerDay - 1) ~/
+          Duration.secondsPerDay,
+    );
+  }
+
+  int get monthlyPassClaimableDays {
+    if (!hasActiveMonthlyPass) return 0;
+    final now = DateTime.now();
+    final lastClaim = _save.monthlyPassLastClaimAt;
+    if (lastClaim == null) return 1;
+    final days = _dateOnly(now).difference(_dateOnly(lastClaim)).inDays;
+    if (days <= 0) return 0;
+    return min(days, monthlyEssencePassMissedClaimCapDays);
+  }
+
+  int get monthlyPassClaimableEssence =>
+      monthlyPassClaimableDays * monthlyEssencePassDailyEssence;
+
+  PremiumPurchaseResult purchasePremiumProduct(String productId) {
+    switch (productId) {
+      case premiumAdRemovalProductId:
+        if (_save.adsRemoved) {
+          return const PremiumPurchaseResult(
+            ok: false,
+            message: '이미 광고 제거가 적용되어 있어요',
+          );
+        }
+        _save.adsRemoved = true;
+        _emit(loaded: true);
+        unawaited(_persist());
+        return const PremiumPurchaseResult(
+          ok: true,
+          message: '광고 제거가 적용됐어요',
+        );
+
+      case premiumMonthlyEssencePassProductId:
+        final now = DateTime.now();
+        final wasActive = hasActiveMonthlyPass;
+        final currentExpiresAt = _save.monthlyPassExpiresAt;
+        final base = currentExpiresAt != null && currentExpiresAt.isAfter(now)
+            ? currentExpiresAt
+            : now;
+        _save.monthlyPassExpiresAt =
+            base.add(const Duration(days: monthlyEssencePassDurationDays));
+        if (!wasActive) _save.monthlyPassLastClaimAt = now;
+        _save.essence += monthlyEssencePassImmediateEssence;
+        _emit(loaded: true);
+        unawaited(_persist());
+        return const PremiumPurchaseResult(
+          ok: true,
+          message: '월간 정수 보급권이 적용됐어요',
+          essenceGranted: monthlyEssencePassImmediateEssence,
+        );
+
+      case premiumStarterPackageProductId:
+        if (_save.starterPackagePurchased) {
+          return const PremiumPurchaseResult(
+            ok: false,
+            message: '초보자 패키지는 계정당 1회만 구매할 수 있어요',
+          );
+        }
+        _save.starterPackagePurchased = true;
+        _save.essence += starterPackageEssence;
+        final bonusSummon = _doOnePull(
+          guaranteedRPlus: true,
+          forceSrPlus: true,
+        );
+        _save.run.summons++;
+        _incMission('daily_summon_15', 1, daily: true);
+        _incMission('weekly_summon_120', 1, daily: false);
+        _applyBooster(
+          BoosterType.dps,
+          2.0,
+          starterPackageDpsBoostDurationSec,
+        );
+        _save.stats.boostersPurchased++;
+        _save.run.boostersUsed++;
+        _save.run.usedAnyBooster = true;
+        _emit(loaded: true);
+        unawaited(_persist());
+        return PremiumPurchaseResult(
+          ok: true,
+          message: '초보자 패키지가 지급됐어요',
+          essenceGranted: starterPackageEssence,
+          bonusSummon: bonusSummon,
+        );
+
+      default:
+        return const PremiumPurchaseResult(
+          ok: false,
+          message: '알 수 없는 상품이에요',
+        );
+    }
+  }
+
+  int claimMonthlyPassEssence() {
+    final days = monthlyPassClaimableDays;
+    if (days <= 0) return 0;
+    final amount = days * monthlyEssencePassDailyEssence;
+    _save.essence += amount;
+    _save.monthlyPassLastClaimAt = DateTime.now();
+    _emit(loaded: true);
+    unawaited(_persist());
+    return amount;
+  }
+
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
 
   // ============ Boosters + ads ============
 
@@ -2503,10 +2711,14 @@ class GameNotifier extends Notifier<GameState> {
     return pool[_random.nextInt(pool.length)];
   }
 
-  SummonResult _doOnePull({required bool guaranteedRPlus}) {
-    final pityHit = _save.summonsSinceHighRare + 1 >= pityThreshold;
+  SummonResult _doOnePull({
+    required bool guaranteedRPlus,
+    bool forceSrPlus = false,
+  }) {
+    final pityHit =
+        !forceSrPlus && _save.summonsSinceHighRare + 1 >= pityThreshold;
     SwordTier tier;
-    if (pityHit) {
+    if (forceSrPlus || pityHit) {
       tier = _rollTier(forceSrPlus: true);
     } else if (guaranteedRPlus) {
       tier = _rollTier(forceSrPlus: false);
@@ -2632,7 +2844,8 @@ class GameNotifier extends Notifier<GameState> {
           existing.formingCandle = null;
         }
         // Heal corrupt prices, e.g. legacy zeros.
-        if (existing.currentPrice <= 0) existing.currentPrice = def.initialPrice;
+        if (existing.currentPrice <= 0)
+          existing.currentPrice = def.initialPrice;
         if (existing.intrinsicPrice <= 0) {
           existing.intrinsicPrice = def.initialPrice;
         }
@@ -2677,8 +2890,9 @@ class GameNotifier extends Notifier<GameState> {
       final hours = elapsed.inSeconds / dividendIntervalSeconds;
       if (hours <= 0) continue;
       final def = regionDefById(state.regionId);
-      final perHour =
-          state.shares * state.currentPrice * regionEffectiveHourlyYield(def.id);
+      final perHour = state.shares *
+          state.currentPrice *
+          regionEffectiveHourlyYield(def.id);
       state.pendingDividend += perHour * hours;
       state.lastAccrualAt = now;
     }
@@ -2727,8 +2941,7 @@ class GameNotifier extends Notifier<GameState> {
       final def = regionDefById(state.regionId);
       final districtBonus = regionSwordDistrictBonusFraction(def.id);
       state.intrinsicPrice = regionIntrinsicPrice(def.id);
-      final sigmaPerTick =
-          def.volatilityPerMinute *
+      final sigmaPerTick = def.volatilityPerMinute *
           volatilityBoost *
           (1.0 + districtBonus * 0.12) *
           tickFactor;
@@ -2740,10 +2953,15 @@ class GameNotifier extends Notifier<GameState> {
             stockPriceTickSeconds;
         final noise = _randGauss() * sigmaPerTick * state.currentPrice;
         var event = 0.0;
-        if (_random.nextDouble() <
-            eventProbPerSec * stockPriceTickSeconds) {
+        if (_random.nextDouble() < eventProbPerSec * stockPriceTickSeconds) {
           const shocks = [
-            -0.18, -0.11, -0.055, 0.055, 0.11, 0.18, 0.26,
+            -0.18,
+            -0.11,
+            -0.055,
+            0.055,
+            0.11,
+            0.18,
+            0.26,
           ];
           event = shocks[_random.nextInt(shocks.length)] * state.currentPrice;
         }
@@ -2762,8 +2980,7 @@ class GameNotifier extends Notifier<GameState> {
         // a fractional tick interval (e.g. 2.5s) still works.
         final tickOffsetMs =
             ((ticksElapsed - i - 1) * stockPriceTickSeconds * 1000).round();
-        final tickInstant =
-            now.subtract(Duration(milliseconds: tickOffsetMs));
+        final tickInstant = now.subtract(Duration(milliseconds: tickOffsetMs));
         final candleStart = _candleStartFor(tickInstant);
         var forming = state.formingCandle;
         if (forming == null || forming.startedAt != candleStart) {
@@ -2776,15 +2993,15 @@ class GameNotifier extends Notifier<GameState> {
           forming = Candle.flat(candleStart, state.currentPrice);
           state.formingCandle = forming;
         }
-        if (state.currentPrice > forming.high) forming.high = state.currentPrice;
+        if (state.currentPrice > forming.high)
+          forming.high = state.currentPrice;
         if (state.currentPrice < forming.low) forming.low = state.currentPrice;
         forming.close = state.currentPrice;
         // Volume proxy: amplified by recent move magnitude.
         final pctMove = forming.open == 0
             ? 0.0
             : (state.currentPrice - forming.open).abs() / forming.open;
-        forming.volume +=
-            1.0 + pctMove * 5.0 + _random.nextDouble() * 0.4;
+        forming.volume += 1.0 + pctMove * 5.0 + _random.nextDouble() * 0.4;
       }
 
       // Hourly dividend accrual.
@@ -2868,8 +3085,7 @@ class GameNotifier extends Notifier<GameState> {
     final unitTotalCost = st.currentPrice * (1 + stockTradeFee);
     if (unitTotalCost <= 0) return 0;
     final byGold = (_save.gold / unitTotalCost).floor();
-    final maxOwnable =
-        (def.totalShares * regionMaxOwnershipFraction).floor();
+    final maxOwnable = (def.totalShares * regionMaxOwnershipFraction).floor();
     final byCap = maxOwnable - st.shares;
     if (byCap <= 0) return 0;
     return byGold < byCap ? byGold : byCap;
@@ -2894,8 +3110,7 @@ class GameNotifier extends Notifier<GameState> {
     final total = gross + fee;
     if (_save.gold < total) return 0;
     // Cap at the configured max ownership fraction (e.g. 80%).
-    final maxOwnable =
-        (def.totalShares * regionMaxOwnershipFraction).floor();
+    final maxOwnable = (def.totalShares * regionMaxOwnershipFraction).floor();
     final remaining = maxOwnable - st.shares;
     final actualShares = shares > remaining ? remaining : shares;
     if (actualShares <= 0) return 0;
@@ -2924,8 +3139,8 @@ class GameNotifier extends Notifier<GameState> {
 
   /// Sell [shares] of [regionId] at current price minus 2% fee. Returns
   /// (sharesSold, netProceeds, realizedProfit).
-  ({int sharesSold, double netProceeds, double realizedProfit})
-      sellShares(String regionId, int shares) {
+  ({int sharesSold, double netProceeds, double realizedProfit}) sellShares(
+      String regionId, int shares) {
     if (shares <= 0) {
       return (sharesSold: 0, netProceeds: 0, realizedProfit: 0);
     }
@@ -2963,12 +3178,8 @@ class GameNotifier extends Notifier<GameState> {
   /// Each region counted as one trade for stats consistency. Returns
   /// aggregate (regions touched, total shares, net proceeds, realized
   /// profit).
-  ({
-    int regionsSold,
-    int sharesSold,
-    double netProceeds,
-    double realizedProfit
-  }) sellAllShares() {
+  ({int regionsSold, int sharesSold, double netProceeds, double realizedProfit})
+      sellAllShares() {
     var regionsSold = 0;
     var sharesSold = 0;
     var netTotal = 0.0;

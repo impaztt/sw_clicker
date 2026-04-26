@@ -29,8 +29,7 @@ class BoosterShopDialog extends ConsumerWidget {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
                 const Spacer(),
-                Icon(Icons.diamond,
-                    color: Colors.teal.shade700, size: 18),
+                Icon(Icons.diamond, color: Colors.teal.shade700, size: 18),
                 const SizedBox(width: 4),
                 Text(
                   '${game.essence}',
@@ -47,6 +46,7 @@ class BoosterShopDialog extends ConsumerWidget {
               _OfferRow(
                 offer: offer,
                 canAffordEssence: game.essence >= offer.essenceCost,
+                adsRemoved: notifier.adsRemoved,
                 onBuyEssence: () {
                   final ok = notifier.buyBoosterWithEssence(offer);
                   if (!ok) _toast(context, '정수가 부족해요');
@@ -54,7 +54,12 @@ class BoosterShopDialog extends ConsumerWidget {
                 onWatchAd: () {
                   // Stub: real AdMob integration goes here.
                   notifier.grantAdBooster(offer);
-                  _toast(context, '(데모) 광고 대신 즉시 지급됐어요');
+                  _toast(
+                    context,
+                    notifier.adsRemoved
+                        ? '광고 제거 혜택으로 즉시 지급됐어요'
+                        : '(데모) 광고 대신 즉시 지급됐어요',
+                  );
                 },
               ),
               const SizedBox(height: 10),
@@ -95,12 +100,14 @@ class BoosterShopDialog extends ConsumerWidget {
 class _OfferRow extends StatelessWidget {
   final BoosterOffer offer;
   final bool canAffordEssence;
+  final bool adsRemoved;
   final VoidCallback onBuyEssence;
   final VoidCallback onWatchAd;
 
   const _OfferRow({
     required this.offer,
     required this.canAffordEssence,
+    required this.adsRemoved,
     required this.onBuyEssence,
     required this.onWatchAd,
   });
@@ -150,8 +157,8 @@ class _OfferRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _BuyButton(
-                  label: '광고 시청',
-                  icon: Icons.play_circle_fill,
+                  label: adsRemoved ? '즉시 수령' : '광고 시청',
+                  icon: adsRemoved ? Icons.flash_on : Icons.play_circle_fill,
                   enabled: true,
                   filled: false,
                   onTap: onWatchAd,
