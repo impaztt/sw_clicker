@@ -50,6 +50,11 @@ class SyncService {
     return localSave;
   }
 
+  Future<SaveData?> fetchCloudForCurrentUser() async {
+    await cloud.ensureSignedIn();
+    return cloud.fetch();
+  }
+
   /// Local save always succeeds; cloud push is best-effort.
   Future<void> persist(SaveData save) async {
     await local.save(save);

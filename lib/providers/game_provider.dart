@@ -1018,6 +1018,34 @@ class GameNotifier extends Notifier<GameState> {
     _startAutoSave();
   }
 
+  Future<bool> loadCloudSaveForCurrentAccount() async {
+    final cloudSave = await _syncService.fetchCloudForCurrentUser();
+    if (cloudSave == null) {
+      await _persist();
+      return false;
+    }
+    final loadedVersion = cloudSave.version;
+    final now = DateTime.now();
+    _save = cloudSave;
+    _pendingOffline = null;
+    _pendingDaily = null;
+    _timeGuardTriggered = false;
+    _combo = 0;
+    _lastTapAt = null;
+    _comboSurgeUntil = null;
+    _burstFiredThisRun = false;
+    _sanitizeLoadedSave();
+    _migrateLegacySoulsToOverallUpgrade();
+    _rotateMissionWindowsIfNeeded(now: now, force: true);
+    _bootstrapStockMarket(now: now, loadedVersion: loadedVersion);
+    _save.version = SaveData.currentVersion;
+    _accrueOfflineDividends(now: now);
+    _emit(loaded: true);
+    _evaluateFeatureUnlocks(silent: true);
+    await _persist();
+    return true;
+  }
+
   Duration _safeOfflineElapsed(DateTime now, DateTime lastSavedAt) {
     final skewLimit = now.add(
       const Duration(minutes: offlineClockSkewGraceMinutes),

@@ -5,7 +5,9 @@ import '../core/number_format.dart';
 import '../core/theme.dart';
 import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
+import '../providers/auth_provider.dart';
 import '../providers/game_provider.dart';
+import '../services/auth_service.dart';
 import '../widgets/feature_unlock_guide.dart';
 import '../widgets/onboarding_dialog.dart';
 import 'achievement_screen.dart';
@@ -16,6 +18,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final game = ref.watch(gameProvider);
+    final authStatus = ref.watch(authStatusProvider);
 
     return SafeArea(
       child: ListView(
@@ -105,6 +108,44 @@ class SettingsScreen extends ConsumerWidget {
               context,
               def: def,
               game: game,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SectionTitle(title: '계정'),
+          const SizedBox(height: 8),
+          authStatus.when(
+            data: (status) => _AccountCard(
+              status: status,
+              onRegister: () => _openAuthDialog(
+                context,
+                ref,
+                initialMode: _AuthMode.register,
+              ),
+              onLogin: () => _openAuthDialog(
+                context,
+                ref,
+                initialMode: _AuthMode.login,
+              ),
+              onLogout: () => _confirmLogout(context, ref),
+            ),
+            loading: () => const _AccountLoadingCard(),
+            error: (_, __) => _AccountCard(
+              status: const AuthStatus(
+                userId: null,
+                email: null,
+                isAnonymous: true,
+              ),
+              onRegister: () => _openAuthDialog(
+                context,
+                ref,
+                initialMode: _AuthMode.register,
+              ),
+              onLogin: () => _openAuthDialog(
+                context,
+                ref,
+                initialMode: _AuthMode.login,
+              ),
+              onLogout: () => _confirmLogout(context, ref),
             ),
           ),
           const SizedBox(height: 24),
@@ -209,6 +250,47 @@ class SettingsScreen extends ConsumerWidget {
     if (ok == true) {
       await ref.read(gameProvider.notifier).resetAll();
     }
+  }
+
+  Future<void> _openAuthDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    required _AuthMode initialMode,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _AuthDialog(initialMode: initialMode),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('로그아웃할까요?'),
+        content: const Text(
+          '현재 기기의 진행도는 유지됩니다.\n'
+          '로그아웃 후에는 게스트 상태로 계속 플레이합니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('로그아웃'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final result = await ref.read(authServiceProvider).signOutToGuest();
+    await ref.read(gameProvider.notifier).persist();
+    if (!context.mounted) return;
+    _toast(context, result.message);
   }
 }
 
@@ -644,6 +726,295 @@ class _ScaleChip extends StatelessWidget {
   }
 }
 
+class _AccountCard extends StatelessWidget {
+  final AuthStatus status;
+  final VoidCallback onRegister;
+  final VoidCallback onLogin;
+  final VoidCallback onLogout;
+
+  const _AccountCard({
+    required this.status,
+    required this.onRegister,
+    required this.onLogin,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final linked = status.isLinkedAccount;
+    final title = linked ? (status.email ?? '로그인 계정') : '게스트 플레이 중';
+    final subtitle =
+        linked ? '클라우드 저장이 이 계정에 연결됩니다' : '계정을 만들면 현재 진행도를 이메일 계정에 연결합니다';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: (linked ? Colors.teal : AppColors.coral)
+                      .withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  linked ? Icons.verified_user : Icons.person_outline,
+                  color: linked ? Colors.teal.shade700 : AppColors.deepCoral,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withValues(alpha: 0.58),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'ID ${status.shortUserId}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.black.withValues(alpha: 0.45),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (linked)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onLogout,
+                icon: const Icon(Icons.logout),
+                label: const Text('로그아웃'),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: onRegister,
+                    icon: const Icon(Icons.person_add, size: 16),
+                    label: const Text('계정 만들기'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.coral,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onLogin,
+                    icon: const Icon(Icons.login, size: 16),
+                    label: const Text('로그인'),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountLoadingCard extends StatelessWidget {
+  const _AccountLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 96,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+enum _AuthMode { login, register }
+
+class _AuthDialog extends ConsumerStatefulWidget {
+  final _AuthMode initialMode;
+
+  const _AuthDialog({required this.initialMode});
+
+  @override
+  ConsumerState<_AuthDialog> createState() => _AuthDialogState();
+}
+
+class _AuthDialogState extends ConsumerState<_AuthDialog> {
+  late _AuthMode _mode = widget.initialMode;
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  bool _busy = false;
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isRegister = _mode == _AuthMode.register;
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      title: Text(isRegister ? '계정 만들기' : '로그인'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRegister
+                  ? '현재 게스트 진행도를 이메일 계정에 연결합니다.'
+                  : '클라우드 저장이 있으면 해당 계정 데이터를 불러옵니다.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.black.withValues(alpha: 0.62),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: '이메일',
+                prefixIcon: Icon(Icons.email_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _password,
+              obscureText: _obscure,
+              decoration: InputDecoration(
+                labelText: '비밀번호',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon:
+                      Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                        _mode =
+                            isRegister ? _AuthMode.login : _AuthMode.register;
+                      }),
+              child: Text(isRegister ? '이미 계정이 있어요' : '새 계정 만들기'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('닫기'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _submit,
+          child: _busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(isRegister ? '계정 만들기' : '로그인'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() => _busy = true);
+    final service = ref.read(authServiceProvider);
+    final game = ref.read(gameProvider.notifier);
+    final isRegister = _mode == _AuthMode.register;
+    final AuthActionResult result;
+    try {
+      if (isRegister) {
+        result = await service.registerGuestAccount(
+          email: _email.text,
+          password: _password.text,
+        );
+        if (result.ok) await game.persist();
+      } else {
+        result = await service.signIn(
+          email: _email.text,
+          password: _password.text,
+        );
+        if (result.ok) {
+          final loadedCloud = await game.loadCloudSaveForCurrentAccount();
+          if (!mounted) return;
+          _toast(
+            context,
+            loadedCloud ? '로그인 후 클라우드 저장을 불러왔어요' : result.message,
+          );
+          Navigator.pop(context);
+          return;
+        }
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _toast(context, '계정 처리 중 오류가 발생했어요');
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _toast(context, result.message);
+    if (result.ok) Navigator.pop(context);
+  }
+}
+
 class _DangerButton extends StatelessWidget {
   final VoidCallback onPressed;
   const _DangerButton({required this.onPressed});
@@ -667,4 +1038,14 @@ class _DangerButton extends StatelessWidget {
       ),
     );
   }
+}
+
+void _toast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
 }
