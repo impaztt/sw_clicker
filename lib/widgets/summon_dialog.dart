@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
+import '../data/sword_affinities.dart';
 import '../models/sword.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
@@ -150,6 +151,8 @@ class _SingleReveal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tier = result.sword.tier;
+    final role = swordFormationRole(result.sword);
+    final region = swordHomeRegion(result.sword);
     return AnimatedBuilder(
       animation: revealScale,
       builder: (_, __) {
@@ -212,6 +215,15 @@ class _SingleReveal extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${role.label} · ${region.shortName} 검세권',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],

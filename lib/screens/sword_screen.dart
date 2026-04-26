@@ -5,6 +5,7 @@ import '../core/theme.dart';
 import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
 import '../data/repeating_achievement_catalog.dart';
+import '../data/sword_affinities.dart';
 import '../data/sword_catalog.dart';
 import '../data/sword_sets.dart';
 import '../models/achievement.dart';
@@ -28,6 +29,7 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
     final game = ref.watch(gameProvider);
     final tabs = <_CodexTab>[
       const _CodexTab(label: '수집', view: _CollectionView()),
+      const _CodexTab(label: '검진', view: _FormationView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.swordSetsView))
         const _CodexTab(label: '세트', view: _SwordSetsView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.summonTab))
@@ -76,6 +78,11 @@ class _CodexTab {
   final String label;
   final Widget view;
   const _CodexTab({required this.label, required this.view});
+}
+
+String _bonusPct(double value) {
+  final digits = value >= 0.1 ? 1 : 2;
+  return '+${(value * 100).toStringAsFixed(digits)}%';
 }
 
 class _HeaderBar extends ConsumerWidget {
@@ -270,6 +277,487 @@ class _CollectionViewState extends ConsumerState<_CollectionView> {
       builder: (_) => _SwordDetailSheet(def: def),
     );
   }
+}
+
+class _FormationView extends ConsumerWidget {
+  const _FormationView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final game = ref.watch(gameProvider);
+    final notifier = ref.read(gameProvider.notifier);
+    final slots = notifier.formationSwordIds;
+    final summary = notifier.formationSummary;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+      children: [
+        _FormationSummaryCard(
+          summary: summary,
+          onAuto: game.ownedSwords.isEmpty ? null : notifier.autoFillFormation,
+          onClear: summary.filledSlots == 0 ? null : notifier.clearFormation,
+        ),
+        const SizedBox(height: 12),
+        for (var i = 0; i < swordFormationSlotCount; i++)
+          _FormationSlotCard(
+            slot: i,
+            swordId: slots[i],
+            onPick: () => _openFormationPicker(context, ref, i),
+            onClear: slots[i] == null
+                ? null
+                : () => notifier.setFormationSword(i, null),
+          ),
+        const SizedBox(height: 8),
+        _FormationRuleCard(summary: summary),
+      ],
+    );
+  }
+}
+
+class _FormationSummaryCard extends StatelessWidget {
+  final FormationSummary summary;
+  final VoidCallback? onAuto;
+  final VoidCallback? onClear;
+
+  const _FormationSummaryCard({
+    required this.summary,
+    required this.onAuto,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF263238), Color(0xFF7C4DFF)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '검진',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '보유 검 5자루를 배치해 전투력과 검세권을 동시에 키웁니다.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.86),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _FormationBonusTile(
+                  label: '터치',
+                  value: _bonusPct(summary.tapBonus),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FormationBonusTile(
+                  label: 'DPS',
+                  value: _bonusPct(summary.dpsBonus),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FormationBonusTile(
+                  label: '검세권',
+                  value: _bonusPct(summary.marketBonus),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onAuto,
+                  icon: const Icon(Icons.auto_fix_high, size: 16),
+                  label: const Text('추천 편성'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: onClear,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.65),
+                  ),
+                ),
+                child: const Text('비우기'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormationBonusTile extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _FormationBonusTile({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormationSlotCard extends StatelessWidget {
+  final int slot;
+  final String? swordId;
+  final VoidCallback onPick;
+  final VoidCallback? onClear;
+
+  const _FormationSlotCard({
+    required this.slot,
+    required this.swordId,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final id = swordId;
+    SwordDef? sword;
+    if (id != null) {
+      try {
+        sword = swordById(id);
+      } catch (_) {
+        sword = null;
+      }
+    }
+    final role = sword == null ? null : swordFormationRole(sword);
+    final region = sword == null ? null : swordHomeRegion(sword);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: role?.color.withValues(alpha: 0.45) ?? Colors.black12,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: (role?.color ?? Colors.black54).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: sword == null
+                  ? Text(
+                      '${slot + 1}',
+                      style: TextStyle(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    )
+                  : SwordPreview(visual: sword.visual, size: 34),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: sword == null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${slot + 1}번 검진 슬롯',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '보유한 검을 배치하세요',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.black.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sword.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        children: [
+                          _MiniTag(
+                            label: role!.label,
+                            color: role.color,
+                            icon: role.icon,
+                          ),
+                          _MiniTag(
+                            label: region!.shortName,
+                            color: region.accent,
+                            icon: Icons.location_city,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: onPick,
+                icon: const Icon(Icons.swap_horiz),
+                tooltip: '선택',
+              ),
+              if (onClear != null)
+                IconButton(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close),
+                  tooltip: '해제',
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormationRuleCard extends StatelessWidget {
+  final FormationSummary summary;
+
+  const _FormationRuleCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '시너지',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '역할 ${summary.distinctRoles}/5 · 지역 ${summary.distinctRegions}/${summary.filledSlots == 0 ? 5 : summary.filledSlots} · 최다 검세권 ${summary.strongestRegionCount}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.black.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '역할을 다양하게 섞으면 전투 보너스가 오르고, 같은 지역 검을 묶으면 해당 지역 주식의 내재가치와 배당이 강해집니다.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniTag extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _MiniTag({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _openFormationPicker(BuildContext context, WidgetRef ref, int slot) {
+  final game = ref.read(gameProvider);
+  final selected = ref.read(gameProvider.notifier).formationSwordIds.toSet();
+  final owned = <SwordDef>[];
+  for (final entry in game.ownedSwords.entries) {
+    if (entry.value <= 0) continue;
+    try {
+      owned.add(swordById(entry.key));
+    } catch (_) {}
+  }
+  owned.sort((a, b) {
+    final tierCmp = b.tier.index.compareTo(a.tier.index);
+    if (tierCmp != 0) return tierCmp;
+    return a.name.compareTo(b.name);
+  });
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) {
+      if (owned.isEmpty) {
+        return const SizedBox(
+          height: 220,
+          child: Center(child: Text('배치할 수 있는 보유 검이 없습니다.')),
+        );
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        itemCount: owned.length + 1,
+        itemBuilder: (context, i) {
+          if (i == 0) {
+            return const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                '검진 배치 선택',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+              ),
+            );
+          }
+          final sword = owned[i - 1];
+          final role = swordFormationRole(sword);
+          final region = swordHomeRegion(sword);
+          final alreadySelected = selected.contains(sword.id);
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: SwordPreview(visual: sword.visual, size: 42),
+            title: Text(
+              sword.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            subtitle: Wrap(
+              spacing: 5,
+              children: [
+                _MiniTag(label: role.label, color: role.color, icon: role.icon),
+                _MiniTag(
+                  label: region.shortName,
+                  color: region.accent,
+                  icon: Icons.location_city,
+                ),
+              ],
+            ),
+            trailing: alreadySelected
+                ? const Icon(Icons.check_circle, color: AppColors.coral)
+                : Icon(Icons.add_circle_outline, color: sword.tier.color),
+            onTap: () {
+              ref.read(gameProvider.notifier).setFormationSword(slot, sword.id);
+              Navigator.of(ctx).pop();
+            },
+          );
+        },
+      );
+    },
+  );
 }
 
 class _TierSection extends StatelessWidget {
@@ -620,6 +1108,8 @@ class _SwordDetailSheet extends ConsumerWidget {
     final level = game.swordLevel(def.id);
     final owned = level > 0;
     final equipped = game.equippedSwordId == def.id;
+    final role = swordFormationRole(def);
+    final region = swordHomeRegion(def);
 
     return Container(
       decoration: const BoxDecoration(
@@ -678,6 +1168,23 @@ class _SwordDetailSheet extends ConsumerWidget {
                         fontSize: 13,
                         color: Colors.black.withValues(alpha: 0.6),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      children: [
+                        _MiniTag(
+                          label: role.label,
+                          color: role.color,
+                          icon: role.icon,
+                        ),
+                        _MiniTag(
+                          label: '검세권 ${region.shortName}',
+                          color: region.accent,
+                          icon: Icons.location_city,
+                        ),
+                      ],
                     ),
                   ],
                 ),

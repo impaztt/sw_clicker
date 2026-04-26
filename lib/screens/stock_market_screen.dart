@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/number_format.dart';
 import '../core/theme.dart';
 import '../data/region_catalog.dart';
+import '../data/sword_affinities.dart';
 import '../models/stock_market.dart';
 import '../providers/game_provider.dart';
 import '../widgets/candle_chart.dart';
@@ -389,8 +390,14 @@ class _RegionListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final def = row.def;
     final st = row.state;
+    final game = ref.watch(gameProvider);
     final notifier = ref.read(gameProvider.notifier);
     final ownership = st.shares / def.totalShares;
+    final districtBonus = notifier.regionSwordDistrictBonusFraction(def.id);
+    final effectiveYield = notifier.regionEffectiveHourlyYield(def.id);
+    final regionOwned =
+        ownedSwordCountForRegion(def.id, game.ownedSwords);
+    final regionTotal = totalSwordCountForRegion(def.id);
     final lastClose = st.recentCandles.isEmpty
         ? (st.formingCandle?.open ?? st.currentPrice)
         : st.recentCandles.last.close;
@@ -461,12 +468,23 @@ class _RegionListTile extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '시가총액 ${NumberFormatter.format(st.currentPrice * def.totalShares)} · 배당 ${(def.hourlyYield * 100).toStringAsFixed(0)}%/h',
+                          '시가총액 ${NumberFormatter.format(st.currentPrice * def.totalShares)} · 배당 ${(effectiveYield * 100).toStringAsFixed(1)}%/h',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.black.withValues(alpha: 0.55),
                           ),
                         ),
+                        if (districtBonus > 0) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            '검세권 +${(districtBonus * 100).toStringAsFixed(1)}% · 지역 검 $regionOwned/$regionTotal',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: def.accent,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -743,6 +761,11 @@ class RegionDetailScreen extends ConsumerWidget {
         ? (st.currentPrice - st.avgCost) / st.avgCost * 100
         : 0.0;
     final hourlyEst = notifier.regionHourlyDividendEstimate(regionId);
+    final districtBonus = notifier.regionSwordDistrictBonusFraction(regionId);
+    final effectiveYield = notifier.regionEffectiveHourlyYield(regionId);
+    final regionOwned =
+        ownedSwordCountForRegion(regionId, game.ownedSwords);
+    final regionTotal = totalSwordCountForRegion(regionId);
 
     return Scaffold(
       appBar: AppBar(
@@ -808,6 +831,15 @@ class RegionDetailScreen extends ConsumerWidget {
                 }
               },
             ),
+          const SizedBox(height: 12),
+          _DistrictBondCard(
+            region: def,
+            bonus: districtBonus,
+            owned: regionOwned,
+            total: regionTotal,
+            effectiveYield: effectiveYield,
+            intrinsicPrice: st.intrinsicPrice,
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -964,6 +996,110 @@ class _PendingDividendCard extends StatelessWidget {
             child: const Text(
               '수령',
               style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DistrictBondCard extends StatelessWidget {
+  final RegionDef region;
+  final double bonus;
+  final int owned;
+  final int total;
+  final double effectiveYield;
+  final double intrinsicPrice;
+
+  const _DistrictBondCard({
+    required this.region,
+    required this.bonus,
+    required this.owned,
+    required this.total,
+    required this.effectiveYield,
+    required this.intrinsicPrice,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = total == 0 ? 0.0 : owned / total;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: region.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: region.accent.withValues(alpha: 0.32)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_city, size: 18, color: region.accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${region.shortName} 검세권',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: region.accent,
+                  ),
+                ),
+              ),
+              Text(
+                '+${(bonus * 100).toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: region.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 7,
+              backgroundColor: Colors.black12,
+              valueColor: AlwaysStoppedAnimation(region.accent),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniStat(
+                  label: '지역 검',
+                  value: '$owned / $total',
+                  valueColor: region.accent,
+                ),
+              ),
+              Expanded(
+                child: _MiniStat(
+                  label: '실효 배당',
+                  value: '${(effectiveYield * 100).toStringAsFixed(1)}%/h',
+                  valueColor: region.accent,
+                ),
+              ),
+              Expanded(
+                child: _MiniStat(
+                  label: '내재가',
+                  value: NumberFormatter.formatPrecise(intrinsicPrice),
+                  valueColor: region.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '이 지역에 연결된 검을 모으거나 검진에 배치하면 주식의 내재가치와 배당률이 올라갑니다.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withValues(alpha: 0.58),
             ),
           ),
         ],

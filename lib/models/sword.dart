@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 enum SwordTier { n, r, sr, ssr, lr, ur }
 
+const swordFormationSlotCount = 5;
+
 extension SwordTierInfo on SwordTier {
   String get label => switch (this) {
         SwordTier.n => 'N',
@@ -63,6 +65,42 @@ extension SwordTierInfo on SwordTier {
         SwordTier.ssr => 0.13,
         SwordTier.lr => 0.14,
         SwordTier.ur => 0.15,
+      };
+}
+
+enum SwordFormationRole { vanguard, striker, support, trader, anchor }
+
+extension SwordFormationRoleInfo on SwordFormationRole {
+  String get label => switch (this) {
+        SwordFormationRole.vanguard => '선봉',
+        SwordFormationRole.striker => '강습',
+        SwordFormationRole.support => '지원',
+        SwordFormationRole.trader => '상권',
+        SwordFormationRole.anchor => '축',
+      };
+
+  String get description => switch (this) {
+        SwordFormationRole.vanguard => '터치 성장에 강한 검진 역할',
+        SwordFormationRole.striker => '터치와 DPS를 함께 올리는 역할',
+        SwordFormationRole.support => 'DPS 성장에 강한 검진 역할',
+        SwordFormationRole.trader => '검세권과 배당 성장에 강한 역할',
+        SwordFormationRole.anchor => '전체 보너스를 안정적으로 받쳐주는 역할',
+      };
+
+  IconData get icon => switch (this) {
+        SwordFormationRole.vanguard => Icons.shield,
+        SwordFormationRole.striker => Icons.flash_on,
+        SwordFormationRole.support => Icons.bolt,
+        SwordFormationRole.trader => Icons.store,
+        SwordFormationRole.anchor => Icons.adjust,
+      };
+
+  Color get color => switch (this) {
+        SwordFormationRole.vanguard => const Color(0xFFD32F2F),
+        SwordFormationRole.striker => const Color(0xFFFF8A65),
+        SwordFormationRole.support => const Color(0xFF26A69A),
+        SwordFormationRole.trader => const Color(0xFF7C4DFF),
+        SwordFormationRole.anchor => const Color(0xFF455A64),
       };
 }
 

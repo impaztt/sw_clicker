@@ -2,9 +2,10 @@ import 'booster.dart';
 import 'game_stats.dart';
 import 'run_stats.dart';
 import 'stock_market.dart';
+import 'sword.dart';
 
 class SaveData {
-  static const currentVersion = 13;
+  static const currentVersion = 14;
 
   int version;
   double gold;
@@ -25,6 +26,7 @@ class SaveData {
   Map<String, int> ownedSwords; // id → level (1~10)
   String? equippedSwordId;
   int summonsSinceHighRare; // pity counter (reset on SR+)
+  List<String?> formationSwordIds; // 5-slot 검진 formation.
 
   // Achievements (v4)
   Set<String> unlockedAchievements;
@@ -81,6 +83,7 @@ class SaveData {
     Map<String, int>? ownedSwords,
     this.equippedSwordId,
     this.summonsSinceHighRare = 0,
+    List<String?>? formationSwordIds,
     Set<String>? unlockedAchievements,
     this.lastDailyClaimAt,
     this.dailyStreak = 0,
@@ -104,6 +107,7 @@ class SaveData {
         stats = stats ?? GameStats(),
         settings = settings ?? GameSettings(),
         ownedSwords = ownedSwords ?? {},
+        formationSwordIds = _normalizeFormationSwordIds(formationSwordIds),
         unlockedAchievements = unlockedAchievements ?? <String>{},
         activeBoosters = activeBoosters ?? <Booster>[],
         skillReadyAt = skillReadyAt ?? <String, DateTime>{},
@@ -135,6 +139,7 @@ class SaveData {
         'ownedSwords': ownedSwords,
         'equippedSwordId': equippedSwordId,
         'summonsSinceHighRare': summonsSinceHighRare,
+        'formationSwordIds': formationSwordIds,
         'unlockedAchievements': unlockedAchievements.toList(),
         'lastDailyClaimAt': lastDailyClaimAt?.toIso8601String(),
         'dailyStreak': dailyStreak,
@@ -177,6 +182,9 @@ class SaveData {
         ownedSwords: Map<String, int>.from(json['ownedSwords'] as Map? ?? {}),
         equippedSwordId: json['equippedSwordId'] as String?,
         summonsSinceHighRare: json['summonsSinceHighRare'] as int? ?? 0,
+        formationSwordIds: (json['formationSwordIds'] as List?)
+            ?.map((e) => e is String ? e : null)
+            .toList(),
         unlockedAchievements: (json['unlockedAchievements'] as List?)
                 ?.map((e) => e as String)
                 .toSet() ??
@@ -224,4 +232,16 @@ class SaveData {
             ? RunStats()
             : RunStats.fromJson(Map<String, dynamic>.from(json['run'] as Map)),
       );
+
+  static List<String?> _normalizeFormationSwordIds(List<String?>? source) {
+    final slots = List<String?>.filled(swordFormationSlotCount, null);
+    if (source == null) return slots;
+    final limit = source.length < swordFormationSlotCount
+        ? source.length
+        : swordFormationSlotCount;
+    for (var i = 0; i < limit; i++) {
+      slots[i] = source[i];
+    }
+    return slots;
+  }
 }

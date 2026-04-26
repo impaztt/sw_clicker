@@ -9,6 +9,7 @@ import '../data/prestige_upgrade_catalog.dart';
 import '../data/repeating_achievement_catalog.dart';
 import '../data/producer_catalog.dart';
 import '../data/region_catalog.dart';
+import '../data/sword_affinities.dart';
 import '../data/sword_catalog.dart';
 import '../data/skill_catalog.dart';
 import '../data/sword_sets.dart';
@@ -446,6 +447,36 @@ class SummonResult {
     required this.isDuplicate,
     required this.isMaxed,
   });
+}
+
+class FormationSummary {
+  final int filledSlots;
+  final double tapBonus;
+  final double dpsBonus;
+  final double marketBonus;
+  final int distinctRoles;
+  final int distinctRegions;
+  final int strongestRegionCount;
+
+  const FormationSummary({
+    required this.filledSlots,
+    required this.tapBonus,
+    required this.dpsBonus,
+    required this.marketBonus,
+    required this.distinctRoles,
+    required this.distinctRegions,
+    required this.strongestRegionCount,
+  });
+
+  static const empty = FormationSummary(
+    filledSlots: 0,
+    tapBonus: 0,
+    dpsBonus: 0,
+    marketBonus: 0,
+    distinctRoles: 0,
+    distinctRegions: 0,
+    strongestRegionCount: 0,
+  );
 }
 
 class TapResult {
@@ -981,6 +1012,7 @@ class GameNotifier extends Notifier<GameState> {
     if (equipped != null && (_save.ownedSwords[equipped] ?? 0) <= 0) {
       _save.equippedSwordId = null;
     }
+    _sanitizeFormationSlots();
 
     final skillIds = skillCatalog.map((e) => e.id.id).toSet();
     _save.skillReadyAt.removeWhere((k, v) => !skillIds.contains(k));
@@ -1014,6 +1046,25 @@ class GameNotifier extends Notifier<GameState> {
   }) {
     source.removeWhere(
         (id, lv) => !allowed.contains(id) || lv < 0 || lv > maxLevel);
+  }
+
+  void _sanitizeFormationSlots() {
+    final allowed = swordCatalog.map((e) => e.id).toSet();
+    final seen = <String>{};
+    final slots = List<String?>.filled(swordFormationSlotCount, null);
+    final source = _save.formationSwordIds;
+    final limit = source.length < swordFormationSlotCount
+        ? source.length
+        : swordFormationSlotCount;
+    for (var i = 0; i < limit; i++) {
+      final id = source[i];
+      if (id == null) continue;
+      if (!allowed.contains(id)) continue;
+      if ((_save.ownedSwords[id] ?? 0) <= 0) continue;
+      if (!seen.add(id)) continue;
+      slots[i] = id;
+    }
+    _save.formationSwordIds = slots;
   }
 
   static final Map<String, MissionDef> _dailyMissionById = {
@@ -1538,6 +1589,117 @@ class GameNotifier extends Notifier<GameState> {
 
   double _collectionMult() => 1.0 + _collectionBonusTotal();
 
+  List<String?> get formationSwordIds {
+    _sanitizeFormationSlots();
+    return List.unmodifiable(_save.formationSwordIds);
+  }
+
+  FormationSummary get formationSummary => _formationSummary();
+
+  double _formationPower(SwordDef def, int level) {
+    final base = switch (def.tier) {
+      SwordTier.n => 0.006,
+      SwordTier.r => 0.010,
+      SwordTier.sr => 0.016,
+      SwordTier.ssr => 0.024,
+      SwordTier.lr => 0.036,
+      SwordTier.ur => 0.052,
+    };
+    final levelScale = 1.0 + (level.clamp(1, SwordDef.maxLevel) - 1) * 0.08;
+    return base * levelScale;
+  }
+
+  FormationSummary _formationSummary() {
+    _sanitizeFormationSlots();
+    var filled = 0;
+    var tap = 0.0;
+    var dps = 0.0;
+    var market = 0.0;
+    final roles = <SwordFormationRole>{};
+    final regions = <String>{};
+    final regionCounts = <String, int>{};
+
+    for (final id in _save.formationSwordIds) {
+      if (id == null) continue;
+      final level = _save.ownedSwords[id] ?? 0;
+      if (level <= 0) continue;
+      SwordDef def;
+      try {
+        def = swordById(id);
+      } catch (_) {
+        continue;
+      }
+      filled++;
+      final role = swordFormationRole(def);
+      final regionId = swordRegionId(def);
+      final power = _formationPower(def, level);
+      roles.add(role);
+      regions.add(regionId);
+      regionCounts[regionId] = (regionCounts[regionId] ?? 0) + 1;
+
+      switch (role) {
+        case SwordFormationRole.vanguard:
+          tap += power * 1.25;
+          dps += power * 0.20;
+          break;
+        case SwordFormationRole.striker:
+          tap += power * 0.75;
+          dps += power * 0.75;
+          break;
+        case SwordFormationRole.support:
+          tap += power * 0.20;
+          dps += power * 1.25;
+          break;
+        case SwordFormationRole.trader:
+          dps += power * 0.35;
+          market += power * 1.50;
+          break;
+        case SwordFormationRole.anchor:
+          tap += power * 0.55;
+          dps += power * 0.55;
+          market += power * 0.55;
+          break;
+      }
+    }
+
+    var strongestRegionCount = 0;
+    for (final count in regionCounts.values) {
+      if (count > strongestRegionCount) strongestRegionCount = count;
+      if (count >= 2) {
+        final pairBonus = (count - 1) * 0.006;
+        tap += pairBonus;
+        dps += pairBonus;
+        market += (count - 1) * 0.018;
+      }
+    }
+
+    if (roles.length >= 4) {
+      tap += 0.02;
+      dps += 0.02;
+    }
+    if (roles.length >= swordFormationSlotCount) {
+      tap += 0.015;
+      dps += 0.015;
+      market += 0.025;
+    }
+    if (filled >= swordFormationSlotCount && regions.length >= filled) {
+      market += 0.02;
+    }
+
+    return FormationSummary(
+      filledSlots: filled,
+      tapBonus: tap,
+      dpsBonus: dps,
+      marketBonus: market,
+      distinctRoles: roles.length,
+      distinctRegions: regions.length,
+      strongestRegionCount: strongestRegionCount,
+    );
+  }
+
+  double _formationTapMult() => 1.0 + _formationSummary().tapBonus;
+  double _formationDpsMult() => 1.0 + _formationSummary().dpsBonus;
+
   double _calcTapPower() {
     double base = 1.0;
     for (final def in tapUpgradeCatalog) {
@@ -1551,7 +1713,8 @@ class GameNotifier extends Notifier<GameState> {
         _equippedTapMult() *
         _boosterTapMult() *
         _setTapBonus() *
-        _collectionMult();
+        _collectionMult() *
+        _formationTapMult();
   }
 
   double _calcDps() {
@@ -1567,11 +1730,134 @@ class GameNotifier extends Notifier<GameState> {
         _equippedDpsMult() *
         _boosterDpsMult() *
         _setDpsBonus() *
-        _collectionMult();
+        _collectionMult() *
+        _formationDpsMult();
   }
 
   /// Public read for the home screen so it can show "수집 보너스 +X%".
   double get collectionBonusFraction => _collectionBonusTotal();
+
+  bool setFormationSword(int slot, String? swordId) {
+    if (slot < 0 || slot >= swordFormationSlotCount) return false;
+    _sanitizeFormationSlots();
+    if (swordId != null) {
+      if ((_save.ownedSwords[swordId] ?? 0) <= 0) return false;
+      try {
+        swordById(swordId);
+      } catch (_) {
+        return false;
+      }
+    }
+    for (var i = 0; i < _save.formationSwordIds.length; i++) {
+      if (i != slot && _save.formationSwordIds[i] == swordId) {
+        _save.formationSwordIds[i] = null;
+      }
+    }
+    _save.formationSwordIds[slot] = swordId;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return true;
+  }
+
+  void clearFormation() {
+    _save.formationSwordIds =
+        List<String?>.filled(swordFormationSlotCount, null);
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  void autoFillFormation() {
+    final owned = <SwordDef>[];
+    for (final entry in _save.ownedSwords.entries) {
+      if (entry.value <= 0) continue;
+      try {
+        owned.add(swordById(entry.key));
+      } catch (_) {}
+    }
+    owned.sort((a, b) {
+      final tierCmp = b.tier.index.compareTo(a.tier.index);
+      if (tierCmp != 0) return tierCmp;
+      final lvCmp =
+          (_save.ownedSwords[b.id] ?? 0).compareTo(_save.ownedSwords[a.id] ?? 0);
+      if (lvCmp != 0) return lvCmp;
+      return a.id.compareTo(b.id);
+    });
+
+    final picked = <SwordDef>[];
+    final usedRoles = <SwordFormationRole>{};
+    for (final sword in owned) {
+      if (picked.length >= swordFormationSlotCount) break;
+      final role = swordFormationRole(sword);
+      if (usedRoles.contains(role)) continue;
+      picked.add(sword);
+      usedRoles.add(role);
+    }
+    for (final sword in owned) {
+      if (picked.length >= swordFormationSlotCount) break;
+      if (picked.any((s) => s.id == sword.id)) continue;
+      picked.add(sword);
+    }
+
+    _save.formationSwordIds =
+        List<String?>.filled(swordFormationSlotCount, null);
+    for (var i = 0; i < picked.length; i++) {
+      _save.formationSwordIds[i] = picked[i].id;
+    }
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  double regionSwordDistrictBonusFraction(String regionId) {
+    final regionSwords = swordsForRegion(regionId);
+    if (regionSwords.isEmpty) return 0;
+
+    var owned = 0;
+    var levelTotal = 0;
+    for (final sword in regionSwords) {
+      final level = _save.ownedSwords[sword.id] ?? 0;
+      if (level <= 0) continue;
+      owned++;
+      levelTotal += level.clamp(0, SwordDef.maxLevel).toInt();
+    }
+
+    final ownedRatio = owned / regionSwords.length;
+    final levelRatio = levelTotal / (regionSwords.length * SwordDef.maxLevel);
+    final collectionBonus = ownedRatio * 0.18 + levelRatio * 0.22;
+
+    var formationBonus = 0.0;
+    for (final id in _save.formationSwordIds) {
+      if (id == null) continue;
+      final level = _save.ownedSwords[id] ?? 0;
+      if (level <= 0) continue;
+      SwordDef def;
+      try {
+        def = swordById(id);
+      } catch (_) {
+        continue;
+      }
+      if (swordRegionId(def) != regionId) continue;
+      final role = swordFormationRole(def);
+      final roleWeight = switch (role) {
+        SwordFormationRole.trader => 2.00,
+        SwordFormationRole.anchor => 1.15,
+        _ => 0.55,
+      };
+      formationBonus += _formationPower(def, level) * roleWeight;
+    }
+
+    return (collectionBonus + formationBonus).clamp(0.0, 0.85).toDouble();
+  }
+
+  double regionEffectiveHourlyYield(String regionId) {
+    final def = regionDefById(regionId);
+    return def.hourlyYield * (1.0 + regionSwordDistrictBonusFraction(regionId));
+  }
+
+  double regionIntrinsicPrice(String regionId) {
+    final def = regionDefById(regionId);
+    return def.initialPrice *
+        (1.0 + regionSwordDistrictBonusFraction(regionId) * 0.45);
+  }
 
   /// All multipliers that turn a producer's raw DPS into the effective DPS
   /// shown on the home screen. Upgrade tiles use this to display the gain
@@ -1584,7 +1870,8 @@ class GameNotifier extends Notifier<GameState> {
       _equippedDpsMult() *
       _boosterDpsMult() *
       _setDpsBonus() *
-      _collectionMult();
+      _collectionMult() *
+      _formationDpsMult();
 
   /// Counterpart of [dpsMultiplier] for tap-power upgrades.
   double get tapMultiplier =>
@@ -1594,7 +1881,8 @@ class GameNotifier extends Notifier<GameState> {
       _equippedTapMult() *
       _boosterTapMult() *
       _setTapBonus() *
-      _collectionMult();
+      _collectionMult() *
+      _formationTapMult();
 
   /// Drop expired boosters from the save (called before any calculation that
   /// reads them, to avoid "ghost" multipliers after their timer ran out).
@@ -2166,6 +2454,11 @@ class GameNotifier extends Notifier<GameState> {
     final refund = dismantleRefund(swordId);
     if (refund <= 0) return 0;
     _save.ownedSwords.remove(swordId);
+    for (var i = 0; i < _save.formationSwordIds.length; i++) {
+      if (_save.formationSwordIds[i] == swordId) {
+        _save.formationSwordIds[i] = null;
+      }
+    }
     _save.essence += refund;
     _save.run.swordDismantles++;
     _emit(loaded: true);
@@ -2228,6 +2521,10 @@ class GameNotifier extends Notifier<GameState> {
     final newLv = wasMaxed ? SwordDef.maxLevel : (wasOwned ? oldLv + 1 : 1);
     _save.ownedSwords[def.id] = newLv;
     _save.equippedSwordId ??= def.id;
+    if (!wasOwned && !_save.formationSwordIds.contains(def.id)) {
+      final emptySlot = _save.formationSwordIds.indexWhere((id) => id == null);
+      if (emptySlot >= 0) _save.formationSwordIds[emptySlot] = def.id;
+    }
     _save.stats.totalSummons++;
     if (tier.index >= SwordTier.sr.index) {
       _save.summonsSinceHighRare = 0;
@@ -2313,7 +2610,7 @@ class GameNotifier extends Notifier<GameState> {
           unlocked: def.unlockOrder == 1 &&
               _save.totalGoldEarned >= stockMarketLifetimeGoldTrigger,
           currentPrice: def.initialPrice,
-          intrinsicPrice: def.initialPrice,
+          intrinsicPrice: regionIntrinsicPrice(def.id),
           lastAccrualAt: null,
         );
       } else {
@@ -2339,6 +2636,7 @@ class GameNotifier extends Notifier<GameState> {
         if (existing.intrinsicPrice <= 0) {
           existing.intrinsicPrice = def.initialPrice;
         }
+        existing.intrinsicPrice = regionIntrinsicPrice(def.id);
         // Cap accidentally-overshot ownership at the configured max so
         // legacy data stays inside the 80% bound.
         final cap = (def.totalShares * regionMaxOwnershipFraction).floor();
@@ -2379,7 +2677,8 @@ class GameNotifier extends Notifier<GameState> {
       final hours = elapsed.inSeconds / dividendIntervalSeconds;
       if (hours <= 0) continue;
       final def = regionDefById(state.regionId);
-      final perHour = state.shares * state.currentPrice * def.hourlyYield;
+      final perHour =
+          state.shares * state.currentPrice * regionEffectiveHourlyYield(def.id);
       state.pendingDividend += perHour * hours;
       state.lastAccrualAt = now;
     }
@@ -2426,8 +2725,13 @@ class GameNotifier extends Notifier<GameState> {
     for (final state in m.regions.values) {
       if (!state.unlocked) continue;
       final def = regionDefById(state.regionId);
+      final districtBonus = regionSwordDistrictBonusFraction(def.id);
+      state.intrinsicPrice = regionIntrinsicPrice(def.id);
       final sigmaPerTick =
-          def.volatilityPerMinute * volatilityBoost * tickFactor;
+          def.volatilityPerMinute *
+          volatilityBoost *
+          (1.0 + districtBonus * 0.12) *
+          tickFactor;
 
       for (var i = 0; i < ticksElapsed; i++) {
         // Mean-reverting drift toward intrinsic price (scaled to tick).
@@ -2489,8 +2793,9 @@ class GameNotifier extends Notifier<GameState> {
         final elapsed = now.difference(last).inSeconds;
         if (elapsed >= dividendIntervalSeconds) {
           final hours = elapsed ~/ dividendIntervalSeconds;
-          final perHour =
-              state.shares * state.currentPrice * def.hourlyYield;
+          final perHour = state.shares *
+              state.currentPrice *
+              regionEffectiveHourlyYield(def.id);
           state.pendingDividend += perHour * hours;
           state.lastAccrualAt =
               last.add(Duration(seconds: hours * dividendIntervalSeconds));
@@ -2542,8 +2847,7 @@ class GameNotifier extends Notifier<GameState> {
   double regionHourlyDividendEstimate(String id) {
     final st = _save.market.regions[id];
     if (st == null || st.shares <= 0) return 0;
-    final def = regionDefById(id);
-    return st.shares * st.currentPrice * def.hourlyYield;
+    return st.shares * st.currentPrice * regionEffectiveHourlyYield(id);
   }
 
   /// Total pending dividend across all regions.
