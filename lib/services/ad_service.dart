@@ -57,10 +57,16 @@ class AdService {
   /// Returns true when the threshold fires and an ad attempt is queued
   /// (regardless of whether it ultimately shows).
   bool recordTabSwitch() {
-    if (_adsRemoved) return false;
+    if (_adsRemoved) {
+      debugPrint('[AdService] tab switch ignored (ads removed)');
+      return false;
+    }
     _tabSwitchCount++;
+    debugPrint('[AdService] tab switch '
+        '$_tabSwitchCount/${AdConfig.tabSwitchesPerInterstitial}');
     if (_tabSwitchCount < AdConfig.tabSwitchesPerInterstitial) return false;
     _tabSwitchCount = 0;
+    debugPrint('[AdService] tab-switch threshold hit — attempting interstitial');
     // Fire-and-forget; the caller doesn't want to block tab navigation.
     unawaited(showInterstitial(trigger: 'tab_switch'));
     return true;
@@ -92,6 +98,8 @@ class AdService {
       return;
     }
     _loadingInterstitial = true;
+    debugPrint('[AdService] preloading interstitial '
+        '(unit=${AdConfig.interstitialUnitId})');
     InterstitialAd.load(
       adUnitId: AdConfig.interstitialUnitId,
       request: const AdRequest(),
@@ -99,6 +107,7 @@ class AdService {
         onAdLoaded: (ad) {
           _interstitialCache = ad;
           _loadingInterstitial = false;
+          debugPrint('[AdService] interstitial preloaded ✓');
         },
         onAdFailedToLoad: (err) {
           _loadingInterstitial = false;
@@ -112,13 +121,21 @@ class AdService {
   /// reached the screen (i.e. wasn't suppressed by purchase grace, daily
   /// ceiling, frequency cap, or load failure).
   Future<bool> showInterstitial({String? trigger}) async {
-    if (_adsRemoved) return false;
-    if (!_initialized) return false;
+    if (_adsRemoved) {
+      debugPrint('[AdService] interstitial blocked: ads removed');
+      return false;
+    }
+    if (!_initialized) {
+      debugPrint('[AdService] interstitial blocked: SDK not yet initialized');
+      return false;
+    }
 
     final now = DateTime.now();
     final purchaseGraceUntil = _lastPurchaseAt
         ?.add(AdConfig.interstitialPurchaseGrace);
     if (purchaseGraceUntil != null && now.isBefore(purchaseGraceUntil)) {
+      debugPrint('[AdService] interstitial blocked: post-purchase grace until '
+          '$purchaseGraceUntil');
       return false;
     }
 
@@ -128,18 +145,25 @@ class AdService {
       _interstitialShownToday = 0;
     }
     if (_interstitialShownToday >= AdConfig.interstitialDailyCeiling) {
+      debugPrint('[AdService] interstitial blocked: daily ceiling '
+          '${AdConfig.interstitialDailyCeiling} reached');
       return false;
     }
     if (_lastInterstitialAt != null &&
         now.difference(_lastInterstitialAt!) < AdConfig.interstitialMinGap) {
+      debugPrint('[AdService] interstitial blocked: within minGap '
+          '${AdConfig.interstitialMinGap.inSeconds}s of last show');
       return false;
     }
 
     final ad = _interstitialCache;
     if (ad == null) {
+      debugPrint('[AdService] interstitial blocked: no cached ad — '
+          'kicking another preload');
       _preloadInterstitial();
       return false;
     }
+    debugPrint('[AdService] interstitial showing (trigger=$trigger)');
     _interstitialCache = null;
     final completer = Completer<bool>();
     ad.fullScreenContentCallback = FullScreenContentCallback(
