@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
+import '../services/ad_service.dart';
 
 class BoosterShopDialog extends ConsumerWidget {
   const BoosterShopDialog({super.key});
@@ -51,15 +52,23 @@ class BoosterShopDialog extends ConsumerWidget {
                   final ok = notifier.buyBoosterWithEssence(offer);
                   if (!ok) _toast(context, '정수가 부족해요');
                 },
-                onWatchAd: () {
-                  // Stub: real AdMob integration goes here.
-                  notifier.grantAdBooster(offer);
-                  _toast(
-                    context,
-                    notifier.adsRemoved
-                        ? '광고 제거 혜택으로 즉시 지급됐어요'
-                        : '(데모) 광고 대신 즉시 지급됐어요',
-                  );
+                onWatchAd: () async {
+                  // 광고 제거 IAP 보유자는 즉시 지급 (광고 시청 단계 스킵).
+                  if (notifier.adsRemoved) {
+                    notifier.grantAdBooster(offer);
+                    _toast(context, '광고 제거 혜택으로 즉시 지급됐어요');
+                    return;
+                  }
+                  final earned = await AdService.instance
+                      .showRewarded(trigger: 'booster_shop');
+                  if (!context.mounted) return;
+                  if (earned) {
+                    notifier.grantAdBooster(offer);
+                    _toast(context, '광고 시청 완료 — 부스터가 적용됐어요');
+                  } else {
+                    _toast(context,
+                        '광고를 끝까지 시청해야 보상이 지급돼요');
+                  }
                 },
               ),
               const SizedBox(height: 10),

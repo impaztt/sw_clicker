@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/number_format.dart';
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
+import '../services/ad_service.dart';
 
 class OfflineRewardDialog extends ConsumerWidget {
   final OfflineReward reward;
@@ -127,10 +128,54 @@ class OfflineRewardDialog extends ConsumerWidget {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
             ),
+            if (!reward.blockedByClockGuard && reward.gold > 0) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => _claimDouble(context, ref),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  side: const BorderSide(color: AppColors.coral, width: 1.5),
+                ),
+                icon: const Icon(Icons.play_circle_fill,
+                    color: AppColors.deepCoral),
+                label: Text(
+                  '광고 시청 후 2배 수령 (+${NumberFormatter.format(reward.gold)})',
+                  style: const TextStyle(
+                    color: AppColors.deepCoral,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _claimDouble(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(gameProvider.notifier);
+    final earned = await AdService.instance
+        .showRewarded(trigger: 'offline_reward_x2');
+    if (!context.mounted) return;
+    if (earned) {
+      // Pay the base reward, then add another full reward worth of gold
+      // (and double the essence bonus too) directly.
+      notifier.claimOfflineReward(reward);
+      notifier.grantBonusGold(reward.gold);
+      if (reward.essenceBonus > 0) {
+        notifier.grantEssence(reward.essenceBonus);
+      }
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('광고를 끝까지 시청해야 2배 보상이 지급돼요'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   String _durationLabel(Duration d) {

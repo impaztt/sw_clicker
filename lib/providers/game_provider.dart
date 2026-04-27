@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart' show PurchaseStatus;
 
 import '../data/achievement_catalog.dart';
 import '../data/feature_unlocks.dart';
@@ -24,6 +25,8 @@ import '../models/save_data.dart';
 import '../models/skill.dart';
 import '../models/stock_market.dart';
 import '../models/sword.dart';
+import '../services/ad_service.dart';
+import '../services/iap_service.dart';
 import '../services/sync_service.dart';
 
 /// Buy count: 1, 10, 100 or -1 for Max.
@@ -216,6 +219,13 @@ const boosterOffers = <BoosterOffer>[
 const premiumAdRemovalProductId = 'premium_ad_removal';
 const premiumMonthlyEssencePassProductId = 'premium_monthly_essence_pass';
 const premiumStarterPackageProductId = 'premium_starter_package';
+const premiumFirstPurchaseProductId = 'premium_first_purchase';
+const premiumEssenceSmallProductId = 'premium_essence_small';
+const premiumEssenceMediumProductId = 'premium_essence_medium';
+const premiumEssenceLargeProductId = 'premium_essence_large';
+const premiumEssenceXLargeProductId = 'premium_essence_xlarge';
+const premiumMasterPackageProductId = 'premium_master_package';
+const premiumSeasonPassProductId = 'premium_season_pass';
 
 const monthlyEssencePassImmediateEssence = 300;
 const monthlyEssencePassDailyEssence = 120;
@@ -224,6 +234,29 @@ const monthlyEssencePassMissedClaimCapDays = 3;
 
 const starterPackageEssence = 1400;
 const starterPackageDpsBoostDurationSec = 1800;
+
+/// Season pass (60 days). Larger daily essence + a weekly stipend.
+const seasonPassDurationDays = 60;
+const seasonPassDailyEssence = 200;
+const seasonPassMissedClaimCapDays = 3;
+/// Weekly bonus: paid out at most once every 7 days while the pass is
+/// active. Designed as the headline "extra" so the pass feels distinct
+/// from the cheaper monthly version.
+const seasonPassWeeklyEssence = 600;
+const seasonPassWeeklyIntervalDays = 7;
+
+/// First-purchase package: heavily front-loaded, one shot per account,
+/// only purchasable in the first ad-funnel window.
+const firstPurchasePackageEssence = 500;
+// Essence packs (consumables — no extra effect, just essence).
+const essenceSmallEssence = 110;
+const essenceMediumEssence = 380;
+const essenceLargeEssence = 1200;
+const essenceXLargeEssence = 2800;
+
+const masterPackageEssence = 7500;
+const masterPackageProtectionScrolls = 10;
+const masterPackageBoosterDurationSec = 86400; // 24h all-buff buffer
 
 class PremiumProductDef {
   final String id;
@@ -267,11 +300,73 @@ const premiumProducts = <PremiumProductDef>[
     id: premiumStarterPackageProductId,
     title: '초보자 패키지',
     subtitle: '초반 소환과 성장 템포를 한 번에 보강',
-    priceLabel: '₩3,900',
+    priceLabel: '₩4,900',
     benefits: [
       '정수 1,400',
       'SR+ 검 1자루 확정 지급',
       '자동 수익 x2 30분',
+    ],
+  ),
+  PremiumProductDef(
+    id: premiumFirstPurchaseProductId,
+    title: '첫 결제 패키지',
+    subtitle: '계정당 1회 — 강력한 진입 보너스',
+    priceLabel: '₩1,100',
+    benefits: [
+      '정수 500',
+      'SR 확정 소환권 1',
+      '24시간 한정 노출',
+    ],
+  ),
+  PremiumProductDef(
+    id: premiumEssenceSmallProductId,
+    title: '정수 꾸러미 (소)',
+    subtitle: '가장 가벼운 정수 충전',
+    priceLabel: '₩1,100',
+    benefits: ['정수 110'],
+  ),
+  PremiumProductDef(
+    id: premiumEssenceMediumProductId,
+    title: '정수 꾸러미 (중)',
+    subtitle: '5분 환금 1회 + 보너스 30',
+    priceLabel: '₩3,300',
+    benefits: ['정수 380'],
+  ),
+  PremiumProductDef(
+    id: premiumEssenceLargeProductId,
+    title: '정수 꾸러미 (대)',
+    subtitle: '8시간 환금 1회분 + 보너스 200',
+    priceLabel: '₩9,900',
+    benefits: ['정수 1,200'],
+  ),
+  PremiumProductDef(
+    id: premiumEssenceXLargeProductId,
+    title: '정수 꾸러미 (특대)',
+    subtitle: '대량 충전 + 보너스 500',
+    priceLabel: '₩19,900',
+    benefits: ['정수 2,800'],
+  ),
+  PremiumProductDef(
+    id: premiumSeasonPassProductId,
+    title: '시즌 패스',
+    subtitle: '60일간 매일 정수 + 주간 보너스',
+    priceLabel: '₩14,900',
+    benefits: [
+      '60일간 매일 정수 200',
+      '7일마다 정수 600 추가',
+      '구매 즉시 시즌 시작',
+    ],
+  ),
+  PremiumProductDef(
+    id: premiumMasterPackageProductId,
+    title: '마스터 패키지',
+    subtitle: '한 번에 코어 빌드 완성',
+    priceLabel: '₩49,900',
+    benefits: [
+      '정수 7,500',
+      'UR 확정 소환권 1',
+      '강 보호권 10',
+      '24시간 모든 부스터',
     ],
   ),
 ];
@@ -900,6 +995,10 @@ class GameState {
   final int mainSwordStage;
   final String? mainSwordName;
   final int mainSwordHighestStage;
+  final bool adsRemoved;
+  final DateTime? monthlyPassExpiresAt;
+  final DateTime? seasonPassExpiresAt;
+  final bool firstPurchasePackageClaimed;
   final bool loaded;
 
   const GameState({
@@ -961,6 +1060,10 @@ class GameState {
     this.mainSwordStage = 0,
     this.mainSwordName,
     this.mainSwordHighestStage = 0,
+    this.adsRemoved = false,
+    this.monthlyPassExpiresAt,
+    this.seasonPassExpiresAt,
+    this.firstPurchasePackageClaimed = false,
     this.loaded = false,
   });
 
@@ -1232,6 +1335,7 @@ class GameNotifier extends Notifier<GameState> {
     _achievementUnlocks.close();
     _featureUnlocks.close();
     _mainSwordEvents.close();
+    _iapSub?.cancel();
   }
 
   Future<void> _initialize() async {
@@ -1268,6 +1372,7 @@ class GameNotifier extends Notifier<GameState> {
     }
     _bootstrapStockMarket(now: now, loadedVersion: loadedVersion);
     _save.version = SaveData.currentVersion;
+    _save.firstLaunchAt ??= now; // anchor first-purchase popup window
     _accrueOfflineDividends(now: now);
     _pendingDaily = _evaluateDailyEligibility();
     _emit(loaded: true);
@@ -1277,6 +1382,34 @@ class GameNotifier extends Notifier<GameState> {
     _featureUnlocksReady = true;
     _startTicker();
     _startAutoSave();
+    _wireIapListener();
+    // Sync ad-removal state with the ad SDK so banners/interstitials are
+    // suppressed for paying users immediately on app boot.
+    AdService.instance.adsRemoved = _save.adsRemoved;
+  }
+
+  StreamSubscription<dynamic>? _iapSub;
+
+  /// Listen for purchase results from in_app_purchase and grant entitlements
+  /// locally. We trust client-side success here; server-side receipt
+  /// validation is the upgrade path for a future release.
+  void _wireIapListener() {
+    _iapSub?.cancel();
+    _iapSub = IapService.instance.purchaseStream.listen((purchase) {
+      // Only purchased/restored grant entitlements. failed/canceled are
+      // user-driven dropouts; pending shouldn't fire grants yet.
+      if (purchase.status != PurchaseStatus.purchased &&
+          purchase.status != PurchaseStatus.restored) {
+        return;
+      }
+      final result = purchasePremiumProduct(purchase.productID);
+      if (result.ok) {
+        AdService.instance.recordPurchase();
+        if (purchase.productID == premiumAdRemovalProductId) {
+          AdService.instance.adsRemoved = true;
+        }
+      }
+    });
   }
 
   Future<bool> loadCloudSaveForCurrentAccount() async {
@@ -1354,6 +1487,10 @@ class GameNotifier extends Notifier<GameState> {
     _save.mainSwordTiersShown.removeWhere(
       (i) => i < 0 || i >= mainSwordTiers.length,
     );
+    if (_save.mainSwordCollectionBonusFraction.isNaN ||
+        _save.mainSwordCollectionBonusFraction < 0) {
+      _save.mainSwordCollectionBonusFraction = 0;
+    }
     _save.prestigeCoins = _intClamp(_save.prestigeCoins, 0, 2147483647);
     _save.prestigeCount = _intClamp(_save.prestigeCount, 0, 1000000);
     _save.ascensionCoreLevel = _intClamp(_save.ascensionCoreLevel, 0, 1000000);
@@ -1620,6 +1757,10 @@ class GameNotifier extends Notifier<GameState> {
       mainSwordStage: _save.mainSwordStage,
       mainSwordName: _save.mainSwordName,
       mainSwordHighestStage: _save.mainSwordHighestStage,
+      adsRemoved: _save.adsRemoved,
+      monthlyPassExpiresAt: _save.monthlyPassExpiresAt,
+      seasonPassExpiresAt: _save.seasonPassExpiresAt,
+      firstPurchasePackageClaimed: _save.firstPurchasePackageClaimed,
       loaded: loaded,
     );
     if (loaded) {
@@ -2755,6 +2896,13 @@ class GameNotifier extends Notifier<GameState> {
               milestone.collectionBonusFraction!;
         }
         _mainSwordEvents.add(MainSwordEvent.milestone(milestone));
+        // Hook the dopamine moment to a (capped) interstitial. Only the
+        // first three milestones — past that the ad would feel like
+        // punishment for paying-feeling progression.
+        if (newStage <= 10) {
+          unawaited(AdService.instance
+              .showInterstitial(trigger: 'enhance_milestone'));
+        }
       }
     }
     if (firstEverEnhance &&
@@ -2802,6 +2950,9 @@ class GameNotifier extends Notifier<GameState> {
     _save.run.reset();
     _emit(loaded: true);
     unawaited(_persist());
+    // Surface an interstitial ad on a natural break point. AdService
+    // handles purchase grace + frequency caps; this is fire-and-forget.
+    unawaited(AdService.instance.showInterstitial(trigger: 'prestige'));
     return true;
   }
 
@@ -3087,12 +3238,214 @@ class GameNotifier extends Notifier<GameState> {
           bonusSummon: bonusSummon,
         );
 
+      case premiumFirstPurchaseProductId:
+        if (_save.firstPurchasePackageClaimed) {
+          return const PremiumPurchaseResult(
+            ok: false,
+            message: '첫 결제 패키지는 계정당 1회만 구매할 수 있어요',
+          );
+        }
+        _save.firstPurchasePackageClaimed = true;
+        _save.essence += firstPurchasePackageEssence;
+        final firstSummon = _doOnePull(
+          guaranteedRPlus: true,
+          forceSrPlus: true,
+        );
+        _save.run.summons++;
+        _incMission('daily_summon_15', 1, daily: true);
+        _incMission('weekly_summon_120', 1, daily: false);
+        _emit(loaded: true);
+        unawaited(_persist());
+        return PremiumPurchaseResult(
+          ok: true,
+          message: '첫 결제 패키지가 지급됐어요',
+          essenceGranted: firstPurchasePackageEssence,
+          bonusSummon: firstSummon,
+        );
+
+      case premiumEssenceSmallProductId:
+        return _grantEssencePack(essenceSmallEssence, '정수 꾸러미 (소)');
+      case premiumEssenceMediumProductId:
+        return _grantEssencePack(essenceMediumEssence, '정수 꾸러미 (중)');
+      case premiumEssenceLargeProductId:
+        return _grantEssencePack(essenceLargeEssence, '정수 꾸러미 (대)');
+      case premiumEssenceXLargeProductId:
+        return _grantEssencePack(essenceXLargeEssence, '정수 꾸러미 (특대)');
+
+      case premiumSeasonPassProductId:
+        final now = DateTime.now();
+        final wasActive = hasActiveSeasonPass;
+        final currentExpiresAt = _save.seasonPassExpiresAt;
+        final base = currentExpiresAt != null && currentExpiresAt.isAfter(now)
+            ? currentExpiresAt
+            : now;
+        _save.seasonPassExpiresAt =
+            base.add(const Duration(days: seasonPassDurationDays));
+        if (!wasActive) {
+          _save.seasonPassLastClaimAt = now;
+          _save.seasonPassLastWeeklyClaimAt = null;
+        }
+        _emit(loaded: true);
+        unawaited(_persist());
+        return const PremiumPurchaseResult(
+          ok: true,
+          message: '시즌 패스가 적용됐어요',
+        );
+
+      case premiumMasterPackageProductId:
+        if (_save.masterPackagePurchased) {
+          return const PremiumPurchaseResult(
+            ok: false,
+            message: '마스터 패키지는 계정당 1회만 구매할 수 있어요',
+          );
+        }
+        _save.masterPackagePurchased = true;
+        _save.essence += masterPackageEssence;
+        final masterSummon = _doOnePull(
+          guaranteedRPlus: true,
+          forceSrPlus: true,
+        );
+        _save.run.summons++;
+        _incMission('daily_summon_15', 1, daily: true);
+        _incMission('weekly_summon_120', 1, daily: false);
+        _applyBooster(
+          BoosterType.dps,
+          2.0,
+          masterPackageBoosterDurationSec,
+        );
+        _applyBooster(
+          BoosterType.tap,
+          2.0,
+          masterPackageBoosterDurationSec,
+        );
+        _save.stats.boostersPurchased += 2;
+        _save.run.boostersUsed += 2;
+        _save.run.usedAnyBooster = true;
+        _emit(loaded: true);
+        unawaited(_persist());
+        return PremiumPurchaseResult(
+          ok: true,
+          message: '마스터 패키지가 지급됐어요',
+          essenceGranted: masterPackageEssence,
+          bonusSummon: masterSummon,
+        );
+
       default:
         return const PremiumPurchaseResult(
           ok: false,
           message: '알 수 없는 상품이에요',
         );
     }
+  }
+
+  PremiumPurchaseResult _grantEssencePack(int amount, String label) {
+    _save.essence += amount;
+    _emit(loaded: true);
+    unawaited(_persist());
+    return PremiumPurchaseResult(
+      ok: true,
+      message: '$label 지급 완료',
+      essenceGranted: amount,
+    );
+  }
+
+  // Season pass helpers (mirror the monthly pass pattern).
+  DateTime? get seasonPassExpiresAt => _save.seasonPassExpiresAt;
+
+  bool get hasActiveSeasonPass {
+    final expiresAt = _save.seasonPassExpiresAt;
+    return expiresAt != null && expiresAt.isAfter(DateTime.now());
+  }
+
+  int get seasonPassDaysRemaining {
+    final expiresAt = _save.seasonPassExpiresAt;
+    if (expiresAt == null) return 0;
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining.isNegative) return 0;
+    return max(
+      1,
+      (remaining.inSeconds + Duration.secondsPerDay - 1) ~/
+          Duration.secondsPerDay,
+    );
+  }
+
+  int get seasonPassClaimableDays {
+    if (!hasActiveSeasonPass) return 0;
+    final now = DateTime.now();
+    final lastClaim = _save.seasonPassLastClaimAt;
+    if (lastClaim == null) return 1;
+    final days = _dateOnly(now).difference(_dateOnly(lastClaim)).inDays;
+    if (days <= 0) return 0;
+    return min(days, seasonPassMissedClaimCapDays);
+  }
+
+  int get seasonPassClaimableEssence =>
+      seasonPassClaimableDays * seasonPassDailyEssence;
+
+  bool get seasonPassWeeklyAvailable {
+    if (!hasActiveSeasonPass) return false;
+    final last = _save.seasonPassLastWeeklyClaimAt;
+    if (last == null) return true;
+    return DateTime.now()
+        .difference(last)
+        .inDays >=
+        seasonPassWeeklyIntervalDays;
+  }
+
+  int claimSeasonPassDailyEssence() {
+    final days = seasonPassClaimableDays;
+    if (days <= 0) return 0;
+    final amount = days * seasonPassDailyEssence;
+    _save.essence += amount;
+    _save.seasonPassLastClaimAt = DateTime.now();
+    _emit(loaded: true);
+    unawaited(_persist());
+    return amount;
+  }
+
+  int claimSeasonPassWeeklyEssence() {
+    if (!seasonPassWeeklyAvailable) return 0;
+    _save.essence += seasonPassWeeklyEssence;
+    _save.seasonPassLastWeeklyClaimAt = DateTime.now();
+    _emit(loaded: true);
+    unawaited(_persist());
+    return seasonPassWeeklyEssence;
+  }
+
+  // First-purchase popup gating.
+  bool get firstPurchasePopupEligible {
+    if (_save.firstPurchasePackageClaimed) return false;
+    if (_save.firstPurchasePopupShown) return false;
+    final firstLaunch = _save.firstLaunchAt;
+    if (firstLaunch == null) return false;
+    final age = DateTime.now().difference(firstLaunch);
+    return age <= const Duration(hours: 24);
+  }
+
+  void markFirstPurchasePopupShown() {
+    _save.firstPurchasePopupShown = true;
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  // Bulk grant for milestones / rewarded ads / external testing.
+  void grantEssence(int amount) {
+    if (amount <= 0) return;
+    _save.essence += amount;
+    _emit(loaded: true);
+    unawaited(_persist());
+  }
+
+  /// Bonus gold grant from rewarded ads (offline-reward x2 etc.). Counts
+  /// toward lifetime/totalGoldEarned because the player earned it through
+  /// ad engagement, not by paying with essence.
+  void grantBonusGold(double amount) {
+    if (amount <= 0) return;
+    _save.gold += amount;
+    _save.totalGoldEarned += amount;
+    _save.stats.lifetimeGold += amount;
+    _emit(loaded: true);
+    unawaited(_persist());
   }
 
   int claimMonthlyPassEssence() {

@@ -5,7 +5,7 @@ import 'stock_market.dart';
 import 'sword.dart';
 
 class SaveData {
-  static const currentVersion = 18;
+  static const currentVersion = 19;
 
   int version;
   double gold;
@@ -70,6 +70,15 @@ class SaveData {
   DateTime? monthlyPassExpiresAt;
   DateTime? monthlyPassLastClaimAt;
   bool starterPackagePurchased;
+
+  // Premium expansion (v18)
+  bool firstPurchasePackageClaimed;
+  DateTime? seasonPassExpiresAt;
+  DateTime? seasonPassLastClaimAt;
+  DateTime? seasonPassLastWeeklyClaimAt;
+  bool masterPackagePurchased;
+  DateTime? firstLaunchAt; // anchors the 24h first-purchase popup window
+  bool firstPurchasePopupShown;
 
   // Main sword (v18): the single sword anchored to the home tab. Separate
   // from the collection — collection swords still grant passive/active
@@ -149,6 +158,13 @@ class SaveData {
     Set<int>? mainSwordTiersShown,
     this.mainSwordEnhanceAttempts = 0,
     this.mainSwordCollectionBonusFraction = 0,
+    this.firstPurchasePackageClaimed = false,
+    this.seasonPassExpiresAt,
+    this.seasonPassLastClaimAt,
+    this.seasonPassLastWeeklyClaimAt,
+    this.masterPackagePurchased = false,
+    this.firstLaunchAt,
+    this.firstPurchasePopupShown = false,
   })  : mainSwordTiersShown = mainSwordTiersShown ?? <int>{},
         producerLevels = producerLevels ?? {},
         tapUpgradeLevels = tapUpgradeLevels ?? {},
@@ -222,6 +238,14 @@ class SaveData {
         'mainSwordTiersShown': mainSwordTiersShown.toList(),
         'mainSwordEnhanceAttempts': mainSwordEnhanceAttempts,
         'mainSwordCollectionBonusFraction': mainSwordCollectionBonusFraction,
+        'firstPurchasePackageClaimed': firstPurchasePackageClaimed,
+        'seasonPassExpiresAt': seasonPassExpiresAt?.toIso8601String(),
+        'seasonPassLastClaimAt': seasonPassLastClaimAt?.toIso8601String(),
+        'seasonPassLastWeeklyClaimAt':
+            seasonPassLastWeeklyClaimAt?.toIso8601String(),
+        'masterPackagePurchased': masterPackagePurchased,
+        'firstLaunchAt': firstLaunchAt?.toIso8601String(),
+        'firstPurchasePopupShown': firstPurchasePopupShown,
       };
 
   factory SaveData.fromJson(Map<String, dynamic> json) => SaveData(
@@ -321,6 +345,20 @@ class SaveData {
             json['mainSwordEnhanceAttempts'] as int? ?? 0,
         mainSwordCollectionBonusFraction:
             (json['mainSwordCollectionBonusFraction'] as num?)?.toDouble() ?? 0,
+        firstPurchasePackageClaimed:
+            json['firstPurchasePackageClaimed'] as bool? ?? false,
+        seasonPassExpiresAt:
+            DateTime.tryParse(json['seasonPassExpiresAt'] as String? ?? ''),
+        seasonPassLastClaimAt:
+            DateTime.tryParse(json['seasonPassLastClaimAt'] as String? ?? ''),
+        seasonPassLastWeeklyClaimAt: DateTime.tryParse(
+            json['seasonPassLastWeeklyClaimAt'] as String? ?? ''),
+        masterPackagePurchased:
+            json['masterPackagePurchased'] as bool? ?? false,
+        firstLaunchAt:
+            DateTime.tryParse(json['firstLaunchAt'] as String? ?? ''),
+        firstPurchasePopupShown:
+            json['firstPurchasePopupShown'] as bool? ?? false,
       );
 
   static List<String?> _normalizeFormationSwordIds(List<String?>? source) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
+import '../services/ad_service.dart';
 
 class DailyBonusDialog extends ConsumerWidget {
   final DailyBonus bonus;
@@ -91,6 +92,23 @@ class DailyBonusDialog extends ConsumerWidget {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _claimDouble(context, ref),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                side: const BorderSide(color: AppColors.coral, width: 1.5),
+              ),
+              icon: const Icon(Icons.play_circle_fill,
+                  color: AppColors.deepCoral),
+              label: Text(
+                '광고 시청 후 2배 (+${bonus.essence})',
+                style: const TextStyle(
+                  color: AppColors.deepCoral,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               '7일 주기 · 하루 거르면 1일째부터 다시',
@@ -103,6 +121,26 @@ class DailyBonusDialog extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _claimDouble(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(gameProvider.notifier);
+    final earned = await AdService.instance
+        .showRewarded(trigger: 'daily_bonus_x2');
+    if (!context.mounted) return;
+    if (earned) {
+      notifier.claimDailyBonus(bonus);
+      notifier.grantEssence(bonus.essence);
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('광고를 끝까지 시청해야 2배 보상이 지급돼요'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 
