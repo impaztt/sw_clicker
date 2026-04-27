@@ -23,6 +23,7 @@ class AdService {
   DateTime? _lastPurchaseAt;
   int _interstitialDayKey = 0;
   int _interstitialShownToday = 0;
+  int _tabSwitchCount = 0;
 
   InterstitialAd? _interstitialCache;
   RewardedAd? _rewardedCache;
@@ -46,6 +47,23 @@ class AdService {
   /// this to suppress interstitials for the configured grace window.
   void recordPurchase() {
     _lastPurchaseAt = DateTime.now();
+  }
+
+  /// Record a bottom-tab navigation. Every Nth switch (configured via
+  /// [AdConfig.tabSwitchesPerInterstitial]) attempts to show an
+  /// interstitial — the underlying frequency cap and purchase grace
+  /// still apply, so a real ad may not actually appear.
+  ///
+  /// Returns true when the threshold fires and an ad attempt is queued
+  /// (regardless of whether it ultimately shows).
+  bool recordTabSwitch() {
+    if (_adsRemoved) return false;
+    _tabSwitchCount++;
+    if (_tabSwitchCount < AdConfig.tabSwitchesPerInterstitial) return false;
+    _tabSwitchCount = 0;
+    // Fire-and-forget; the caller doesn't want to block tab navigation.
+    unawaited(showInterstitial(trigger: 'tab_switch'));
+    return true;
   }
 
   Future<void> initialize() async {

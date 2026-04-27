@@ -10,7 +10,6 @@ import '../data/feature_unlocks.dart';
 import '../models/booster.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
-import '../widgets/banner_ad_slot.dart';
 import '../widgets/booster_shop_dialog.dart';
 import '../widgets/gold_exchange_dialog.dart';
 import '../widgets/main_sword_enhance_dialog.dart';
@@ -210,8 +209,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 4),
               const PassExpiryBanner(),
-              const SizedBox(height: 4),
-              const Center(child: BannerAdSlot()),
               const SizedBox(height: 76),
             ],
           ),

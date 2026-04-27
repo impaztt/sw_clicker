@@ -2896,13 +2896,6 @@ class GameNotifier extends Notifier<GameState> {
               milestone.collectionBonusFraction!;
         }
         _mainSwordEvents.add(MainSwordEvent.milestone(milestone));
-        // Hook the dopamine moment to a (capped) interstitial. Only the
-        // first three milestones — past that the ad would feel like
-        // punishment for paying-feeling progression.
-        if (newStage <= 10) {
-          unawaited(AdService.instance
-              .showInterstitial(trigger: 'enhance_milestone'));
-        }
       }
     }
     if (firstEverEnhance &&
@@ -2950,9 +2943,6 @@ class GameNotifier extends Notifier<GameState> {
     _save.run.reset();
     _emit(loaded: true);
     unawaited(_persist());
-    // Surface an interstitial ad on a natural break point. AdService
-    // handles purchase grace + frequency caps; this is fire-and-forget.
-    unawaited(AdService.instance.showInterstitial(trigger: 'prestige'));
     return true;
   }
 

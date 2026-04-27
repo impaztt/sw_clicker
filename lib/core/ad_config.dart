@@ -79,15 +79,21 @@ class AdConfig {
   }
 
   // ───────── Frequency caps (interstitial) ─────────
-  /// Minimum gap between any two interstitials.
-  static const Duration interstitialMinGap = Duration(minutes: 5);
+  /// Minimum gap between any two interstitials. Tighter than the original
+  /// 5 minutes because interstitials only fire on tab navigation now —
+  /// players who tab-hop quickly should still see at most one ad per gap.
+  static const Duration interstitialMinGap = Duration(minutes: 2);
 
   /// Hard daily ceiling on interstitials per user.
-  static const int interstitialDailyCeiling = 6;
+  static const int interstitialDailyCeiling = 8;
 
   /// Quarantine window after a fresh purchase: don't show interstitials
   /// for this many days so the player isn't punished for paying.
   static const Duration interstitialPurchaseGrace = Duration(days: 14);
+
+  /// Number of bottom-tab switches between interstitial attempts. Counted
+  /// across the whole session; resets only on app restart.
+  static const int tabSwitchesPerInterstitial = 15;
 
   // ───────── Test devices ─────────
   /// Add your own physical devices here so they always receive test ads

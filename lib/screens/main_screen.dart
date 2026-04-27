@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/game_provider.dart';
+import '../services/ad_service.dart';
 import '../widgets/daily_bonus_dialog.dart';
 import '../widgets/offline_reward_dialog.dart';
 import '../widgets/onboarding_dialog.dart';
@@ -107,8 +108,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: slot,
-        onDestinationSelected: (i) =>
-            setState(() => _index = visible[i].pageIndex),
+        onDestinationSelected: (i) {
+          final target = visible[i].pageIndex;
+          if (target == _index) return; // tapping the current tab — no ad
+          setState(() => _index = target);
+          AdService.instance.recordTabSwitch();
+        },
         destinations: [
           for (final d in visible)
             NavigationDestination(
