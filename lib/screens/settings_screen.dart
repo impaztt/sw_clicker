@@ -21,205 +21,101 @@ class SettingsScreen extends ConsumerWidget {
     final authStatus = ref.watch(authStatusProvider);
 
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const SizedBox(height: 4),
-          const Text(
-            '통계 & 설정',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 16),
-          const _SectionTitle(title: '통계'),
-          const SizedBox(height: 8),
-          _StatGrid(
-            items: [
-              _StatItem(
-                icon: Icons.touch_app,
-                color: AppColors.coral,
-                label: '총 터치',
-                value: NumberFormatter.format(game.totalTaps.toDouble()),
-              ),
-              _StatItem(
-                icon: Icons.timer,
-                color: const Color(0xFF00695C),
-                label: '플레이 시간',
-                value: _fmtDuration(game.playTimeSeconds),
-              ),
-              _StatItem(
-                icon: Icons.bolt,
-                color: const Color(0xFF8D6E00),
-                label: '최고 DPS',
-                value: NumberFormatter.format(game.maxDpsEver),
-              ),
-              _StatItem(
-                icon: Icons.monetization_on,
-                color: AppColors.deepCoral,
-                label: '누적 골드',
-                value: NumberFormatter.format(game.lifetimeGold),
-              ),
-              _StatItem(
-                icon: Icons.auto_awesome,
-                color: AppColors.mint,
-                label: '환생 횟수',
-                value: '${game.prestigeCount}',
-              ),
-              _StatItem(
-                icon: Icons.trending_up,
-                color: const Color(0xFF7E57C2),
-                label: '영구 배율',
-                value:
-                    '+${((game.prestigeMultiplier - 1) * 100).toStringAsFixed(0)}%',
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const _SectionTitle(title: '업적'),
-          const SizedBox(height: 8),
-          _AchievementLink(
-            unlocked: game.unlockedAchievements.length,
-            total: achievementCatalog.length,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AchievementScreen()),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionTitle(title: '해금 가이드'),
-          const SizedBox(height: 8),
-          _UnlockGuideHeader(
-            game: game,
-            onOpenRoadmap: () => showFeatureUnlockRoadmapSheet(
-              context,
-              game: game,
-              title: '설정 - 해금 가이드',
-            ),
-            onReplayTutorial: () => showDialog<void>(
-              context: context,
-              builder: (_) => OnboardingDialog(
-                game: game,
-                replayMode: true,
+      child: DefaultTabController(
+        length: 4,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '설정',
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          FeatureUnlockRoadmapList(
-            game: game,
-            onTap: (def) => showFeatureUnlockDetailSheet(
-              context,
-              def: def,
-              game: game,
+            const SizedBox(height: 12),
+            const TabBar(
+              labelColor: AppColors.deepCoral,
+              unselectedLabelColor: Colors.black45,
+              indicatorColor: AppColors.coral,
+              dividerColor: Colors.transparent,
+              labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+              unselectedLabelStyle:
+                  TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              tabs: [
+                Tab(text: '요약'),
+                Tab(text: '환경'),
+                Tab(text: '계정'),
+                Tab(text: '데이터'),
+              ],
             ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionTitle(title: '계정'),
-          const SizedBox(height: 8),
-          authStatus.when(
-            data: (status) => _AccountCard(
-              status: status,
-              onGoogle: () => _startSocialLogin(
-                context,
-                ref,
-                SocialSignInProvider.google,
-              ),
-              onApple: () => _startSocialLogin(
-                context,
-                ref,
-                SocialSignInProvider.apple,
-              ),
-              onLogout: () => _confirmLogout(context, ref),
-            ),
-            loading: () => const _AccountLoadingCard(),
-            error: (_, __) => _AccountCard(
-              status: const AuthStatus(
-                userId: null,
-                email: null,
-                isAnonymous: true,
-              ),
-              onGoogle: () => _startSocialLogin(
-                context,
-                ref,
-                SocialSignInProvider.google,
-              ),
-              onApple: () => _startSocialLogin(
-                context,
-                ref,
-                SocialSignInProvider.apple,
-              ),
-              onLogout: () => _confirmLogout(context, ref),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionTitle(title: '설정'),
-          const SizedBox(height: 8),
-          _ToggleRow(
-            icon: Icons.vibration,
-            label: '진동 (터치 피드백)',
-            value: game.haptic,
-            onChanged: (v) => ref.read(gameProvider.notifier).setHaptic(v),
-          ),
-          const SizedBox(height: 8),
-          _ToggleRow(
-            icon: Icons.volume_up,
-            label: '사운드',
-            value: game.sound,
-            onChanged: (v) => ref.read(gameProvider.notifier).setSound(v),
-          ),
-          const SizedBox(height: 8),
-          _ToggleRow(
-            icon: Icons.dark_mode,
-            label: '다크 모드',
-            value: game.darkMode,
-            onChanged: (v) => ref.read(gameProvider.notifier).setDarkMode(v),
-          ),
-          const SizedBox(height: 8),
-          _ToggleRow(
-            icon: Icons.contrast,
-            label: '고대비 모드',
-            value: game.highContrast,
-            onChanged: (v) =>
-                ref.read(gameProvider.notifier).setHighContrast(v),
-          ),
-          const SizedBox(height: 8),
-          _ToggleRow(
-            icon: Icons.vibration,
-            label: '일반 터치 진동 줄이기',
-            value: game.reduceTapHaptics,
-            onChanged: (v) =>
-                ref.read(gameProvider.notifier).setReduceTapHaptics(v),
-          ),
-          const SizedBox(height: 8),
-          _TextScaleSelector(
-            value: game.textScale,
-            onChanged: (v) => ref.read(gameProvider.notifier).setTextScale(v),
-          ),
-          const SizedBox(height: 24),
-          const _SectionTitle(title: '데이터'),
-          const SizedBox(height: 8),
-          if (game.timeGuardTriggered)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border:
-                    Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
-              ),
-              child: const Text(
-                '기기 시간 조작이 감지되어 오프라인 보상이 제한되었습니다.\n'
-                '시간 자동 설정 사용을 권장합니다.',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.redAccent,
-                ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _SettingsSummaryView(
+                    game: game,
+                    authStatus: authStatus,
+                    onOpenAchievements: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AchievementScreen(),
+                      ),
+                    ),
+                    onOpenRoadmap: () => showFeatureUnlockRoadmapSheet(
+                      context,
+                      game: game,
+                      title: '설정 - 해금 가이드',
+                    ),
+                  ),
+                  _SettingsEnvironmentView(
+                    game: game,
+                    onHaptic: (v) =>
+                        ref.read(gameProvider.notifier).setHaptic(v),
+                    onSound: (v) => ref.read(gameProvider.notifier).setSound(v),
+                    onDarkMode: (v) =>
+                        ref.read(gameProvider.notifier).setDarkMode(v),
+                    onHighContrast: (v) =>
+                        ref.read(gameProvider.notifier).setHighContrast(v),
+                    onReduceTapHaptics: (v) =>
+                        ref.read(gameProvider.notifier).setReduceTapHaptics(v),
+                    onTextScale: (v) =>
+                        ref.read(gameProvider.notifier).setTextScale(v),
+                  ),
+                  _SettingsAccountView(
+                    authStatus: authStatus,
+                    onGoogle: () => _startSocialLogin(
+                      context,
+                      ref,
+                      SocialSignInProvider.google,
+                    ),
+                    onApple: () => _startSocialLogin(
+                      context,
+                      ref,
+                      SocialSignInProvider.apple,
+                    ),
+                    onLogout: () => _confirmLogout(context, ref),
+                  ),
+                  _SettingsDataView(
+                    game: game,
+                    onOpenRoadmap: () => showFeatureUnlockRoadmapSheet(
+                      context,
+                      game: game,
+                      title: '설정 - 해금 가이드',
+                    ),
+                    onReplayTutorial: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => OnboardingDialog(
+                        game: game,
+                        replayMode: true,
+                      ),
+                    ),
+                    onReset: () => _confirmReset(context, ref),
+                  ),
+                ],
               ),
             ),
-          _DangerButton(
-            onPressed: () => _confirmReset(context, ref),
-          ),
-          const SizedBox(height: 24),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -291,6 +187,503 @@ class SettingsScreen extends ConsumerWidget {
     await ref.read(gameProvider.notifier).persist();
     if (!context.mounted) return;
     _toast(context, result.message);
+  }
+}
+
+class _SettingsSummaryView extends StatelessWidget {
+  final GameState game;
+  final AsyncValue<AuthStatus> authStatus;
+  final VoidCallback onOpenAchievements;
+  final VoidCallback onOpenRoadmap;
+
+  const _SettingsSummaryView({
+    required this.game,
+    required this.authStatus,
+    required this.onOpenAchievements,
+    required this.onOpenRoadmap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+      children: [
+        authStatus.when(
+          data: (status) => _AccountStatusStrip(status: status),
+          loading: () => const _AccountStatusLoadingStrip(),
+          error: (_, __) => const _AccountStatusStrip(
+            status: AuthStatus(
+              userId: null,
+              email: null,
+              isAnonymous: true,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const _SectionTitle(title: '통계'),
+        const SizedBox(height: 8),
+        _StatGrid(
+          items: [
+            _StatItem(
+              icon: Icons.touch_app,
+              color: AppColors.coral,
+              label: '총 터치',
+              value: NumberFormatter.format(game.totalTaps.toDouble()),
+            ),
+            _StatItem(
+              icon: Icons.timer,
+              color: const Color(0xFF00695C),
+              label: '플레이 시간',
+              value: _fmtDuration(game.playTimeSeconds),
+            ),
+            _StatItem(
+              icon: Icons.bolt,
+              color: const Color(0xFF8D6E00),
+              label: '최고 DPS',
+              value: NumberFormatter.format(game.maxDpsEver),
+            ),
+            _StatItem(
+              icon: Icons.monetization_on,
+              color: AppColors.deepCoral,
+              label: '누적 골드',
+              value: NumberFormatter.format(game.lifetimeGold),
+            ),
+            _StatItem(
+              icon: Icons.auto_awesome,
+              color: AppColors.mint,
+              label: '환생 횟수',
+              value: '${game.prestigeCount}',
+            ),
+            _StatItem(
+              icon: Icons.trending_up,
+              color: const Color(0xFF7E57C2),
+              label: '영구 배율',
+              value:
+                  '+${((game.prestigeMultiplier - 1) * 100).toStringAsFixed(0)}%',
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        const _SectionTitle(title: '진행'),
+        const SizedBox(height: 8),
+        _AchievementLink(
+          unlocked: game.unlockedAchievements.length,
+          total: achievementCatalog.length,
+          onTap: onOpenAchievements,
+        ),
+        const SizedBox(height: 8),
+        _UnlockGuideHeader(
+          game: game,
+          onOpenRoadmap: onOpenRoadmap,
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsEnvironmentView extends StatelessWidget {
+  final GameState game;
+  final ValueChanged<bool> onHaptic;
+  final ValueChanged<bool> onSound;
+  final ValueChanged<bool> onDarkMode;
+  final ValueChanged<bool> onHighContrast;
+  final ValueChanged<bool> onReduceTapHaptics;
+  final ValueChanged<double> onTextScale;
+
+  const _SettingsEnvironmentView({
+    required this.game,
+    required this.onHaptic,
+    required this.onSound,
+    required this.onDarkMode,
+    required this.onHighContrast,
+    required this.onReduceTapHaptics,
+    required this.onTextScale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+      children: [
+        _SettingsGroup(
+          title: '조작',
+          children: [
+            _ToggleRow(
+              icon: Icons.vibration,
+              label: '진동',
+              value: game.haptic,
+              onChanged: onHaptic,
+            ),
+            _ToggleRow(
+              icon: Icons.touch_app,
+              label: '일반 터치 진동 줄이기',
+              value: game.reduceTapHaptics,
+              onChanged: onReduceTapHaptics,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: '소리',
+          children: [
+            _ToggleRow(
+              icon: Icons.volume_up,
+              label: '사운드',
+              value: game.sound,
+              onChanged: onSound,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: '화면',
+          children: [
+            _ToggleRow(
+              icon: Icons.dark_mode,
+              label: '다크 모드',
+              value: game.darkMode,
+              onChanged: onDarkMode,
+            ),
+            _ToggleRow(
+              icon: Icons.contrast,
+              label: '고대비 모드',
+              value: game.highContrast,
+              onChanged: onHighContrast,
+            ),
+            _TextScaleSelector(
+              value: game.textScale,
+              onChanged: onTextScale,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsAccountView extends StatelessWidget {
+  final AsyncValue<AuthStatus> authStatus;
+  final VoidCallback onGoogle;
+  final VoidCallback onApple;
+  final VoidCallback onLogout;
+
+  const _SettingsAccountView({
+    required this.authStatus,
+    required this.onGoogle,
+    required this.onApple,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+      children: [
+        const _SectionTitle(title: '계정'),
+        const SizedBox(height: 8),
+        authStatus.when(
+          data: (status) => _AccountCard(
+            status: status,
+            onGoogle: onGoogle,
+            onApple: onApple,
+            onLogout: onLogout,
+          ),
+          loading: () => const _AccountLoadingCard(),
+          error: (_, __) => _AccountCard(
+            status: const AuthStatus(
+              userId: null,
+              email: null,
+              isAnonymous: true,
+            ),
+            onGoogle: onGoogle,
+            onApple: onApple,
+            onLogout: onLogout,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsDataView extends StatelessWidget {
+  final GameState game;
+  final VoidCallback onOpenRoadmap;
+  final VoidCallback onReplayTutorial;
+  final VoidCallback onReset;
+
+  const _SettingsDataView({
+    required this.game,
+    required this.onOpenRoadmap,
+    required this.onReplayTutorial,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+      children: [
+        if (game.timeGuardTriggered) ...[
+          const _TimeGuardWarning(),
+          const SizedBox(height: 14),
+        ],
+        _SettingsGroup(
+          title: '도움말',
+          children: [
+            _DataActionTile(
+              icon: Icons.map_outlined,
+              label: '해금 가이드 전체 보기',
+              onTap: onOpenRoadmap,
+            ),
+            _DataActionTile(
+              icon: Icons.school,
+              label: '튜토리얼 다시 보기',
+              onTap: onReplayTutorial,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _DangerZone(onReset: onReset),
+      ],
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _SettingsGroup({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(title: title),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i != children.length - 1)
+                  Divider(
+                    height: 1,
+                    color: Colors.black.withValues(alpha: 0.06),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountStatusStrip extends StatelessWidget {
+  final AuthStatus status;
+
+  const _AccountStatusStrip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final linked = status.isLinkedAccount;
+    final title = linked ? '계정 연결됨' : '게스트 플레이';
+    final subtitle = linked ? (status.email ?? '로그인 계정') : '현재 기기에 자동 저장';
+    final color = linked ? const Color(0xFF00695C) : AppColors.deepCoral;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(linked ? Icons.verified_user : Icons.person_outline,
+              color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            'ID ${status.shortUserId}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Colors.black.withValues(alpha: 0.45),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountStatusLoadingStrip extends StatelessWidget {
+  const _AccountStatusLoadingStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 70,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _DataActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DataActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.deepCoral),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.black45),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeGuardWarning extends StatelessWidget {
+  const _TimeGuardWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+      ),
+      child: const Text(
+        '기기 시간 조작이 감지되어 오프라인 보상이 제한되었습니다.\n'
+        '시간 자동 설정 사용을 권장합니다.',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.redAccent,
+        ),
+      ),
+    );
+  }
+}
+
+class _DangerZone extends StatelessWidget {
+  final VoidCallback onReset;
+
+  const _DangerZone({required this.onReset});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionTitle(title: '위험 영역'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.redAccent.withValues(alpha: 0.24)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '모든 진행도 삭제',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '골드, 강화, 환생 코인, 통계가 삭제되며 복구할 수 없습니다.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black.withValues(alpha: 0.58),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _DangerButton(onPressed: onReset),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -409,12 +802,10 @@ class _StatItem extends StatelessWidget {
 class _UnlockGuideHeader extends StatelessWidget {
   final GameState game;
   final VoidCallback onOpenRoadmap;
-  final VoidCallback onReplayTutorial;
 
   const _UnlockGuideHeader({
     required this.game,
     required this.onOpenRoadmap,
-    required this.onReplayTutorial,
   });
 
   @override
@@ -487,11 +878,6 @@ class _UnlockGuideHeader extends StatelessWidget {
                 icon: const Icon(Icons.visibility),
                 label: const Text('전체 기준 보기'),
               ),
-              OutlinedButton.icon(
-                onPressed: onReplayTutorial,
-                icon: const Icon(Icons.school),
-                label: const Text('튜토리얼 다시 보기'),
-              ),
             ],
           ),
         ],
@@ -515,19 +901,8 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           Icon(icon, color: AppColors.coral),
@@ -543,7 +918,7 @@ class _ToggleRow extends StatelessWidget {
           ),
           Switch(
             value: value,
-            activeColor: AppColors.coral,
+            activeThumbColor: AppColors.coral,
             onChanged: onChanged,
           ),
         ],
@@ -642,19 +1017,8 @@ class _TextScaleSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const options = <double>[0.9, 1.0, 1.15, 1.3];
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
