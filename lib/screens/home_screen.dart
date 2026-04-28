@@ -714,38 +714,73 @@ class _SlimeProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ratio = active ? 1.0 : ((total - remaining) / total).clamp(0.0, 1.0);
     final accent = active ? const Color(0xFFE53935) : const Color(0xFFFFB300);
+    final title = active ? '슬라임 출현' : '다음 슬라임';
     final label = active
-        ? '🟡 슬라임 출현! 처치 보상 +${NumberFormatter.format(reward)}'
-        : '🟡 슬라임까지 $remaining회 · 처치 시 +${NumberFormatter.format(reward)}';
+        ? '처치 보상 +${NumberFormatter.format(reward)}'
+        : '$remaining회 터치 후 출현 · 보상 +${NumberFormatter.format(reward)}';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.card),
         border: Border.all(color: accent.withValues(alpha: 0.45), width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: accent.computeLuminance() < 0.5
-                  ? accent
-                  : const Color(0xFF8D6E00),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppRadii.control),
             ),
+            child: Icon(Icons.bubble_chart, color: accent, size: 18),
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 8,
-              backgroundColor: Colors.black12,
-              valueColor: AlwaysStoppedAnimation(accent),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: accent.computeLuminance() < 0.5
+                            ? accent
+                            : const Color(0xFF8D6E00),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black.withValues(alpha: 0.58),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: ratio,
+                    minHeight: 6,
+                    backgroundColor: Colors.black12,
+                    valueColor: AlwaysStoppedAnimation(accent),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -183,7 +183,7 @@ class _QuickStartPage extends StatelessWidget {
         const _StepRow(
           icon: Icons.auto_awesome,
           title: '3) 환생 루프로 영구 성장 누적',
-          desc: '환생 코인 상점이 열리면 장기 성장 구간이 본격적으로 시작됩니다.',
+          desc: '각인 연구가 열리면 장기 성장 구간이 본격적으로 시작됩니다.',
         ),
         const SizedBox(height: 8),
         Container(

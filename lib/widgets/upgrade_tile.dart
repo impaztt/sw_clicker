@@ -34,32 +34,37 @@ class UpgradeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(
+          color: affordable
+              ? accent.withValues(alpha: 0.18)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(16),
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadii.control),
               ),
-              child: Icon(icon, color: accent, size: 28),
+              child: Icon(icon, color: accent, size: 24),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,9 +74,11 @@ class UpgradeTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
@@ -81,15 +88,15 @@ class UpgradeTile extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.mint.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(10),
+                          color: accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           'Lv $level',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF00695C),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: accent,
                           ),
                         ),
                       ),
@@ -98,24 +105,25 @@ class UpgradeTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: Colors.black.withValues(alpha: 0.55),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    gainLabel,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF00695C),
-                    ),
+                  const SizedBox(height: 5),
+                  _GainPill(
+                    label: gainLabel,
+                    color: const Color(0xFF00695C),
                   ),
                   if (milestoneLabel != null) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       milestoneLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -134,6 +142,34 @@ class UpgradeTile extends StatelessWidget {
               onBuy: onBuy,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GainPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _GainPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: color,
         ),
       ),
     );
@@ -159,14 +195,15 @@ class _BuyButton extends StatelessWidget {
     final fg = affordable ? Colors.white : Colors.grey.shade600;
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadii.control),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         onTap: affordable ? onBuy : null,
         child: Container(
-          width: 96,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          width: 86,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 7),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'x$buyCount',
@@ -187,8 +224,8 @@ class _BuyButton extends StatelessWidget {
                       NumberFormatter.format(cost),
                       style: TextStyle(
                         color: fg,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

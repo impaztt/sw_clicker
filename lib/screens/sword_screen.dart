@@ -76,14 +76,44 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
             const _HeaderBar(),
             const SizedBox(height: 8),
             if (tabs.length > 1)
-              TabBar(
-                labelColor: AppColors.deepCoral,
-                unselectedLabelColor: Colors.black45,
-                indicatorColor: AppColors.coral,
-                labelStyle:
-                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                isScrollable: tabs.length >= 5,
-                tabs: [for (final t in tabs) Tab(text: t.label)],
+              Container(
+                height: 44,
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  border:
+                      Border.all(color: Colors.black.withValues(alpha: 0.06)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.035),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TabBar(
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.black54,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  indicator: BoxDecoration(
+                    color: AppColors.deepCoral,
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                  tabs: [
+                    for (final t in tabs) Tab(height: 34, text: t.label),
+                  ],
+                ),
               ),
             Expanded(
               child: tabs.length == 1

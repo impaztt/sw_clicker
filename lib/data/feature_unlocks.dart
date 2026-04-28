@@ -215,7 +215,7 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
     trigger: (s) => s.prestigeCoinsAvailable >= 1,
     roadmapOrder: 5,
     unlockConditionText: '획득 가능 환생코인 1 이상',
-    benefitSummary: '영구 성장 루프(환생 코인 상점) 시작',
+    benefitSummary: '영구 성장 루프(각인 연구) 시작',
     stageHint: '중후반',
     tips: const [
       '환생 직전에는 골드/강화를 충분히 올려 코인 획득량을 극대화하세요.',

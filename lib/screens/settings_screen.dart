@@ -35,20 +35,35 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const TabBar(
-              labelColor: AppColors.deepCoral,
-              unselectedLabelColor: Colors.black45,
-              indicatorColor: AppColors.coral,
-              dividerColor: Colors.transparent,
-              labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
-              unselectedLabelStyle:
-                  TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-              tabs: [
-                Tab(text: '요약'),
-                Tab(text: '환경'),
-                Tab(text: '계정'),
-                Tab(text: '데이터'),
-              ],
+            Container(
+              height: 42,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+              ),
+              child: const TabBar(
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.black54,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: AppColors.deepCoral,
+                  borderRadius: BorderRadius.all(Radius.circular(7)),
+                ),
+                labelStyle:
+                    TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                unselectedLabelStyle:
+                    TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                tabs: [
+                  Tab(height: 34, text: '요약'),
+                  Tab(height: 34, text: '환경'),
+                  Tab(height: 34, text: '계정'),
+                  Tab(height: 34, text: '데이터'),
+                ],
+              ),
             ),
             Expanded(
               child: TabBarView(
@@ -124,7 +139,9 @@ class SettingsScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
         title: const Text('정말 초기화할까요?'),
         content: const Text(
           '모든 진행도, 골드, 강화 레벨, 환생 코인, 통계가 삭제됩니다.\n'
@@ -164,7 +181,9 @@ class SettingsScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
         title: const Text('로그아웃할까요?'),
         content: const Text(
           '현재 기기의 진행도는 유지됩니다.\n'

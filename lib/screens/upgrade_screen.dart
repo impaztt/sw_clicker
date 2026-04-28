@@ -32,30 +32,42 @@ class UpgradeScreen extends ConsumerWidget {
         length: 3,
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(child: GoldDisplay(amount: game.gold)),
-                  const SizedBox(width: 12),
-                  DpsDisplay(dps: game.dps),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _UpgradeHeader(game: game),
             ),
             const SizedBox(height: 8),
             const _BuyMultiplierSelector(),
-            const SizedBox(height: 4),
-            const TabBar(
-              labelColor: AppColors.deepCoral,
-              unselectedLabelColor: Colors.black45,
-              indicatorColor: AppColors.coral,
-              labelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-              tabs: [
-                Tab(text: '터치'),
-                Tab(text: '동료'),
-                Tab(text: '초월'),
-              ],
+            const SizedBox(height: 8),
+            Container(
+              height: 42,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+              ),
+              child: const TabBar(
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.black54,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: AppColors.deepCoral,
+                  borderRadius: BorderRadius.all(Radius.circular(7)),
+                ),
+                labelStyle:
+                    TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                unselectedLabelStyle:
+                    TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                tabs: [
+                  Tab(height: 34, text: '터치'),
+                  Tab(height: 34, text: '동료'),
+                  Tab(height: 34, text: '초월'),
+                ],
+              ),
             ),
             Expanded(
               child: TabBarView(
@@ -70,9 +82,8 @@ class UpgradeScreen extends ConsumerWidget {
                           final isMax = multiplier < 0;
                           final n = isMax ? (maxN > 0 ? maxN : 1) : multiplier;
                           final cost = def.costForNext(lv, n);
-                          final affordable = isMax
-                              ? maxN > 0
-                              : game.canAfford(cost);
+                          final affordable =
+                              isMax ? maxN > 0 : game.canAfford(cost);
                           // Show the EFFECTIVE gain — i.e. raw upgrade × all
                           // currently active multipliers (prestige, equipped
                           // sword, boosters, set, collection). Without this,
@@ -108,14 +119,45 @@ class UpgradeScreen extends ConsumerWidget {
                     game: game,
                     multiplier: multiplier,
                     notifier: notifier,
-                    headerLabel:
-                        '동료보다 한참 위의 존재들. 가격이 무서울 정도지만 DPS도 자릿수가 다릅니다.',
+                    headerLabel: '동료보다 한참 위의 존재들. 가격이 무서울 정도지만 DPS도 자릿수가 다릅니다.',
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _UpgradeHeader extends StatelessWidget {
+  final GameState game;
+
+  const _UpgradeHeader({required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(child: GoldDisplay(amount: game.gold)),
+          const SizedBox(width: 8),
+          DpsDisplay(dps: game.dps),
+        ],
       ),
     );
   }
@@ -180,8 +222,7 @@ class _ProducerList extends StatelessWidget {
               level: lv,
               cost: cost,
               buyCount: n,
-              gainLabel:
-                  'DPS +${NumberFormatter.formatPrecise(effDps)}',
+              gainLabel: 'DPS +${NumberFormatter.formatPrecise(effDps)}',
               milestoneLabel: msLabel,
               affordable: affordable,
               onBuy: () => notifier.buyProducer(def.id, multiplier),
@@ -204,20 +245,22 @@ class _BuyMultiplierSelector extends ConsumerWidget {
       (100, 'x100'),
       (-1, 'Max'),
     ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
       child: Row(
         children: [
           for (final opt in options)
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: _SegmentButton(
-                  label: opt.$2,
-                  selected: selected == opt.$1,
-                  onTap: () => ref.read(buyMultiplierProvider.notifier).state =
-                      opt.$1,
-                ),
+              child: _SegmentButton(
+                label: opt.$2,
+                selected: selected == opt.$1,
+                onTap: () =>
+                    ref.read(buyMultiplierProvider.notifier).state = opt.$1,
               ),
             ),
         ],
@@ -243,20 +286,20 @@ class _SegmentButton extends StatelessWidget {
     final fg = selected ? Colors.white : AppColors.deepCoral;
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppRadii.control),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          height: 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadii.control),
             border: Border.all(
               color: selected
                   ? AppColors.coral
                   : AppColors.coral.withValues(alpha: 0.25),
-              width: 1.5,
+              width: selected ? 1.5 : 1,
             ),
           ),
           child: Text(

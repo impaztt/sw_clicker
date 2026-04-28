@@ -40,30 +40,46 @@ class PrestigeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Expanded(
+          Expanded(
             child: DefaultTabController(
               length: 2,
               child: Column(
                 children: [
-                  TabBar(
-                    labelColor: AppColors.deepCoral,
-                    unselectedLabelColor: Colors.black45,
-                    indicatorColor: AppColors.coral,
-                    dividerColor: Colors.transparent,
-                    labelStyle: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
+                  Container(
+                    height: 42,
+                    margin: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(AppRadii.card),
+                      border: Border.all(
+                        color: Colors.black.withValues(alpha: 0.06),
+                      ),
                     ),
-                    unselectedLabelStyle: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                    child: const TabBar(
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.black54,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      indicator: BoxDecoration(
+                        color: AppColors.deepCoral,
+                        borderRadius: BorderRadius.all(Radius.circular(7)),
+                      ),
+                      labelStyle: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      unselectedLabelStyle: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      tabs: [
+                        Tab(height: 34, text: '환생 준비'),
+                        Tab(height: 34, text: '각인 연구'),
+                      ],
                     ),
-                    tabs: [
-                      Tab(text: '환생 준비'),
-                      Tab(text: '각인 연구'),
-                    ],
                   ),
-                  Expanded(
+                  const Expanded(
                     child: TabBarView(
                       children: [
                         _PrestigeOverview(),
@@ -147,7 +163,9 @@ class _PrestigeOverview extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
         title: const Text('환생 확인'),
         content: Text(
           '환생 코인 +$coinsGain 을 획득합니다.\n'
@@ -488,6 +506,7 @@ class _PrestigeChangePanel extends StatelessWidget {
             child: _PrestigeChangeColumn(
               title: '초기화됨',
               color: AppColors.deepCoral,
+              icon: Icons.restart_alt,
               items: ['골드', '일반 강화', '현재 회차 진행'],
             ),
           ),
@@ -496,6 +515,7 @@ class _PrestigeChangePanel extends StatelessWidget {
             child: _PrestigeChangeColumn(
               title: '유지됨',
               color: Color(0xFF00695C),
+              icon: Icons.verified,
               items: ['환생 코인', '각인 연구', '수집 보너스'],
             ),
           ),
@@ -508,11 +528,13 @@ class _PrestigeChangePanel extends StatelessWidget {
 class _PrestigeChangeColumn extends StatelessWidget {
   final String title;
   final Color color;
+  final IconData icon;
   final List<String> items;
 
   const _PrestigeChangeColumn({
     required this.title,
     required this.color,
+    required this.icon,
     required this.items,
   });
 
@@ -533,7 +555,7 @@ class _PrestigeChangeColumn extends StatelessWidget {
         for (final item in items) ...[
           Row(
             children: [
-              Icon(Icons.check_circle, size: 14, color: color),
+              Icon(icon, size: 14, color: color),
               const SizedBox(width: 5),
               Expanded(
                 child: Text(

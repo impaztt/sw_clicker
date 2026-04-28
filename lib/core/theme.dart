@@ -18,6 +18,12 @@ class AppColors {
   static const darkSurfaceAlt = Color(0xFF2F2F3D);
 }
 
+class AppRadii {
+  static const card = 10.0;
+  static const control = 8.0;
+  static const chip = 8.0;
+}
+
 ThemeData buildAppTheme({bool highContrast = false}) {
   final scheme = ColorScheme.fromSeed(
     seedColor: highContrast ? AppColors.deepCoral : AppColors.coral,
@@ -45,7 +51,7 @@ ThemeData buildAppTheme({bool highContrast = false}) {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         textStyle: const TextStyle(
@@ -57,7 +63,7 @@ ThemeData buildAppTheme({bool highContrast = false}) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         textStyle: const TextStyle(
@@ -105,7 +111,7 @@ ThemeData buildDarkTheme({bool highContrast = false}) {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         textStyle: const TextStyle(
@@ -117,7 +123,7 @@ ThemeData buildDarkTheme({bool highContrast = false}) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         textStyle: const TextStyle(

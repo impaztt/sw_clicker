@@ -9,22 +9,27 @@ class DpsDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.mint.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.mint.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.bolt, size: 18, color: Color(0xFF00897B)),
           const SizedBox(width: 4),
-          Text(
-            '${NumberFormatter.formatPrecise(dps)}/초',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF00695C),
+          Flexible(
+            child: Text(
+              '${NumberFormatter.formatPrecise(dps)}/초',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF00695C),
+              ),
             ),
           ),
         ],
