@@ -27,24 +27,48 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameProvider);
-    final tabs = <_CodexTab>[
-      const _CodexTab(label: '수집', view: _CollectionView()),
-      const _CodexTab(label: '검진', view: _FormationView()),
-      if (game.isFeatureUnlocked(FeatureUnlocks.swordSetsView))
-        const _CodexTab(label: '세트', view: _SwordSetsView()),
-      if (game.isFeatureUnlocked(FeatureUnlocks.summonTab))
-        const _CodexTab(label: '소환', view: _SummonView()),
-      const _CodexTab(label: '상점', view: _PremiumStoreView()),
-      if (game.isFeatureUnlocked(FeatureUnlocks.missionsTab))
-        const _CodexTab(label: '미션', view: _MissionHubView()),
-      if (game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
-        const _CodexTab(label: '업적', view: _AchievementHubView()),
+    final tabs = <_StoreHubTab>[
+      _StoreHubTab(
+        label: '상점',
+        view: _NestedStoreTabView(
+          tabs: [
+            const _StoreHubTab(label: '상품', view: _PremiumStoreView()),
+            if (game.isFeatureUnlocked(FeatureUnlocks.summonTab))
+              const _StoreHubTab(label: '소환', view: _SummonView()),
+          ],
+        ),
+      ),
+      _StoreHubTab(
+        label: '무기고',
+        view: _NestedStoreTabView(
+          tabs: [
+            const _StoreHubTab(label: '수집', view: _CollectionView()),
+            const _StoreHubTab(label: '착용', view: _FormationView()),
+            if (game.isFeatureUnlocked(FeatureUnlocks.swordSetsView))
+              const _StoreHubTab(label: '세트', view: _SwordSetsView()),
+          ],
+        ),
+      ),
+      if (game.isFeatureUnlocked(FeatureUnlocks.missionsTab) ||
+          game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
+        _StoreHubTab(
+          label: '임무',
+          view: _NestedStoreTabView(
+            tabs: [
+              if (game.isFeatureUnlocked(FeatureUnlocks.missionsTab))
+                const _StoreHubTab(label: '미션', view: _MissionHubView()),
+              if (game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
+                const _StoreHubTab(label: '업적', view: _AchievementHubView()),
+            ],
+          ),
+        ),
       if (game.isFeatureUnlocked(FeatureUnlocks.stockMarket))
-        const _CodexTab(label: '주식', view: StockMarketView()),
+        const _StoreHubTab(label: '투자', view: StockMarketView()),
     ];
 
     return SafeArea(
       child: DefaultTabController(
+        key: ValueKey(tabs.map((t) => t.label).join('|')),
         length: tabs.length,
         child: Column(
           children: [
@@ -75,10 +99,65 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
   }
 }
 
-class _CodexTab {
+class _StoreHubTab {
   final String label;
   final Widget view;
-  const _CodexTab({required this.label, required this.view});
+  const _StoreHubTab({required this.label, required this.view});
+}
+
+class _NestedStoreTabView extends StatelessWidget {
+  final List<_StoreHubTab> tabs;
+
+  const _NestedStoreTabView({required this.tabs});
+
+  @override
+  Widget build(BuildContext context) {
+    if (tabs.length == 1) return tabs.first.view;
+
+    return DefaultTabController(
+      key: ValueKey(tabs.map((t) => t.label).join('|')),
+      length: tabs.length,
+      child: Column(
+        children: [
+          Container(
+            height: 42,
+            margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+            ),
+            child: TabBar(
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.black54,
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+              indicator: BoxDecoration(
+                color: AppColors.deepCoral,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              tabs: [for (final tab in tabs) Tab(height: 32, text: tab.label)],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [for (final tab in tabs) tab.view],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _bonusPct(double value) {
@@ -340,7 +419,7 @@ class _FormationSummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '검진',
+            '착용',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -528,7 +607,7 @@ class _FormationSlotCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${slot + 1}번 검진 슬롯',
+                        '${slot + 1}번 착용 슬롯',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
@@ -718,7 +797,7 @@ void _openFormationPicker(BuildContext context, WidgetRef ref, int slot) {
             return const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
-                '검진 배치 선택',
+                '착용 검 선택',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
               ),
             );
@@ -1246,13 +1325,13 @@ class _SwordDetailSheet extends ConsumerWidget {
             const SizedBox(height: 8),
             _DismantleButton(def: def, level: level, equipped: equipped),
           ] else ...[
-            _StatRow(
+            const _StatRow(
               label: '장착 시 터치 배율',
               value: '?',
               sub: '소환 후 표시',
             ),
             const SizedBox(height: 8),
-            _StatRow(
+            const _StatRow(
               label: '장착 시 DPS 배율',
               value: '?',
               sub: '소환 후 표시',

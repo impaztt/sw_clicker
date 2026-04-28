@@ -2,7 +2,7 @@ import '../models/sword.dart';
 import 'region_catalog.dart';
 import 'sword_catalog.dart';
 
-/// Signature metadata for "검세권" and "검진".
+/// Signature metadata for "검세권" and equipped formation.
 ///
 /// The catalog already contains many fantasy swords, so this layer gives every
 /// sword a permanent regional base and a formation role without rewriting the
@@ -32,7 +32,8 @@ final Map<String, SwordFormationRole> swordFormationRoles = () {
 String swordRegionId(SwordDef sword) =>
     swordRegionAffinities[sword.id] ?? regionCatalog.first.id;
 
-RegionDef swordHomeRegion(SwordDef sword) => regionDefById(swordRegionId(sword));
+RegionDef swordHomeRegion(SwordDef sword) =>
+    regionDefById(swordRegionId(sword));
 
 SwordFormationRole swordFormationRole(SwordDef sword) =>
     swordFormationRoles[sword.id] ?? SwordFormationRole.striker;
@@ -50,4 +51,5 @@ int ownedSwordCountForRegion(String regionId, Map<String, int> ownedSwords) {
   return count;
 }
 
-int totalSwordCountForRegion(String regionId) => swordsForRegion(regionId).length;
+int totalSwordCountForRegion(String regionId) =>
+    swordsForRegion(regionId).length;

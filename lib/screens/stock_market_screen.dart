@@ -9,7 +9,7 @@ import '../models/stock_market.dart';
 import '../providers/game_provider.dart';
 import '../widgets/candle_chart.dart';
 
-/// Top-level view rendered inside the codex 주식 sub-tab.
+/// Top-level view rendered inside the store hub investment tab.
 class StockMarketView extends ConsumerWidget {
   const StockMarketView({super.key});
 
@@ -1096,7 +1096,7 @@ class _DistrictBondCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '이 지역에 연결된 검을 모으거나 검진에 배치하면 주식의 내재가치와 배당률이 올라갑니다.',
+            '이 지역에 연결된 검을 모으거나 착용에 배치하면 주식의 내재가치와 배당률이 올라갑니다.',
             style: TextStyle(
               fontSize: 11,
               color: Colors.black.withValues(alpha: 0.58),

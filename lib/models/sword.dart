@@ -80,9 +80,9 @@ extension SwordFormationRoleInfo on SwordFormationRole {
       };
 
   String get description => switch (this) {
-        SwordFormationRole.vanguard => '터치 성장에 강한 검진 역할',
+        SwordFormationRole.vanguard => '터치 성장에 강한 착용 역할',
         SwordFormationRole.striker => '터치와 DPS를 함께 올리는 역할',
-        SwordFormationRole.support => 'DPS 성장에 강한 검진 역할',
+        SwordFormationRole.support => 'DPS 성장에 강한 착용 역할',
         SwordFormationRole.trader => '검세권과 배당 성장에 강한 역할',
         SwordFormationRole.anchor => '전체 보너스를 안정적으로 받쳐주는 역할',
       };

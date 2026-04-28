@@ -53,13 +53,11 @@ class FeatureUnlockProgress {
   String _formatValue(double value) {
     final safe = value.isNaN || value.isInfinite ? 0.0 : value;
     return switch (kind) {
-      FeatureUnlockProgressKind.count =>
-        NumberFormatter.formatInt(
+      FeatureUnlockProgressKind.count => NumberFormatter.formatInt(
           safe.floor().clamp(0, 1 << 31).toInt(),
         ),
       FeatureUnlockProgressKind.gold => NumberFormatter.format(safe),
-      FeatureUnlockProgressKind.essence =>
-        NumberFormatter.formatInt(
+      FeatureUnlockProgressKind.essence => NumberFormatter.formatInt(
           safe.floor().clamp(0, 1 << 31).toInt(),
         ),
     };
@@ -127,7 +125,7 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
   FeatureUnlockDef(
     id: FeatureUnlocks.missionsTab,
     label: '미션',
-    description: '도감에 미션 탭이 열립니다. 일일/주간 목표로 정수와 코인을 얻을 수 있어요.',
+    description: '상점 탭의 임무 메뉴가 열립니다. 일일/주간 목표로 정수와 코인을 얻을 수 있어요.',
     icon: Icons.flag,
     color: const Color(0xFF00897B),
     trigger: (s) => s.totalTaps >= 1,
@@ -148,7 +146,7 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
   FeatureUnlockDef(
     id: FeatureUnlocks.summonTab,
     label: '소환',
-    description: '도감에 소환 탭이 열립니다. 정수로 검을 뽑아 수집 보너스를 올릴 수 있어요.',
+    description: '상점 탭의 소환 메뉴가 열립니다. 정수로 검을 뽑아 수집 보너스를 올릴 수 있어요.',
     icon: Icons.auto_awesome,
     color: const Color(0xFF7C4DFF),
     trigger: (s) => s.essence >= 50,
@@ -169,7 +167,7 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
   FeatureUnlockDef(
     id: FeatureUnlocks.achievementsTab,
     label: '업적',
-    description: '도감에 업적 탭이 열립니다. 업적 달성으로 정수 보상을 받습니다.',
+    description: '상점 탭의 임무 메뉴에 업적이 열립니다. 업적 달성으로 정수 보상을 받습니다.',
     icon: Icons.emoji_events,
     color: const Color(0xFFFFB300),
     trigger: (s) => s.unlockedAchievements.isNotEmpty,
@@ -190,7 +188,7 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
   FeatureUnlockDef(
     id: FeatureUnlocks.swordSetsView,
     label: '검 세트',
-    description: '도감에 세트 탭이 열립니다. 같은 세트 검을 모으면 세트 보너스가 적용됩니다.',
+    description: '상점 탭의 무기고 메뉴에 세트가 열립니다. 같은 세트 검을 모으면 세트 보너스가 적용됩니다.',
     icon: Icons.workspaces,
     color: const Color(0xFFEC407A),
     trigger: _ownsAnySetPair,
@@ -253,7 +251,7 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
   FeatureUnlockDef(
     id: FeatureUnlocks.stockMarket,
     label: '주식 시장',
-    description: '도감에 주식 탭이 열립니다. 지역 지분을 매수해 시간당 배당 수익을 얻을 수 있어요.',
+    description: '상점 탭의 투자 메뉴가 열립니다. 지역 지분을 매수해 시간당 배당 수익을 얻을 수 있어요.',
     icon: Icons.show_chart,
     color: const Color(0xFFD32F2F),
     trigger: (s) => s.lifetimeGold >= stockMarketLifetimeGoldTrigger,
@@ -290,7 +288,8 @@ final featureUnlockCatalog = <FeatureUnlockDef>[
       '환전한 골드를 강화/주식에 쓰면 그때부터 환생 코인 계산에 정상 반영됩니다.',
     ],
     progress: (s) => FeatureUnlockProgress(
-      current: s.prestigeCount >= 1 ? 1 : (s.lifetimeGold / 1e8).clamp(0.0, 1.0),
+      current:
+          s.prestigeCount >= 1 ? 1 : (s.lifetimeGold / 1e8).clamp(0.0, 1.0),
       target: 1,
       kind: FeatureUnlockProgressKind.count,
     ),
@@ -310,9 +309,9 @@ List<FeatureUnlockDef> featureUnlockRoadmap() {
 }
 
 List<FeatureUnlockDef> lockedFeatureDefs(GameState state) => [
-  for (final d in featureUnlockRoadmap())
-    if (!state.isFeatureUnlocked(d.id)) d,
-];
+      for (final d in featureUnlockRoadmap())
+        if (!state.isFeatureUnlocked(d.id)) d,
+    ];
 
 int unlockedFeatureCount(GameState state) {
   var n = 0;

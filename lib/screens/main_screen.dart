@@ -34,7 +34,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   static const _navHome = 0;
   static const _navUpgrade = 1;
-  static const _navCodex = 2;
+  static const _navStore = 2;
   static const _navPrestige = 3;
   static const _navSettings = 4;
 
@@ -52,10 +52,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       label: '강화',
     ),
     _NavDestSpec(
-      pageIndex: _navCodex,
-      icon: Icons.collections_outlined,
-      selectedIcon: Icons.collections,
-      label: '도감',
+      pageIndex: _navStore,
+      icon: Icons.storefront_outlined,
+      selectedIcon: Icons.storefront,
+      label: '상점',
     ),
     _NavDestSpec(
       pageIndex: _navPrestige,

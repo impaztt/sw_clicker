@@ -26,7 +26,7 @@ class SaveData {
   Map<String, int> ownedSwords; // id → level (1~10)
   String? equippedSwordId;
   int summonsSinceHighRare; // pity counter (reset on SR+)
-  List<String?> formationSwordIds; // 5-slot 검진 formation.
+  List<String?> formationSwordIds; // 5-slot equipped formation.
 
   // Achievements (v4)
   Set<String> unlockedAchievements;
@@ -338,11 +338,11 @@ class SaveData {
         mainSwordStage: json['mainSwordStage'] as int? ?? 0,
         mainSwordName: json['mainSwordName'] as String?,
         mainSwordHighestStage: json['mainSwordHighestStage'] as int? ?? 0,
-        mainSwordTiersShown: ((json['mainSwordTiersShown'] as List?) ?? const [])
-            .map((e) => e as int)
-            .toSet(),
-        mainSwordEnhanceAttempts:
-            json['mainSwordEnhanceAttempts'] as int? ?? 0,
+        mainSwordTiersShown:
+            ((json['mainSwordTiersShown'] as List?) ?? const [])
+                .map((e) => e as int)
+                .toSet(),
+        mainSwordEnhanceAttempts: json['mainSwordEnhanceAttempts'] as int? ?? 0,
         mainSwordCollectionBonusFraction:
             (json['mainSwordCollectionBonusFraction'] as num?)?.toDouble() ?? 0,
         firstPurchasePackageClaimed:
