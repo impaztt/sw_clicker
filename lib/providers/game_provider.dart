@@ -239,6 +239,7 @@ const starterPackageDpsBoostDurationSec = 1800;
 const seasonPassDurationDays = 60;
 const seasonPassDailyEssence = 200;
 const seasonPassMissedClaimCapDays = 3;
+
 /// Weekly bonus: paid out at most once every 7 days while the pass is
 /// active. Designed as the headline "extra" so the pass feels distinct
 /// from the cheaper monthly version.
@@ -1383,7 +1384,7 @@ class GameNotifier extends Notifier<GameState> {
     _startTicker();
     _startAutoSave();
     _wireIapListener();
-    // Sync ad-removal state with the ad SDK so banners/interstitials are
+    // Sync ad-removal state with the ad SDK so forced interstitials are
     // suppressed for paying users immediately on app boot.
     AdService.instance.adsRemoved = _save.adsRemoved;
   }
@@ -1404,7 +1405,6 @@ class GameNotifier extends Notifier<GameState> {
       }
       final result = purchasePremiumProduct(purchase.productID);
       if (result.ok) {
-        AdService.instance.recordPurchase();
         if (purchase.productID == premiumAdRemovalProductId) {
           AdService.instance.adsRemoved = true;
         }
@@ -1475,8 +1475,8 @@ class GameNotifier extends Notifier<GameState> {
     );
     _save.goldExchangeDailyCount =
         _intClamp(_save.goldExchangeDailyCount, 0, goldExchangeDailyLimit);
-    _save.goldExchangePrestigeCount =
-        _intClamp(_save.goldExchangePrestigeCount, 0, goldExchangePrestigeLimit);
+    _save.goldExchangePrestigeCount = _intClamp(
+        _save.goldExchangePrestigeCount, 0, goldExchangePrestigeLimit);
     _save.mainSwordStage =
         _intClamp(_save.mainSwordStage, 0, mainSwordEnhanceMaxStage);
     _save.mainSwordHighestStage = _intClamp(
@@ -2747,8 +2747,7 @@ class GameNotifier extends Notifier<GameState> {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Stream of milestone awards / tier evolutions / first-naming prompts.
-  final _mainSwordEvents =
-      StreamController<MainSwordEvent>.broadcast();
+  final _mainSwordEvents = StreamController<MainSwordEvent>.broadcast();
   Stream<MainSwordEvent> get mainSwordEventStream => _mainSwordEvents.stream;
 
   /// Set/replace the main sword's nickname. Empty/whitespace input is
@@ -2801,7 +2800,8 @@ class GameNotifier extends Notifier<GameState> {
         goldCost = cost.goldCost;
         essenceCost = boost.essenceCost +
             (protection ? mainSwordProtectionEssenceCost : 0);
-        successRate = (cost.goldSuccessBase + boost.successBonus).clamp(0.0, 1.0);
+        successRate =
+            (cost.goldSuccessBase + boost.successBonus).clamp(0.0, 1.0);
       case MainSwordEnhanceCurrency.essence:
         essenceCost = cost.essenceCost;
         successRate = cost.essenceSuccessBase;
@@ -2809,8 +2809,8 @@ class GameNotifier extends Notifier<GameState> {
         goldCost = cost.goldCost * mainSwordHybridGoldMultiplier;
         essenceCost =
             (cost.essenceCost * mainSwordHybridEssenceMultiplier).round();
-        successRate =
-            (cost.goldSuccessBase + mainSwordHybridSuccessBonus).clamp(0.0, 1.0);
+        successRate = (cost.goldSuccessBase + mainSwordHybridSuccessBonus)
+            .clamp(0.0, 1.0);
     }
 
     if (_save.gold < goldCost) {
@@ -2856,23 +2856,19 @@ class GameNotifier extends Notifier<GameState> {
     } else if (currency == MainSwordEnhanceCurrency.hybrid) {
       // Hybrid paid the full price, treat as protected.
     } else if (!protection) {
-      penaltyApplied =
-          cost.penaltyOnFail.clamp(0, currentStage);
+      penaltyApplied = cost.penaltyOnFail.clamp(0, currentStage);
       newStage = currentStage - penaltyApplied;
     }
     _save.mainSwordStage = newStage.clamp(0, mainSwordEnhanceMaxStage);
     _save.mainSwordEnhanceAttempts++;
 
     // Milestone + tier-up detection on the *new* stage.
-    final wasNewHigh =
-        _save.mainSwordStage > _save.mainSwordHighestStage;
+    final wasNewHigh = _save.mainSwordStage > _save.mainSwordHighestStage;
     if (wasNewHigh) {
       _save.mainSwordHighestStage = _save.mainSwordStage;
     }
-    final crossedTierUp =
-        success &&
-        mainSwordTierIndex(newStage) >
-            mainSwordTierIndex(previousStage);
+    final crossedTierUp = success &&
+        mainSwordTierIndex(newStage) > mainSwordTierIndex(previousStage);
     if (crossedTierUp) {
       final tierIdx = mainSwordTierIndex(newStage);
       if (!_save.mainSwordTiersShown.contains(tierIdx)) {
@@ -2898,9 +2894,7 @@ class GameNotifier extends Notifier<GameState> {
         _mainSwordEvents.add(MainSwordEvent.milestone(milestone));
       }
     }
-    if (firstEverEnhance &&
-        success &&
-        _save.mainSwordName == null) {
+    if (firstEverEnhance && success && _save.mainSwordName == null) {
       _mainSwordEvents.add(const MainSwordEvent.namingPrompt());
     }
 
@@ -3376,9 +3370,7 @@ class GameNotifier extends Notifier<GameState> {
     if (!hasActiveSeasonPass) return false;
     final last = _save.seasonPassLastWeeklyClaimAt;
     if (last == null) return true;
-    return DateTime.now()
-        .difference(last)
-        .inDays >=
+    return DateTime.now().difference(last).inDays >=
         seasonPassWeeklyIntervalDays;
   }
 

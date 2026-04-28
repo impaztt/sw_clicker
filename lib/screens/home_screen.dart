@@ -14,7 +14,6 @@ import '../widgets/booster_shop_dialog.dart';
 import '../widgets/gold_exchange_dialog.dart';
 import '../widgets/main_sword_enhance_dialog.dart';
 import '../widgets/main_sword_widget.dart';
-import '../widgets/pass_expiry_banner.dart';
 import '../widgets/dps_display.dart';
 import '../widgets/floating_number.dart';
 import '../widgets/feature_unlock_guide.dart';
@@ -208,7 +207,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              const PassExpiryBanner(),
               const SizedBox(height: 76),
             ],
           ),
@@ -232,9 +230,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (game.isFeatureUnlocked(FeatureUnlocks.goldExchange))
             Positioned(
               right: 16,
-              bottom: game.isFeatureUnlocked(FeatureUnlocks.boosterShop)
-                  ? 76
-                  : 16,
+              bottom:
+                  game.isFeatureUnlocked(FeatureUnlocks.boosterShop) ? 76 : 16,
               child: _ExchangeFab(onTap: _openGoldExchange),
             ),
           Positioned(
@@ -305,8 +302,8 @@ class _EnhanceFab extends StatelessWidget {
                 right: 4,
                 bottom: 4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
@@ -345,8 +342,7 @@ class _ExchangeFab extends StatelessWidget {
         child: const SizedBox(
           width: 52,
           height: 52,
-          child: Icon(Icons.currency_exchange,
-              color: Colors.white, size: 26),
+          child: Icon(Icons.currency_exchange, color: Colors.white, size: 26),
         ),
       ),
     );
@@ -518,38 +514,38 @@ class _BattleStatusPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-              Row(
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: AppColors.coral.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: const Icon(
-                      Icons.dashboard_customize,
-                      size: 14,
-                      color: AppColors.deepCoral,
+            Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: AppColors.coral.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: const Icon(
+                    Icons.dashboard_customize,
+                    size: 14,
+                    color: AppColors.deepCoral,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '전투 대시보드',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '전투 대시보드',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.mint.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(999),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.mint.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: const Text(
                     'LIVE',

@@ -5,71 +5,71 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../core/ad_config.dart';
 
-/// Centralized AdMob façade. Only this class talks to google_mobile_ads;
-/// everything else asks the service to "show me a rewarded for X" so we
-/// can cap frequency, gate by purchase state, and swap stubs in tests.
-///
-/// Boot order:
-///   1. Call [AdService.instance.initialize()] from main() before runApp.
-///   2. Set [AdService.instance.adsRemoved] whenever the IAP flag changes
-///      (e.g. on save load and after a purchase).
+/// Centralized AdMob facade. Only this class talks to google_mobile_ads.
+/// Forced ads are tied to bottom-tab navigation; rewarded ads stay opt-in.
 class AdService {
   AdService._();
   static final AdService instance = AdService._();
 
   bool _initialized = false;
   bool _adsRemoved = false;
-  DateTime? _lastInterstitialAt;
-  DateTime? _lastPurchaseAt;
-  int _interstitialDayKey = 0;
-  int _interstitialShownToday = 0;
   int _tabSwitchCount = 0;
+  bool _tabInterstitialInFlight = false;
 
   InterstitialAd? _interstitialCache;
   RewardedAd? _rewardedCache;
   bool _loadingInterstitial = false;
   bool _loadingRewarded = false;
 
-  /// True once Mobile Ads SDK init has completed. UI should hold off
-  /// requesting ads until this flips.
   bool get isInitialized => _initialized;
 
   bool get adsRemoved => _adsRemoved;
   set adsRemoved(bool value) {
+    if (_adsRemoved == value) return;
     _adsRemoved = value;
     if (value) {
+      _tabSwitchCount = 0;
+      _tabInterstitialInFlight = false;
       _interstitialCache?.dispose();
       _interstitialCache = null;
+    } else if (_initialized) {
+      _preloadInterstitial();
     }
   }
 
-  /// Tell the service that the player just made an IAP purchase. We use
-  /// this to suppress interstitials for the configured grace window.
-  void recordPurchase() {
-    _lastPurchaseAt = DateTime.now();
-  }
-
-  /// Record a bottom-tab navigation. Every Nth switch (configured via
-  /// [AdConfig.tabSwitchesPerInterstitial]) attempts to show an
-  /// interstitial — the underlying frequency cap and purchase grace
-  /// still apply, so a real ad may not actually appear.
-  ///
-  /// Returns true when the threshold fires and an ad attempt is queued
-  /// (regardless of whether it ultimately shows).
+  /// Record a real bottom-tab change. Every configured Nth switch attempts an
+  /// interstitial. Failed attempts do not consume the count, so the next tab
+  /// switch retries once an ad is available.
   bool recordTabSwitch() {
     if (_adsRemoved) {
       debugPrint('[AdService] tab switch ignored (ads removed)');
       return false;
     }
+
     _tabSwitchCount++;
     debugPrint('[AdService] tab switch '
         '$_tabSwitchCount/${AdConfig.tabSwitchesPerInterstitial}');
+
     if (_tabSwitchCount < AdConfig.tabSwitchesPerInterstitial) return false;
-    _tabSwitchCount = 0;
-    debugPrint('[AdService] tab-switch threshold hit — attempting interstitial');
-    // Fire-and-forget; the caller doesn't want to block tab navigation.
-    unawaited(showInterstitial(trigger: 'tab_switch'));
+    if (_tabInterstitialInFlight) return false;
+
+    debugPrint(
+        '[AdService] tab-switch threshold hit - attempting interstitial');
+    unawaited(_showTabSwitchInterstitial());
     return true;
+  }
+
+  Future<void> _showTabSwitchInterstitial() async {
+    _tabInterstitialInFlight = true;
+    try {
+      final shown = await showInterstitial(trigger: 'tab_switch');
+      if (shown) {
+        final remaining = _tabSwitchCount - AdConfig.tabSwitchesPerInterstitial;
+        _tabSwitchCount = remaining > 0 ? remaining : 0;
+      }
+    } finally {
+      _tabInterstitialInFlight = false;
+    }
   }
 
   Future<void> initialize() async {
@@ -89,10 +89,6 @@ class AdService {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Interstitial
-  // ─────────────────────────────────────────────────────────────────────────
-
   void _preloadInterstitial() {
     if (_adsRemoved || _loadingInterstitial || _interstitialCache != null) {
       return;
@@ -107,7 +103,7 @@ class AdService {
         onAdLoaded: (ad) {
           _interstitialCache = ad;
           _loadingInterstitial = false;
-          debugPrint('[AdService] interstitial preloaded ✓');
+          debugPrint('[AdService] interstitial preloaded');
         },
         onAdFailedToLoad: (err) {
           _loadingInterstitial = false;
@@ -117,9 +113,8 @@ class AdService {
     );
   }
 
-  /// Try to show an interstitial. Returns true only if the ad actually
-  /// reached the screen (i.e. wasn't suppressed by purchase grace, daily
-  /// ceiling, frequency cap, or load failure).
+  /// Try to show an interstitial. Returns true only if the ad reached the
+  /// screen and was dismissed normally.
   Future<bool> showInterstitial({String? trigger}) async {
     if (_adsRemoved) {
       debugPrint('[AdService] interstitial blocked: ads removed');
@@ -130,47 +125,18 @@ class AdService {
       return false;
     }
 
-    final now = DateTime.now();
-    final purchaseGraceUntil = _lastPurchaseAt
-        ?.add(AdConfig.interstitialPurchaseGrace);
-    if (purchaseGraceUntil != null && now.isBefore(purchaseGraceUntil)) {
-      debugPrint('[AdService] interstitial blocked: post-purchase grace until '
-          '$purchaseGraceUntil');
-      return false;
-    }
-
-    final today = _dayKey(now);
-    if (_interstitialDayKey != today) {
-      _interstitialDayKey = today;
-      _interstitialShownToday = 0;
-    }
-    if (_interstitialShownToday >= AdConfig.interstitialDailyCeiling) {
-      debugPrint('[AdService] interstitial blocked: daily ceiling '
-          '${AdConfig.interstitialDailyCeiling} reached');
-      return false;
-    }
-    if (_lastInterstitialAt != null &&
-        now.difference(_lastInterstitialAt!) < AdConfig.interstitialMinGap) {
-      debugPrint('[AdService] interstitial blocked: within minGap '
-          '${AdConfig.interstitialMinGap.inSeconds}s of last show');
-      return false;
-    }
-
     final ad = _interstitialCache;
     if (ad == null) {
-      debugPrint('[AdService] interstitial blocked: no cached ad — '
+      debugPrint('[AdService] interstitial blocked: no cached ad - '
           'kicking another preload');
       _preloadInterstitial();
       return false;
     }
+
     debugPrint('[AdService] interstitial showing (trigger=$trigger)');
     _interstitialCache = null;
     final completer = Completer<bool>();
     ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdShowedFullScreenContent: (_) {
-        _lastInterstitialAt = DateTime.now();
-        _interstitialShownToday++;
-      },
       onAdDismissedFullScreenContent: (a) {
         a.dispose();
         _preloadInterstitial();
@@ -192,10 +158,6 @@ class AdService {
     return completer.future;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Rewarded
-  // ─────────────────────────────────────────────────────────────────────────
-
   void _preloadRewarded() {
     if (_loadingRewarded || _rewardedCache != null) return;
     _loadingRewarded = true;
@@ -216,9 +178,7 @@ class AdService {
   }
 
   /// Show a rewarded ad. The returned future resolves with `true` if the
-  /// user finished watching and earned the reward, `false` otherwise (load
-  /// fail, dismiss, etc.). Rewarded ads are NOT suppressed by adsRemoved
-  /// because the player opted in for the reward.
+  /// user finished watching and earned the reward.
   Future<bool> showRewarded({String? trigger}) async {
     if (!_initialized) return false;
     final ad = _rewardedCache;
@@ -251,11 +211,5 @@ class AdService {
     return completer.future;
   }
 
-  /// Probe whether a rewarded ad is ready to show right now. UI uses this
-  /// to grey the "watch ad" button during a load gap.
   bool get rewardedReady => _initialized && _rewardedCache != null;
-
-  // ─────────────────────────────────────────────────────────────────────────
-
-  int _dayKey(DateTime t) => t.year * 10000 + t.month * 100 + t.day;
 }
