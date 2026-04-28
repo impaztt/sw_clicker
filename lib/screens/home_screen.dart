@@ -196,7 +196,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: _BattleStatusPanel(
+                child: _CompactBattleStatusPanel(
                   combo: game.combo,
                   tapPower: game.tapPower,
                   maxIdleReward: game.dps * offlineMaxSeconds,
@@ -439,7 +439,7 @@ class _LockedFeaturePeekCard extends StatelessWidget {
   }
 }
 
-class _BattleStatusPanel extends StatelessWidget {
+class _CompactBattleStatusPanel extends StatelessWidget {
   final int combo;
   final double tapPower;
   final double maxIdleReward;
@@ -447,7 +447,8 @@ class _BattleStatusPanel extends StatelessWidget {
   final double prestigeMultiplier;
   final double collectionFraction;
   final List<Booster> boosters;
-  const _BattleStatusPanel({
+
+  const _CompactBattleStatusPanel({
     required this.combo,
     required this.tapPower,
     required this.maxIdleReward,
@@ -481,102 +482,44 @@ class _BattleStatusPanel extends StatelessWidget {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [
-                    AppColors.darkSurfaceAlt.withValues(alpha: 0.96),
-                    AppColors.darkSurface.withValues(alpha: 0.96),
-                  ]
-                : [
-                    Colors.white.withValues(alpha: 0.98),
-                    const Color(0xFFFFF3EA).withValues(alpha: 0.98),
-                  ],
-          ),
-          borderRadius: BorderRadius.circular(16),
+          color: isDark
+              ? AppColors.darkSurfaceAlt.withValues(alpha: 0.96)
+              : Colors.white.withValues(alpha: 0.98),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.05),
+                : Colors.black.withValues(alpha: 0.06),
           ),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: AppColors.coral.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: const Icon(
-                    Icons.dashboard_customize,
-                    size: 14,
-                    color: AppColors.deepCoral,
+                Expanded(
+                  child: _CompactBattleMetric(
+                    icon: Icons.touch_app,
+                    label: '탭',
+                    value: '+${NumberFormatter.formatPrecise(tapPower)}',
+                    color: const Color(0xFF8D6E00),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    '전투 대시보드',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.mint.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'LIVE',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF00695C),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _BattleMetricCard(
-                    icon: Icons.touch_app,
-                    title: '터치',
-                    value: '+${NumberFormatter.formatPrecise(tapPower)}',
-                    subtitle: '탭 1회 획득량',
-                    color: const Color(0xFF8D6E00),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _BattleMetricCard(
+                  child: _CompactBattleMetric(
                     icon: Icons.nightlight_round,
-                    title: '방치',
+                    label: '방치 ${idleHours}h',
                     value: '+${NumberFormatter.format(maxIdleReward)}',
-                    subtitle: '$idleHours시간 최대 누적',
                     color: const Color(0xFF5E35B1),
                   ),
                 ),
@@ -586,148 +529,46 @@ class _BattleStatusPanel extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _BattleMetricCard(
+                  child: _CompactBattleMetric(
                     icon: Icons.auto_awesome,
-                    title: '영구 배율',
+                    label: '영구',
                     value: '+${permanentPct.toStringAsFixed(0)}%',
-                    subtitle: '환생 · 코인 상점',
                     color: const Color(0xFF00695C),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
-                  child: _BattleMetricCard(
+                  child: _CompactBattleMetric(
                     icon: Icons.collections_bookmark,
-                    title: '수집 보너스',
+                    label: '수집',
                     value:
                         '+${collectionPct.toStringAsFixed(collectionFraction >= 1 ? 0 : 1)}%',
-                    subtitle: '터치 · 동료 · 초월',
                     color: const Color(0xFF6A1B9A),
                   ),
                 ),
               ],
             ),
             if (combo > 1 || activeBoosters.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.04)
-                      : Colors.black.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
-                    Text(
-                      '활성 효과',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                    if (combo > 1)
+                      _CompactEffectChip(
+                        icon: Icons.local_fire_department,
+                        label: '콤보 x$combo · +${comboPct.toStringAsFixed(0)}%',
+                        color: AppColors.deepCoral,
                       ),
-                    ),
-                    if (combo > 1) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.local_fire_department,
-                              color: AppColors.deepCoral, size: 15),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              '콤보 x$combo',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '+${comboPct.toStringAsFixed(0)}%',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.deepCoral,
-                            ),
-                          ),
-                        ],
+                    if (activeBoosters.isNotEmpty)
+                      _CompactEffectChip(
+                        icon: Icons.bolt,
+                        label:
+                            '부스터 ${activeBoosters.length}개 · x${strongestBoost.toStringAsFixed(strongestBoost % 1 == 0 ? 0 : 1)} · ${_fmtDuration(minRemaining)}',
+                        color: AppColors.deepCoral,
                       ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: (combo / comboMax).clamp(0.0, 1.0),
-                          minHeight: 4,
-                          backgroundColor: Colors.black
-                              .withValues(alpha: isDark ? 0.28 : 0.12),
-                          valueColor:
-                              const AlwaysStoppedAnimation(AppColors.coral),
-                        ),
-                      ),
-                    ],
-                    if (activeBoosters.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.bolt,
-                              color: AppColors.deepCoral, size: 15),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              '부스터 ${activeBoosters.length}개 · 최고 x${strongestBoost.toStringAsFixed(strongestBoost % 1 == 0 ? 0 : 1)}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            _fmtDuration(minRemaining),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: [
-                          for (final b in activeBoosters.take(3))
-                            _BoosterBadge(
-                              label: _boosterLabel(b.type),
-                              multiplier: b.multiplier,
-                              remaining: b.remaining(now),
-                            ),
-                          if (activeBoosters.length > 3)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black
-                                    .withValues(alpha: isDark ? 0.24 : 0.08),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                '+${activeBoosters.length - 3}',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.7),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -744,75 +585,59 @@ class _BattleStatusPanel extends StatelessWidget {
     final s = totalSec % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
   }
-
-  String _boosterLabel(BoosterType type) {
-    return switch (type) {
-      BoosterType.dps => 'DPS',
-      BoosterType.tap => '터치',
-      BoosterType.rush => '러시',
-      BoosterType.autoTap => 'AUTO',
-    };
-  }
 }
 
-class _BattleMetricCard extends StatelessWidget {
+class _CompactBattleMetric extends StatelessWidget {
   final IconData icon;
-  final String title;
+  final String label;
   final String value;
-  final String subtitle;
   final Color color;
-  const _BattleMetricCard({
+
+  const _CompactBattleMetric({
     required this.icon,
-    required this.title,
+    required this.label,
     required this.value,
-    required this.subtitle,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: color.withValues(alpha: 0.26),
-        ),
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 13, color: color),
-              const SizedBox(width: 4),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  color: color.withValues(alpha: 0.9),
-                ),
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: color.withValues(alpha: 0.82),
               ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: color,
             ),
           ),
-          const SizedBox(height: 1),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w700,
-              color: color.withValues(alpha: 0.72),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -821,36 +646,45 @@ class _BattleMetricCard extends StatelessWidget {
   }
 }
 
-class _BoosterBadge extends StatelessWidget {
+class _CompactEffectChip extends StatelessWidget {
+  final IconData icon;
   final String label;
-  final double multiplier;
-  final Duration remaining;
-  const _BoosterBadge({
+  final Color color;
+
+  const _CompactEffectChip({
+    required this.icon,
     required this.label,
-    required this.multiplier,
-    required this.remaining,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final totalSec = remaining.inSeconds.clamp(0, 1 << 31);
-    final m = totalSec ~/ 60;
-    final s = totalSec % 60;
-    final timeText = '$m:${s.toString().padLeft(2, '0')}';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      constraints: const BoxConstraints(maxWidth: 260),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.deepCoral.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.deepCoral.withValues(alpha: 0.25)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
       ),
-      child: Text(
-        '$label x${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)} · $timeText',
-        style: const TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: AppColors.deepCoral,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

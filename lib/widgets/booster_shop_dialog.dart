@@ -66,8 +66,7 @@ class BoosterShopDialog extends ConsumerWidget {
                     notifier.grantAdBooster(offer);
                     _toast(context, '광고 시청 완료 — 부스터가 적용됐어요');
                   } else {
-                    _toast(context,
-                        '광고를 끝까지 시청해야 보상이 지급돼요');
+                    _toast(context, '광고를 끝까지 시청해야 보상이 지급돼요');
                   }
                 },
               ),
@@ -166,7 +165,7 @@ class _OfferRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _BuyButton(
-                  label: adsRemoved ? '즉시 수령' : '광고 시청',
+                  label: adsRemoved ? '광고 제거 보상' : '광고 시청',
                   icon: adsRemoved ? Icons.flash_on : Icons.play_circle_fill,
                   enabled: true,
                   filled: false,
@@ -225,12 +224,17 @@ class _BuyButton extends StatelessWidget {
             children: [
               Icon(icon, size: 14, color: fg),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: fg,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
