@@ -8,10 +8,6 @@ import '../data/main_sword_evolution.dart';
 import '../providers/game_provider.dart';
 import 'main_sword_widget.dart';
 
-/// Full-screen-ish dialog that lets the player enhance the home-tab main
-/// sword. Shows the current stage's preview, the next stage's preview,
-/// and three currency tracks (gold / essence / hybrid) with their
-/// individual costs and success rates.
 class MainSwordEnhanceDialog extends ConsumerStatefulWidget {
   const MainSwordEnhanceDialog({super.key});
 
@@ -22,6 +18,7 @@ class MainSwordEnhanceDialog extends ConsumerStatefulWidget {
 
 class _MainSwordEnhanceDialogState
     extends ConsumerState<MainSwordEnhanceDialog> {
+  MainSwordEnhanceCurrency _currency = MainSwordEnhanceCurrency.gold;
   MainSwordBoostLevel _boost = MainSwordBoostLevel.none;
   bool _useProtection = false;
 
@@ -35,16 +32,20 @@ class _MainSwordEnhanceDialogState
     final cost = mainSwordEnhanceCost(targetStage);
     final tierCurrent = mainSwordTierFor(stage);
     final tierNext = mainSwordTierFor(targetStage);
+    final selected = _planFor(cost, _currency, _boost, _useProtection);
+    final canAfford = game.gold >= selected.goldCost &&
+        game.essence >= selected.essenceCost &&
+        !atMax;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 720, maxWidth: 460),
+        constraints: const BoxConstraints(maxHeight: 720, maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _Header(
                 name: game.mainSwordName ?? '이름 없는 검',
@@ -52,75 +53,53 @@ class _MainSwordEnhanceDialogState
                 tierLabel: tierCurrent.name,
                 essence: game.essence,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               _StagePreview(stage: stage, targetStage: targetStage),
-              if (!atMax) ...[
-                const SizedBox(height: 12),
-                Text(
-                  '다음: +$targetStage (${tierNext.name})',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              if (atMax)
+                const _MaxedPanel()
+              else ...[
+                _NextStageBar(
+                    targetStage: targetStage, tierName: tierNext.name),
+                const SizedBox(height: 10),
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      _GoldTrackSection(
-                        cost: cost,
+                      _OptionPanel(
                         boost: _boost,
                         useProtection: _useProtection,
-                        gold: game.gold,
-                        essence: game.essence,
-                        onBoostChanged: (b) => setState(() => _boost = b),
-                        onProtectionChanged: (v) =>
-                            setState(() => _useProtection = v),
-                        onTry: () => _attempt(
-                            MainSwordEnhanceCurrency.gold, notifier),
+                        selectedCurrency: _currency,
+                        onBoostChanged: (value) =>
+                            setState(() => _boost = value),
+                        onProtectionChanged: (value) =>
+                            setState(() => _useProtection = value),
                       ),
                       const SizedBox(height: 10),
-                      _EssenceTrackSection(
-                        cost: cost,
-                        essence: game.essence,
-                        onTry: () => _attempt(
-                            MainSwordEnhanceCurrency.essence, notifier),
-                      ),
-                      const SizedBox(height: 10),
-                      _HybridTrackSection(
-                        cost: cost,
+                      _ModeGrid(
+                        selected: _currency,
+                        plans: {
+                          for (final currency
+                              in MainSwordEnhanceCurrency.values)
+                            currency: _planFor(
+                                cost, currency, _boost, _useProtection),
+                        },
                         gold: game.gold,
                         essence: game.essence,
-                        onTry: () => _attempt(
-                            MainSwordEnhanceCurrency.hybrid, notifier),
+                        onSelected: (value) =>
+                            setState(() => _currency = value),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '실패 시 단계 손실: ${cost.penaltyOnFail}강 (정수·하이브리드는 보존)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.black.withValues(alpha: 0.5),
-                        ),
+                      const SizedBox(height: 10),
+                      _AttemptSummary(
+                        plan: selected,
+                        canAfford: canAfford,
+                        onTry: () => _attempt(notifier),
                       ),
                     ],
                   ),
                 ),
-              ] else ...[
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    '+50 단계 도달! 강화는 여기까지입니다.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black.withValues(alpha: 0.6),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const Spacer(),
               ],
+              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -135,16 +114,65 @@ class _MainSwordEnhanceDialogState
     );
   }
 
-  Future<void> _attempt(
+  _EnhancePlan _planFor(
+    MainSwordEnhanceCost cost,
     MainSwordEnhanceCurrency currency,
-    GameNotifier notifier,
-  ) async {
+    MainSwordBoostLevel boost,
+    bool useProtection,
+  ) {
+    final boostCost = boost.essenceCost;
+    final boostBonus = boost.successBonus;
+    return switch (currency) {
+      MainSwordEnhanceCurrency.gold => _EnhancePlan(
+          currency: currency,
+          title: '골드 강화',
+          subtitle: '가장 기본적인 시도',
+          icon: Icons.paid,
+          color: AppColors.deepCoral,
+          goldCost: cost.goldCost,
+          essenceCost:
+              boostCost + (useProtection ? mainSwordProtectionEssenceCost : 0),
+          successRate: (cost.goldSuccessBase + boostBonus).clamp(0.0, 1.0),
+          failureLabel:
+              useProtection ? '실패 시 단계 유지' : '실패 시 -${cost.penaltyOnFail}강',
+          protectedOnFail: useProtection,
+        ),
+      MainSwordEnhanceCurrency.essence => _EnhancePlan(
+          currency: currency,
+          title: '정수 강화',
+          subtitle: '실패해도 단계 유지',
+          icon: Icons.diamond,
+          color: const Color(0xFF7C4DFF),
+          goldCost: 0,
+          essenceCost: cost.essenceCost + boostCost,
+          successRate: (cost.essenceSuccessBase + boostBonus).clamp(0.0, 1.0),
+          failureLabel: '실패 시 단계 유지',
+          protectedOnFail: true,
+        ),
+      MainSwordEnhanceCurrency.hybrid => _EnhancePlan(
+          currency: currency,
+          title: '하이브리드',
+          subtitle: '골드와 정수 모두 사용',
+          icon: Icons.auto_awesome,
+          color: const Color(0xFFFFB300),
+          goldCost: cost.goldCost * mainSwordHybridGoldMultiplier,
+          essenceCost:
+              (cost.essenceCost * mainSwordHybridEssenceMultiplier).round() +
+                  boostCost,
+          successRate:
+              (cost.goldSuccessBase + mainSwordHybridSuccessBonus + boostBonus)
+                  .clamp(0.0, 1.0),
+          failureLabel: '실패 시 단계 유지',
+          protectedOnFail: true,
+        ),
+    };
+  }
+
+  Future<void> _attempt(GameNotifier notifier) async {
     final result = notifier.attemptMainSwordEnhance(
-      currency: currency,
-      boostLevel:
-          currency == MainSwordEnhanceCurrency.gold ? _boost : MainSwordBoostLevel.none,
-      useProtection:
-          currency == MainSwordEnhanceCurrency.gold && _useProtection,
+      currency: _currency,
+      boostLevel: _boost,
+      useProtection: _useProtection,
     );
     if (!mounted) return;
     if (!result.ok) {
@@ -152,26 +180,17 @@ class _MainSwordEnhanceDialogState
       return;
     }
     if (result.success) {
-      _toast('성공! +${result.newStage} 단계 진입');
+      _toast('성공! +${result.newStage}강 진입');
     } else if (result.penaltyApplied > 0) {
-      _toast('실패 — ${result.penaltyApplied}강 손실 (+${result.newStage})');
+      _toast('실패: ${result.penaltyApplied}강 하락 (+${result.newStage})');
     } else {
-      _toast('실패 — 단계 보존');
+      _toast('실패: 단계 유지');
     }
-    // Reset transient toggles after a successful attempt so the next try
-    // starts fresh and the player isn't surprised by stale boost essence
-    // costs.
-    if (result.success) {
-      setState(() {
-        _boost = MainSwordBoostLevel.none;
-        _useProtection = false;
-      });
-    }
+    setState(() {});
   }
 
   void _toast(String msg) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
         duration: const Duration(seconds: 2),
@@ -180,7 +199,7 @@ class _MainSwordEnhanceDialogState
     );
   }
 
-  String _failureLabel(MainSwordEnhanceFailure r) => switch (r) {
+  String _failureLabel(MainSwordEnhanceFailure reason) => switch (reason) {
         MainSwordEnhanceFailure.notEnoughGold => '골드가 부족해요',
         MainSwordEnhanceFailure.notEnoughEssence => '정수가 부족해요',
         MainSwordEnhanceFailure.alreadyMaxed => '이미 최대 단계입니다',
@@ -190,11 +209,38 @@ class _MainSwordEnhanceDialogState
       };
 }
 
+class _EnhancePlan {
+  final MainSwordEnhanceCurrency currency;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final double goldCost;
+  final int essenceCost;
+  final double successRate;
+  final String failureLabel;
+  final bool protectedOnFail;
+
+  const _EnhancePlan({
+    required this.currency,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.goldCost,
+    required this.essenceCost,
+    required this.successRate,
+    required this.failureLabel,
+    required this.protectedOnFail,
+  });
+}
+
 class _Header extends StatelessWidget {
   final String name;
   final int stage;
   final String tierLabel;
   final int essence;
+
   const _Header({
     required this.name,
     required this.stage,
@@ -206,39 +252,65 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.auto_fix_high,
-            color: AppColors.deepCoral, size: 22),
-        const SizedBox(width: 6),
+        const Icon(Icons.auto_fix_high, color: AppColors.deepCoral, size: 22),
+        const SizedBox(width: 7),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 name,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
               ),
               Text(
-                '$tierLabel · +$stage 단계',
+                '$tierLabel · +$stage강',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.black.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black.withValues(alpha: 0.58),
                 ),
               ),
             ],
           ),
         ),
-        Icon(Icons.diamond, color: Colors.teal.shade700, size: 18),
-        const SizedBox(width: 4),
-        Text(
-          '$essence',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: Colors.teal.shade700,
-          ),
-        ),
+        _EssenceChip(essence: essence),
       ],
+    );
+  }
+}
+
+class _EssenceChip extends StatelessWidget {
+  final int essence;
+
+  const _EssenceChip({required this.essence});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.teal.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.diamond, color: Colors.teal.shade700, size: 15),
+          const SizedBox(width: 4),
+          Text(
+            '$essence',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: Colors.teal.shade800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -246,23 +318,18 @@ class _Header extends StatelessWidget {
 class _StagePreview extends StatelessWidget {
   final int stage;
   final int targetStage;
+
   const _StagePreview({required this.stage, required this.targetStage});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 130,
+      height: 116,
       child: Row(
         children: [
-          Expanded(
-            child: _SwordPreviewCard(
-              label: '현재',
-              stage: stage,
-            ),
-          ),
+          Expanded(child: _SwordPreviewCard(label: '현재', stage: stage)),
           const SizedBox(width: 8),
-          const Icon(Icons.arrow_forward,
-              color: AppColors.deepCoral, size: 18),
+          const Icon(Icons.arrow_forward, color: AppColors.deepCoral, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: _SwordPreviewCard(
@@ -281,6 +348,7 @@ class _SwordPreviewCard extends StatelessWidget {
   final String label;
   final int stage;
   final bool highlight;
+
   const _SwordPreviewCard({
     required this.label,
     required this.stage,
@@ -289,13 +357,14 @@ class _SwordPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = highlight ? AppColors.deepCoral : Colors.black54;
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: highlight
-              ? AppColors.coral.withValues(alpha: 0.6)
+              ? AppColors.coral.withValues(alpha: 0.58)
               : Colors.black12,
         ),
       ),
@@ -305,17 +374,42 @@ class _SwordPreviewCard extends StatelessWidget {
             '$label +$stage',
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: highlight
-                  ? AppColors.deepCoral
-                  : Colors.black.withValues(alpha: 0.55),
+              fontWeight: FontWeight.w900,
+              color: color,
             ),
           ),
           Expanded(
-            child: MainSwordWidget(
-              stage: stage,
-              size: 88,
-              onTap: (_) {},
+            child: MainSwordWidget(stage: stage, size: 78, onTap: (_) {}),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextStageBar extends StatelessWidget {
+  final int targetStage;
+  final String tierName;
+
+  const _NextStageBar({required this.targetStage, required this.tierName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.coral.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.coral.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.flag, color: AppColors.deepCoral, size: 15),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '목표 +$targetStage · $tierName',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
             ),
           ),
         ],
@@ -324,42 +418,27 @@ class _SwordPreviewCard extends StatelessWidget {
   }
 }
 
-class _GoldTrackSection extends StatelessWidget {
-  final MainSwordEnhanceCost cost;
+class _OptionPanel extends StatelessWidget {
   final MainSwordBoostLevel boost;
   final bool useProtection;
-  final double gold;
-  final int essence;
+  final MainSwordEnhanceCurrency selectedCurrency;
   final ValueChanged<MainSwordBoostLevel> onBoostChanged;
   final ValueChanged<bool> onProtectionChanged;
-  final VoidCallback onTry;
 
-  const _GoldTrackSection({
-    required this.cost,
+  const _OptionPanel({
     required this.boost,
     required this.useProtection,
-    required this.gold,
-    required this.essence,
+    required this.selectedCurrency,
     required this.onBoostChanged,
     required this.onProtectionChanged,
-    required this.onTry,
   });
 
   @override
   Widget build(BuildContext context) {
-    final boostBonus = boost.successBonus;
-    final finalRate = (cost.goldSuccessBase + boostBonus).clamp(0.0, 1.0);
-    final extraEssence =
-        boost.essenceCost + (useProtection ? mainSwordProtectionEssenceCost : 0);
-    final canAfford = gold >= cost.goldCost && essence >= extraEssence;
-    return _TrackContainer(
-      title: '🟡 골드로 시도',
-      lines: [
-        '비용: ${NumberFormatter.format(cost.goldCost)} 골드'
-            '${extraEssence > 0 ? ' + 정수 $extraEssence' : ''}',
-        '성공률: ${(finalRate * 100).toStringAsFixed(0)}%',
-        '실패 시: ${useProtection ? '단계 보존' : '−${cost.penaltyOnFail}강'}',
-      ],
+    final protectionRelevant =
+        selectedCurrency == MainSwordEnhanceCurrency.gold;
+    return _Panel(
+      title: '공통 옵션',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -367,39 +446,289 @@ class _GoldTrackSection extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final b in MainSwordBoostLevel.values)
-                _Chip(
-                  label: b.label,
-                  selected: boost == b,
-                  onTap: () => onBoostChanged(b),
+              for (final level in MainSwordBoostLevel.values)
+                _ChoiceChipButton(
+                  label: _boostLabel(level),
+                  subLabel: _boostCostLabel(level),
+                  selected: boost == level,
+                  onTap: () => onBoostChanged(level),
                 ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => onProtectionChanged(!useProtection),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+              decoration: BoxDecoration(
+                color: protectionRelevant
+                    ? AppColors.deepCoral.withValues(alpha: 0.07)
+                    : Colors.black.withValues(alpha: 0.035),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: protectionRelevant
+                      ? AppColors.deepCoral.withValues(alpha: 0.22)
+                      : Colors.black12,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: useProtection,
+                    onChanged: (value) => onProtectionChanged(value ?? false),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '보호권 유지',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          protectionRelevant
+                              ? '골드 강화 실패 시 단계 하락 방지 · 정수 $mainSwordProtectionEssenceCost'
+                              : '정수/하이브리드는 기본적으로 실패 시 단계가 유지됩니다',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _boostLabel(MainSwordBoostLevel level) => switch (level) {
+        MainSwordBoostLevel.none => '부스트 없음',
+        MainSwordBoostLevel.small => '+10%',
+        MainSwordBoostLevel.medium => '+25%',
+        MainSwordBoostLevel.large => '+50%',
+      };
+
+  String _boostCostLabel(MainSwordBoostLevel level) {
+    if (level.essenceCost <= 0) return '무료';
+    return '정수 ${level.essenceCost}';
+  }
+}
+
+class _ModeGrid extends StatelessWidget {
+  final MainSwordEnhanceCurrency selected;
+  final Map<MainSwordEnhanceCurrency, _EnhancePlan> plans;
+  final double gold;
+  final int essence;
+  final ValueChanged<MainSwordEnhanceCurrency> onSelected;
+
+  const _ModeGrid({
+    required this.selected,
+    required this.plans,
+    required this.gold,
+    required this.essence,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      title: '강화 방식',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final twoColumns = constraints.maxWidth >= 390;
+          final width = twoColumns
+              ? (constraints.maxWidth - 8) / 2
+              : constraints.maxWidth;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final plan in plans.values)
+                SizedBox(
+                  width: width,
+                  child: _ModeCard(
+                    plan: plan,
+                    selected: selected == plan.currency,
+                    canAfford:
+                        gold >= plan.goldCost && essence >= plan.essenceCost,
+                    onTap: () => onSelected(plan.currency),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ModeCard extends StatelessWidget {
+  final _EnhancePlan plan;
+  final bool selected;
+  final bool canAfford;
+  final VoidCallback onTap;
+
+  const _ModeCard({
+    required this.plan,
+    required this.selected,
+    required this.canAfford,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor =
+        selected ? plan.color : plan.color.withValues(alpha: 0.22);
+    return Material(
+      color: selected
+          ? plan.color.withValues(alpha: 0.1)
+          : Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor, width: selected ? 1.4 : 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(plan.icon, color: plan.color, size: 17),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      plan.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    selected ? Icons.radio_button_checked : Icons.circle,
+                    size: 14,
+                    color: selected ? plan.color : Colors.black26,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${(plan.successRate * 100).toStringAsFixed(0)}% · ${canAfford ? '시도 가능' : '재화 부족'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: canAfford ? plan.color : Colors.black45,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                plan.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.black.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttemptSummary extends StatelessWidget {
+  final _EnhancePlan plan;
+  final bool canAfford;
+  final VoidCallback onTry;
+
+  const _AttemptSummary({
+    required this.plan,
+    required this.canAfford,
+    required this.onTry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      title: '이번 시도',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Row(
             children: [
-              Checkbox(
-                value: useProtection,
-                onChanged: (v) => onProtectionChanged(v ?? false),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
               Expanded(
-                child: Text(
-                  '보호권 (정수 $mainSwordProtectionEssenceCost) — 실패해도 단계 유지',
-                  style: const TextStyle(fontSize: 12),
+                child: _CostPill(
+                  icon: Icons.paid,
+                  label: plan.goldCost > 0
+                      ? NumberFormatter.format(plan.goldCost)
+                      : '없음',
+                  color: AppColors.deepCoral,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _CostPill(
+                  icon: Icons.diamond,
+                  label: plan.essenceCost > 0 ? '${plan.essenceCost}' : '없음',
+                  color: const Color(0xFF7C4DFF),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          FilledButton(
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _InfoBadge(
+                label: '성공률 ${(plan.successRate * 100).toStringAsFixed(0)}%',
+                color: plan.color,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _InfoBadge(
+                  label: plan.failureLabel,
+                  color: plan.protectedOnFail
+                      ? const Color(0xFF00695C)
+                      : AppColors.deepCoral,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
             onPressed: canAfford ? onTry : null,
+            icon: const Icon(Icons.auto_fix_high, size: 17),
+            label: Text(canAfford ? '${plan.title} 시도' : '재화 부족'),
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              minimumSize: const Size.fromHeight(40),
+              backgroundColor: plan.color,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade600,
+              minimumSize: const Size.fromHeight(42),
             ),
-            child: const Text('골드로 강화 시도'),
           ),
         ],
       ),
@@ -407,86 +736,141 @@ class _GoldTrackSection extends StatelessWidget {
   }
 }
 
-class _EssenceTrackSection extends StatelessWidget {
-  final MainSwordEnhanceCost cost;
-  final int essence;
-  final VoidCallback onTry;
-  const _EssenceTrackSection({
-    required this.cost,
-    required this.essence,
-    required this.onTry,
+class _CostPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _CostPill({
+    required this.icon,
+    required this.label,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final canAfford = essence >= cost.essenceCost;
-    return _TrackContainer(
-      title: '🟣 정수로 시도',
-      lines: [
-        '비용: 정수 ${cost.essenceCost}',
-        '성공률: ${(cost.essenceSuccessBase * 100).toStringAsFixed(0)}% (보정)',
-        '실패 시: 단계 보존',
-      ],
-      child: FilledButton(
-        onPressed: canAfford ? onTry : null,
-        style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF7C4DFF),
-          minimumSize: const Size.fromHeight(40),
-        ),
-        child: const Text('정수로 강화 시도'),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _HybridTrackSection extends StatelessWidget {
-  final MainSwordEnhanceCost cost;
-  final double gold;
-  final int essence;
-  final VoidCallback onTry;
-  const _HybridTrackSection({
-    required this.cost,
-    required this.gold,
-    required this.essence,
-    required this.onTry,
-  });
+class _InfoBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _InfoBadge({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final hybridGold = cost.goldCost * mainSwordHybridGoldMultiplier;
-    final hybridEssence =
-        (cost.essenceCost * mainSwordHybridEssenceMultiplier).round();
-    final rate =
-        (cost.goldSuccessBase + mainSwordHybridSuccessBonus).clamp(0.0, 1.0);
-    final canAfford = gold >= hybridGold && essence >= hybridEssence;
-    return _TrackContainer(
-      title: '⚡ 하이브리드 (자원 모두 사용)',
-      lines: [
-        '비용: ${NumberFormatter.format(hybridGold)} 골드 + 정수 $hybridEssence',
-        '성공률: ${(rate * 100).toStringAsFixed(0)}%',
-        '실패 시: 단계 보존',
-      ],
-      child: FilledButton(
-        onPressed: canAfford ? onTry : null,
-        style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFFFFB300),
-          minimumSize: const Size.fromHeight(40),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          color: color,
         ),
-        child: const Text('하이브리드 시도'),
       ),
     );
   }
 }
 
-class _TrackContainer extends StatelessWidget {
+class _ChoiceChipButton extends StatelessWidget {
+  final String label;
+  final String subLabel;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ChoiceChipButton({
+    required this.label,
+    required this.subLabel,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.deepCoral : Colors.black54;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.coral.withValues(alpha: 0.14)
+              : Colors.black.withValues(alpha: 0.035),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? AppColors.coral.withValues(alpha: 0.56)
+                : Colors.black12,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              subLabel,
+              style: TextStyle(
+                color: color.withValues(alpha: 0.72),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
   final String title;
-  final List<String> lines;
   final Widget child;
-  const _TrackContainer({
-    required this.title,
-    required this.lines,
-    required this.child,
-  });
+
+  const _Panel({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -494,7 +878,7 @@ class _TrackContainer extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.black12),
       ),
       child: Column(
@@ -502,20 +886,8 @@ class _TrackContainer extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 4),
-          for (final line in lines)
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Text(
-                line,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.black.withValues(alpha: 0.65),
-                ),
-              ),
-            ),
           const SizedBox(height: 8),
           child,
         ],
@@ -524,39 +896,17 @@ class _TrackContainer extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+class _MaxedPanel extends StatelessWidget {
+  const _MaxedPanel();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.coral.withValues(alpha: 0.85)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? AppColors.coral : Colors.black26,
-          ),
-        ),
+    return const Expanded(
+      child: Center(
         child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: selected ? Colors.white : Colors.black,
-          ),
+          '+50강 도달! 더 이상 강화할 수 없습니다',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
         ),
       ),
     );

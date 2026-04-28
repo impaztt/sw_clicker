@@ -124,13 +124,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  double _enhanceFabBottom(GameState game) {
-    var bottom = 16.0;
-    if (game.isFeatureUnlocked(FeatureUnlocks.boosterShop)) bottom += 60;
-    if (game.isFeatureUnlocked(FeatureUnlocks.goldExchange)) bottom += 60;
-    return bottom;
-  }
-
   void _openUnlockRoadmap() {
     final game = ref.read(gameProvider);
     showFeatureUnlockRoadmapSheet(
@@ -174,14 +167,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 10),
               DpsDisplay(dps: game.dps),
-              const Spacer(),
-              Center(
-                child: MainSwordWidget(
-                  onTap: _handleTap,
-                  stage: game.mainSwordStage,
+              Expanded(
+                child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final height = constraints.maxHeight.isFinite
+                          ? constraints.maxHeight
+                          : 240.0;
+                      final size = height.clamp(128.0, 240.0).toDouble();
+                      return MainSwordWidget(
+                        onTap: _handleTap,
+                        stage: game.mainSwordStage,
+                        size: size,
+                      );
+                    },
+                  ),
                 ),
               ),
-              const Spacer(),
               if (lockedFeatures.isNotEmpty && nextLocked != null) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -207,7 +209,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              const SizedBox(height: 76),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: _HomeActionBar(
+                  boosterUnlocked:
+                      game.isFeatureUnlocked(FeatureUnlocks.boosterShop),
+                  exchangeUnlocked:
+                      game.isFeatureUnlocked(FeatureUnlocks.goldExchange),
+                  stage: game.mainSwordStage,
+                  onBooster: _openBoosterShop,
+                  onExchange: _openGoldExchange,
+                  onEnhance: _openMainSwordEnhance,
+                ),
+              ),
+              const SizedBox(height: 10),
             ],
           ),
           FloatingNumberLayer(items: _floats, onDone: _removeFloat),
@@ -221,27 +236,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTimeout: () => _slimeTimedOut(slime.id),
               ),
             ),
-          if (game.isFeatureUnlocked(FeatureUnlocks.boosterShop))
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: _ShopFab(onTap: _openBoosterShop),
-            ),
-          if (game.isFeatureUnlocked(FeatureUnlocks.goldExchange))
-            Positioned(
-              right: 16,
-              bottom:
-                  game.isFeatureUnlocked(FeatureUnlocks.boosterShop) ? 76 : 16,
-              child: _ExchangeFab(onTap: _openGoldExchange),
-            ),
-          Positioned(
-            right: 16,
-            bottom: _enhanceFabBottom(game),
-            child: _EnhanceFab(
-              onTap: _openMainSwordEnhance,
-              stage: game.mainSwordStage,
-            ),
-          ),
         ],
       ),
     );
@@ -254,95 +248,105 @@ class _SlimeSpawn {
   const _SlimeSpawn({required this.id, required this.offset});
 }
 
-class _ShopFab extends StatelessWidget {
-  final VoidCallback onTap;
-  const _ShopFab({required this.onTap});
+class _HomeActionBar extends StatelessWidget {
+  final bool boosterUnlocked;
+  final bool exchangeUnlocked;
+  final int stage;
+  final VoidCallback onBooster;
+  final VoidCallback onExchange;
+  final VoidCallback onEnhance;
+
+  const _HomeActionBar({
+    required this.boosterUnlocked,
+    required this.exchangeUnlocked,
+    required this.stage,
+    required this.onBooster,
+    required this.onExchange,
+    required this.onEnhance,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.coral,
-      shape: const CircleBorder(),
-      elevation: 4,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const SizedBox(
-          width: 52,
-          height: 52,
-          child: Icon(Icons.bolt, color: Colors.white, size: 28),
+    return Row(
+      children: [
+        Expanded(
+          child: _HomeActionButton(
+            icon: Icons.auto_fix_high,
+            label: '강화 +$stage',
+            color: const Color(0xFF7C4DFF),
+            onTap: onEnhance,
+          ),
         ),
-      ),
+        if (boosterUnlocked) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: _HomeActionButton(
+              icon: Icons.bolt,
+              label: '부스터',
+              color: AppColors.deepCoral,
+              onTap: onBooster,
+            ),
+          ),
+        ],
+        if (exchangeUnlocked) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: _HomeActionButton(
+              icon: Icons.currency_exchange,
+              label: '환전',
+              color: const Color(0xFFFFB300),
+              onTap: onExchange,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
 
-class _EnhanceFab extends StatelessWidget {
+class _HomeActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
   final VoidCallback onTap;
-  final int stage;
-  const _EnhanceFab({required this.onTap, required this.stage});
+
+  const _HomeActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF7C4DFF),
-      shape: const CircleBorder(),
-      elevation: 4,
+      color: color,
+      borderRadius: BorderRadius.circular(10),
+      elevation: 2,
       child: InkWell(
-        customBorder: const CircleBorder(),
+        borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: SizedBox(
-          width: 56,
-          height: 56,
-          child: Stack(
-            alignment: Alignment.center,
+          height: 42,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.auto_fix_high, color: Colors.white, size: 26),
-              Positioned(
-                right: 4,
-                bottom: 4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '+$stage',
-                    style: const TextStyle(
-                      color: Color(0xFF7C4DFF),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ExchangeFab extends StatelessWidget {
-  final VoidCallback onTap;
-  const _ExchangeFab({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFFFB300),
-      shape: const CircleBorder(),
-      elevation: 4,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const SizedBox(
-          width: 52,
-          height: 52,
-          child: Icon(Icons.currency_exchange, color: Colors.white, size: 26),
         ),
       ),
     );

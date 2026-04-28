@@ -27,6 +27,13 @@ class FirstPurchasePopupHost extends ConsumerStatefulWidget {
 class _FirstPurchasePopupHostState
     extends ConsumerState<FirstPurchasePopupHost> {
   bool _checked = false;
+  Timer? _popupTimer;
+
+  @override
+  void dispose() {
+    _popupTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,12 +42,13 @@ class _FirstPurchasePopupHostState
     if (!_checked) {
       _checked = true;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Future<void>.delayed(const Duration(seconds: 4));
-        if (!mounted) return;
-        final notifier = ref.read(gameProvider.notifier);
-        if (!notifier.firstPurchasePopupEligible) return;
-        notifier.markFirstPurchasePopupShown();
-        await _showPopup();
+        _popupTimer = Timer(const Duration(seconds: 4), () async {
+          if (!mounted) return;
+          final notifier = ref.read(gameProvider.notifier);
+          if (!notifier.firstPurchasePopupEligible) return;
+          notifier.markFirstPurchasePopupShown();
+          await _showPopup();
+        });
       });
     }
     return widget.child;
@@ -78,13 +86,11 @@ class _FirstPurchaseDialog extends StatelessWidget {
           children: [
             const Row(
               children: [
-                Icon(Icons.card_giftcard,
-                    color: AppColors.deepCoral, size: 22),
+                Icon(Icons.card_giftcard, color: AppColors.deepCoral, size: 22),
                 SizedBox(width: 6),
                 Text(
                   '첫 결제 패키지',
-                  style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ],
             ),
@@ -137,8 +143,7 @@ class _BenefitLine extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          const Icon(Icons.check_circle,
-              color: AppColors.deepCoral, size: 14),
+          const Icon(Icons.check_circle, color: AppColors.deepCoral, size: 14),
           const SizedBox(width: 6),
           Text(label, style: const TextStyle(fontSize: 13)),
         ],

@@ -61,7 +61,7 @@ MainSwordEnhanceCost mainSwordEnhanceCost(int targetStage) {
   );
 }
 
-/// Optional essence-paid boost stacked onto a gold-track attempt.
+/// Optional essence-paid boost stacked onto any enhancement attempt.
 enum MainSwordBoostLevel {
   none,
   small, // +10%p

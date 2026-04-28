@@ -2793,23 +2793,29 @@ class GameNotifier extends Notifier<GameState> {
     int essenceCost = 0;
     double successRate;
     final boost = boostLevel;
-    final protection = useProtection;
+    final boostEssenceCost = boost.essenceCost;
+    final protection =
+        currency == MainSwordEnhanceCurrency.gold && useProtection;
 
     switch (currency) {
       case MainSwordEnhanceCurrency.gold:
         goldCost = cost.goldCost;
-        essenceCost = boost.essenceCost +
+        essenceCost = boostEssenceCost +
             (protection ? mainSwordProtectionEssenceCost : 0);
         successRate =
             (cost.goldSuccessBase + boost.successBonus).clamp(0.0, 1.0);
       case MainSwordEnhanceCurrency.essence:
-        essenceCost = cost.essenceCost;
-        successRate = cost.essenceSuccessBase;
+        essenceCost = cost.essenceCost + boostEssenceCost;
+        successRate =
+            (cost.essenceSuccessBase + boost.successBonus).clamp(0.0, 1.0);
       case MainSwordEnhanceCurrency.hybrid:
         goldCost = cost.goldCost * mainSwordHybridGoldMultiplier;
         essenceCost =
-            (cost.essenceCost * mainSwordHybridEssenceMultiplier).round();
-        successRate = (cost.goldSuccessBase + mainSwordHybridSuccessBonus)
+            (cost.essenceCost * mainSwordHybridEssenceMultiplier).round() +
+                boostEssenceCost;
+        successRate = (cost.goldSuccessBase +
+                mainSwordHybridSuccessBonus +
+                boost.successBonus)
             .clamp(0.0, 1.0);
     }
 
