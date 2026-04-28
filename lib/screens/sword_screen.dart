@@ -34,7 +34,7 @@ class _SwordScreenState extends ConsumerState<SwordScreen> {
         const _CodexTab(label: '세트', view: _SwordSetsView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.summonTab))
         const _CodexTab(label: '소환', view: _SummonView()),
-      const _CodexTab(label: '상점', view: _PremiumShopView()),
+      const _CodexTab(label: '상점', view: _PremiumStoreView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.missionsTab))
         const _CodexTab(label: '미션', view: _MissionHubView()),
       if (game.isFeatureUnlocked(FeatureUnlocks.achievementsTab))
@@ -2386,401 +2386,6 @@ class _AchievementHubTile extends StatelessWidget {
   }
 }
 
-class _PremiumShopView extends ConsumerWidget {
-  const _PremiumShopView();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final game = ref.watch(gameProvider);
-    final notifier = ref.read(gameProvider.notifier);
-    final activePass = notifier.hasActiveMonthlyPass;
-    final passDays = notifier.monthlyPassDaysRemaining;
-    final claimableEssence = notifier.monthlyPassClaimableEssence;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF202A44),
-                  AppColors.deepCoral.withValues(alpha: 0.88),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '상점',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '정수 보급, 광고 제거, 초반 성장 패키지를 먼저 열어둔 1차 상점입니다.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.86),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _PremiumStatusChip(
-                      icon: Icons.diamond,
-                      label: '보유 정수 ${game.essence}',
-                    ),
-                    _PremiumStatusChip(
-                      icon: Icons.workspace_premium,
-                      label: activePass ? '월정액 D-$passDays' : '월정액 없음',
-                    ),
-                    _PremiumStatusChip(
-                      icon: Icons.block,
-                      label: notifier.adsRemoved ? '광고 제거 적용' : '광고 포함',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (activePass)
-            _MonthlyClaimPanel(
-              claimableEssence: claimableEssence,
-              daysRemaining: passDays,
-              onClaim: () {
-                final amount =
-                    ref.read(gameProvider.notifier).claimMonthlyPassEssence();
-                _toast(
-                  context,
-                  amount > 0 ? '정수 $amount개를 수령했어요' : '오늘 받을 정수가 없어요',
-                );
-              },
-            ),
-          if (activePass) const SizedBox(height: 14),
-          for (final product in premiumProducts) ...[
-            _PremiumProductCard(
-              product: product,
-              icon: _premiumProductIcon(product.id),
-              color: _premiumProductColor(product.id),
-              status: _premiumProductStatus(product.id, notifier),
-              buttonLabel: _premiumProductButtonLabel(product.id, notifier),
-              enabled: _premiumProductEnabled(product.id, notifier),
-              onPressed: () => _buyPremiumProduct(context, ref, product.id),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MonthlyClaimPanel extends StatelessWidget {
-  final int claimableEssence;
-  final int daysRemaining;
-  final VoidCallback onClaim;
-
-  const _MonthlyClaimPanel({
-    required this.claimableEssence,
-    required this.daysRemaining,
-    required this.onClaim,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final canClaim = claimableEssence > 0;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.teal.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.teal.withValues(alpha: 0.24)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.teal.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.event_available, color: Colors.teal.shade700),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  canClaim ? '수령 가능 정수 $claimableEssence' : '오늘 수령 완료',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '월간 보급권 잔여 $daysRemaining일',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black.withValues(alpha: 0.58),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: canClaim ? onClaim : null,
-            icon: const Icon(Icons.diamond, size: 15),
-            label: const Text('수령'),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.teal.shade600,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: Colors.grey.shade300,
-              disabledForegroundColor: Colors.grey.shade600,
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumProductCard extends StatelessWidget {
-  final PremiumProductDef product;
-  final IconData icon;
-  final Color color;
-  final String status;
-  final String buttonLabel;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  const _PremiumProductCard({
-    required this.product,
-    required this.icon,
-    required this.color,
-    required this.status,
-    required this.buttonLabel,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 23),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      product.subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black.withValues(alpha: 0.58),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    product.priceLabel,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  _MiniTag(label: status, color: color, icon: Icons.verified),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (final benefit in product.benefits) ...[
-            Row(
-              children: [
-                Icon(Icons.check_circle, size: 14, color: color),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    benefit,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-          ],
-          const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: enabled ? onPressed : null,
-              icon: Icon(enabled ? Icons.shopping_bag : Icons.check, size: 16),
-              label: Text(buttonLabel),
-              style: FilledButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade300,
-                disabledForegroundColor: Colors.grey.shade600,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                textStyle: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumStatusChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _PremiumStatusChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: Colors.white),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-IconData _premiumProductIcon(String productId) {
-  return switch (productId) {
-    premiumAdRemovalProductId => Icons.block,
-    premiumMonthlyEssencePassProductId => Icons.calendar_month,
-    premiumStarterPackageProductId => Icons.inventory_2,
-    _ => Icons.storefront,
-  };
-}
-
-Color _premiumProductColor(String productId) {
-  return switch (productId) {
-    premiumAdRemovalProductId => const Color(0xFF455A64),
-    premiumMonthlyEssencePassProductId => Colors.teal.shade700,
-    premiumStarterPackageProductId => AppColors.deepCoral,
-    _ => AppColors.coral,
-  };
-}
-
-String _premiumProductStatus(String productId, GameNotifier notifier) {
-  return switch (productId) {
-    premiumAdRemovalProductId => notifier.adsRemoved ? '구매 완료' : '영구',
-    premiumMonthlyEssencePassProductId => notifier.hasActiveMonthlyPass
-        ? 'D-${notifier.monthlyPassDaysRemaining}'
-        : '30일',
-    premiumStarterPackageProductId =>
-      notifier.starterPackagePurchased ? '구매 완료' : '1회',
-    _ => '',
-  };
-}
-
-String _premiumProductButtonLabel(String productId, GameNotifier notifier) {
-  return switch (productId) {
-    premiumAdRemovalProductId => notifier.adsRemoved ? '적용 완료' : '테스트 구매',
-    premiumMonthlyEssencePassProductId =>
-      notifier.hasActiveMonthlyPass ? '30일 연장' : '테스트 구매',
-    premiumStarterPackageProductId =>
-      notifier.starterPackagePurchased ? '구매 완료' : '테스트 구매',
-    _ => '테스트 구매',
-  };
-}
-
-bool _premiumProductEnabled(String productId, GameNotifier notifier) {
-  return switch (productId) {
-    premiumAdRemovalProductId => !notifier.adsRemoved,
-    premiumMonthlyEssencePassProductId => true,
-    premiumStarterPackageProductId => !notifier.starterPackagePurchased,
-    _ => false,
-  };
-}
-
 Future<void> _buyPremiumProduct(
   BuildContext context,
   WidgetRef ref,
@@ -2804,6 +2409,794 @@ void _toast(BuildContext context, String message) {
       behavior: SnackBarBehavior.floating,
     ),
   );
+}
+
+class _PremiumStoreView extends ConsumerWidget {
+  const _PremiumStoreView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final game = ref.watch(gameProvider);
+    final notifier = ref.read(gameProvider.notifier);
+    final products = {
+      for (final product in premiumProducts) product.id: product
+    };
+
+    List<PremiumProductDef> pick(List<String> ids) => [
+          for (final id in ids)
+            if (products[id] != null) products[id]!,
+        ];
+
+    final recommended = pick([
+      if (!notifier.firstPurchasePackageClaimed) premiumFirstPurchaseProductId,
+      if (!notifier.starterPackagePurchased) premiumStarterPackageProductId,
+      premiumAdRemovalProductId,
+    ]);
+
+    final sections = <_StoreSectionData>[
+      _StoreSectionData(
+        title: '추천',
+        subtitle: '초반 성장과 편의 혜택',
+        products: recommended,
+      ),
+      _StoreSectionData(
+        title: '패스',
+        subtitle: '매일 받는 정수 보급',
+        products: pick([
+          premiumMonthlyEssencePassProductId,
+          premiumSeasonPassProductId,
+        ]),
+      ),
+      _StoreSectionData(
+        title: '정수',
+        subtitle: '필요할 때 바로 충전',
+        products: pick([
+          premiumEssenceSmallProductId,
+          premiumEssenceMediumProductId,
+          premiumEssenceLargeProductId,
+          premiumEssenceXLargeProductId,
+        ]),
+      ),
+      _StoreSectionData(
+        title: '패키지',
+        subtitle: '큰 폭의 성장 묶음',
+        products: pick([premiumMasterPackageProductId]),
+      ),
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _StoreHeaderPanel(
+            essence: game.essence,
+            monthlyLabel: notifier.hasActiveMonthlyPass
+                ? '월정액 D-${notifier.monthlyPassDaysRemaining}'
+                : '월정액 없음',
+            seasonLabel: notifier.hasActiveSeasonPass
+                ? '시즌 D-${notifier.seasonPassDaysRemaining}'
+                : '시즌 없음',
+            adLabel: notifier.adsRemoved ? '광고 제거 적용' : '광고 포함',
+          ),
+          if (notifier.hasActiveMonthlyPass || notifier.hasActiveSeasonPass)
+            const SizedBox(height: 16),
+          if (notifier.hasActiveMonthlyPass || notifier.hasActiveSeasonPass)
+            _PassRewardPanel(
+              monthlyClaimable: notifier.monthlyPassClaimableEssence,
+              monthlyDaysRemaining: notifier.monthlyPassDaysRemaining,
+              seasonClaimable: notifier.seasonPassClaimableEssence,
+              seasonDaysRemaining: notifier.seasonPassDaysRemaining,
+              seasonWeeklyAvailable: notifier.seasonPassWeeklyAvailable,
+              onClaimMonthly: () {
+                final amount =
+                    ref.read(gameProvider.notifier).claimMonthlyPassEssence();
+                _toast(
+                  context,
+                  amount > 0 ? '정수 $amount개를 수령했어요' : '오늘 받을 정수가 없어요',
+                );
+              },
+              onClaimSeasonDaily: () {
+                final amount = ref
+                    .read(gameProvider.notifier)
+                    .claimSeasonPassDailyEssence();
+                _toast(
+                  context,
+                  amount > 0 ? '정수 $amount개를 수령했어요' : '오늘 받을 정수가 없어요',
+                );
+              },
+              onClaimSeasonWeekly: () {
+                final amount = ref
+                    .read(gameProvider.notifier)
+                    .claimSeasonPassWeeklyEssence();
+                _toast(
+                  context,
+                  amount > 0 ? '주간 보너스 정수 $amount개' : '아직 받을 수 없어요',
+                );
+              },
+            ),
+          for (final section in sections)
+            if (section.products.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _StoreSection(section: section, notifier: notifier, ref: ref),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreHeaderPanel extends StatelessWidget {
+  final int essence;
+  final String monthlyLabel;
+  final String seasonLabel;
+  final String adLabel;
+
+  const _StoreHeaderPanel({
+    required this.essence,
+    required this.monthlyLabel,
+    required this.seasonLabel,
+    required this.adLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.coral.withValues(alpha: 0.22),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.deepCoral.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.storefront,
+                  color: AppColors.deepCoral,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '상점',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '정수, 패스, 패키지',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.58),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _EssencePill(amount: essence),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StoreBadge(
+                label: monthlyLabel,
+                icon: Icons.calendar_month,
+                color: Colors.teal.shade700,
+              ),
+              _StoreBadge(
+                label: seasonLabel,
+                icon: Icons.workspace_premium,
+                color: const Color(0xFF7E57C2),
+              ),
+              _StoreBadge(
+                label: adLabel,
+                icon: Icons.block,
+                color: const Color(0xFF546E7A),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EssencePill extends StatelessWidget {
+  final int amount;
+  const _EssencePill({required this.amount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.teal.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.diamond, color: Colors.teal.shade700, size: 16),
+          const SizedBox(width: 5),
+          Text(
+            '$amount',
+            style: TextStyle(
+              color: Colors.teal.shade800,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PassRewardPanel extends StatelessWidget {
+  final int monthlyClaimable;
+  final int monthlyDaysRemaining;
+  final int seasonClaimable;
+  final int seasonDaysRemaining;
+  final bool seasonWeeklyAvailable;
+  final VoidCallback onClaimMonthly;
+  final VoidCallback onClaimSeasonDaily;
+  final VoidCallback onClaimSeasonWeekly;
+
+  const _PassRewardPanel({
+    required this.monthlyClaimable,
+    required this.monthlyDaysRemaining,
+    required this.seasonClaimable,
+    required this.seasonDaysRemaining,
+    required this.seasonWeeklyAvailable,
+    required this.onClaimMonthly,
+    required this.onClaimSeasonDaily,
+    required this.onClaimSeasonWeekly,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = <Widget>[
+      if (monthlyDaysRemaining > 0)
+        _ClaimCard(
+          title: '월간 보급',
+          value: monthlyClaimable > 0 ? '+$monthlyClaimable' : '완료',
+          status: 'D-$monthlyDaysRemaining',
+          icon: Icons.calendar_today,
+          color: Colors.teal.shade700,
+          enabled: monthlyClaimable > 0,
+          onPressed: onClaimMonthly,
+        ),
+      if (seasonDaysRemaining > 0)
+        _ClaimCard(
+          title: '시즌 일일',
+          value: seasonClaimable > 0 ? '+$seasonClaimable' : '완료',
+          status: 'D-$seasonDaysRemaining',
+          icon: Icons.auto_awesome,
+          color: const Color(0xFF7E57C2),
+          enabled: seasonClaimable > 0,
+          onPressed: onClaimSeasonDaily,
+        ),
+      if (seasonDaysRemaining > 0)
+        _ClaimCard(
+          title: '시즌 주간',
+          value: '+$seasonPassWeeklyEssence',
+          status: seasonWeeklyAvailable ? '수령 가능' : '대기',
+          icon: Icons.card_giftcard,
+          color: AppColors.deepCoral,
+          enabled: seasonWeeklyAvailable,
+          onPressed: onClaimSeasonWeekly,
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _StoreSectionTitle(title: '패스 보상', subtitle: '받을 수 있는 정수'),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final twoColumns = constraints.maxWidth >= 620;
+            final width = twoColumns
+                ? (constraints.maxWidth - 10) / 2
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final card in cards) SizedBox(width: width, child: card),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ClaimCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String status;
+  final IconData icon;
+  final Color color;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _ClaimCard({
+    required this.title,
+    required this.value,
+    required this.status,
+    required this.icon,
+    required this.color,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rewardText = value.startsWith('+') ? '$value 정수' : value;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$rewardText · $status',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: enabled ? onPressed : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade600,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: const Text('수령'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreSectionData {
+  final String title;
+  final String subtitle;
+  final List<PremiumProductDef> products;
+
+  const _StoreSectionData({
+    required this.title,
+    required this.subtitle,
+    required this.products,
+  });
+}
+
+class _StoreSection extends StatelessWidget {
+  final _StoreSectionData section;
+  final GameNotifier notifier;
+  final WidgetRef ref;
+
+  const _StoreSection({
+    required this.section,
+    required this.notifier,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StoreSectionTitle(title: section.title, subtitle: section.subtitle),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final twoColumns = constraints.maxWidth >= 720;
+            final gap = twoColumns ? 12.0 : 10.0;
+            final width = twoColumns
+                ? (constraints.maxWidth - gap) / 2
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: gap,
+              runSpacing: 10,
+              children: [
+                for (final product in section.products)
+                  SizedBox(
+                    width: width,
+                    child: _StoreProductCard(
+                      product: product,
+                      meta: _storeProductMeta(product.id),
+                      status: _storeProductStatus(product.id, notifier),
+                      enabled: _storeProductEnabled(product.id, notifier),
+                      onPressed: () =>
+                          _buyPremiumProduct(context, ref, product.id),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _StoreSectionTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _StoreSectionTitle({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StoreProductMeta {
+  final IconData icon;
+  final Color color;
+  final String summary;
+  final List<String> badges;
+
+  const _StoreProductMeta({
+    required this.icon,
+    required this.color,
+    required this.summary,
+    required this.badges,
+  });
+}
+
+class _StoreProductCard extends StatelessWidget {
+  final PremiumProductDef product;
+  final _StoreProductMeta meta;
+  final String status;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _StoreProductCard({
+    required this.product,
+    required this.meta,
+    required this.status,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: meta.color.withValues(alpha: 0.24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.045),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: meta.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(meta.icon, color: meta.color, size: 24),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _StoreBadge(
+                          label: status,
+                          icon: enabled ? Icons.local_offer : Icons.check,
+                          color: meta.color,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      meta.summary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                        color: onSurface.withValues(alpha: 0.62),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final badge in meta.badges)
+                _StoreBadge(label: badge, icon: Icons.check, color: meta.color),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  product.priceLabel,
+                  style: TextStyle(
+                    color: meta.color,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: enabled ? onPressed : null,
+                icon:
+                    Icon(enabled ? Icons.shopping_bag : Icons.check, size: 16),
+                label: Text(enabled ? '구매' : '보유 중'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: meta.color,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreBadge extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _StoreBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 11),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+_StoreProductMeta _storeProductMeta(String productId) {
+  return switch (productId) {
+    premiumAdRemovalProductId => const _StoreProductMeta(
+        icon: Icons.block,
+        color: Color(0xFF546E7A),
+        summary: '전면 광고 OFF · 광고 보상 즉시 수령',
+        badges: ['영구 혜택', '편의'],
+      ),
+    premiumMonthlyEssencePassProductId => _StoreProductMeta(
+        icon: Icons.calendar_month,
+        color: Colors.teal.shade700,
+        summary: '즉시 300 · 매일 120 정수',
+        badges: const ['30일', '누적 보상'],
+      ),
+    premiumStarterPackageProductId => const _StoreProductMeta(
+        icon: Icons.inventory_2,
+        color: AppColors.deepCoral,
+        summary: '정수 1,400 · SR+ 검 · 30분 부스터',
+        badges: ['초반 추천', '1회'],
+      ),
+    premiumFirstPurchaseProductId => const _StoreProductMeta(
+        icon: Icons.card_giftcard,
+        color: Color(0xFF5E35B1),
+        summary: '정수 500 · SR 확정권 · 첫 결제 보너스',
+        badges: ['한정', '1회'],
+      ),
+    premiumEssenceSmallProductId =>
+      _essenceMeta('정수 110', Colors.teal.shade600),
+    premiumEssenceMediumProductId =>
+      _essenceMeta('정수 380', const Color(0xFF00897B)),
+    premiumEssenceLargeProductId =>
+      _essenceMeta('정수 1,200', const Color(0xFF00796B)),
+    premiumEssenceXLargeProductId =>
+      _essenceMeta('정수 2,800', const Color(0xFF00695C)),
+    premiumSeasonPassProductId => const _StoreProductMeta(
+        icon: Icons.workspace_premium,
+        color: Color(0xFF7E57C2),
+        summary: '60일 매일 정수 · 주간 600 보너스',
+        badges: ['장기 효율', '패스'],
+      ),
+    premiumMasterPackageProductId => const _StoreProductMeta(
+        icon: Icons.auto_awesome,
+        color: Color(0xFFAD6800),
+        summary: '정수 7,500 · UR 검 · 보호권 10',
+        badges: ['최대 묶음', '1회'],
+      ),
+    _ => const _StoreProductMeta(
+        icon: Icons.storefront,
+        color: AppColors.coral,
+        summary: '상점 상품',
+        badges: ['상품'],
+      ),
+  };
+}
+
+_StoreProductMeta _essenceMeta(String summary, Color color) {
+  return _StoreProductMeta(
+    icon: Icons.diamond,
+    color: color,
+    summary: summary,
+    badges: const ['즉시 지급', '정수'],
+  );
+}
+
+String _storeProductStatus(String productId, GameNotifier notifier) {
+  return switch (productId) {
+    premiumAdRemovalProductId => notifier.adsRemoved ? '완료' : '영구',
+    premiumMonthlyEssencePassProductId => notifier.hasActiveMonthlyPass
+        ? 'D-${notifier.monthlyPassDaysRemaining}'
+        : '30일',
+    premiumSeasonPassProductId => notifier.hasActiveSeasonPass
+        ? 'D-${notifier.seasonPassDaysRemaining}'
+        : '60일',
+    premiumStarterPackageProductId =>
+      notifier.starterPackagePurchased ? '완료' : '1회',
+    premiumFirstPurchaseProductId =>
+      notifier.firstPurchasePackageClaimed ? '완료' : '1회',
+    premiumMasterPackageProductId =>
+      notifier.masterPackagePurchased ? '완료' : '1회',
+    _ => '즉시',
+  };
+}
+
+bool _storeProductEnabled(String productId, GameNotifier notifier) {
+  return switch (productId) {
+    premiumAdRemovalProductId => !notifier.adsRemoved,
+    premiumStarterPackageProductId => !notifier.starterPackagePurchased,
+    premiumFirstPurchaseProductId => !notifier.firstPurchasePackageClaimed,
+    premiumMasterPackageProductId => !notifier.masterPackagePurchased,
+    _ => true,
+  };
 }
 
 class _SummonView extends ConsumerWidget {

@@ -3121,6 +3121,10 @@ class GameNotifier extends Notifier<GameState> {
 
   bool get starterPackagePurchased => _save.starterPackagePurchased;
 
+  bool get firstPurchasePackageClaimed => _save.firstPurchasePackageClaimed;
+
+  bool get masterPackagePurchased => _save.masterPackagePurchased;
+
   DateTime? get monthlyPassExpiresAt => _save.monthlyPassExpiresAt;
 
   bool get hasActiveMonthlyPass {
